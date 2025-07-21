@@ -1,0 +1,189 @@
+:root {
+  /* Tema Scuro (Default) */
+
+  /* Breakpoints per la responsività */
+  --breakpoint-sm: 576px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 992px;
+  --breakpoint-xl: 1200px;
+
+  /* Colori di base */
+  --color-primary: #61dafbaa; /* Verde acqua React */
+  --color-secondary: #555;
+  --color-danger: #e06c75;
+  --color-text-light: #ffffff;
+  --color-text-dark: #202124;
+  --color-background: #282c34;
+  --color-border: #444;
+
+  /* Stili per i bottoni (esempio) */
+  --btn-primary-bg: var(--color-primary);
+  --btn-primary-text: var(--color-text-dark);
+  --btn-primary-border: var(--color-primary);
+
+  --btn-secondary-bg: transparent;
+  --btn-secondary-text: var(--color-text-light);
+  --btn-secondary-border: var(--color-secondary);
+
+  /* Stili per gli alert */
+  --alert-info-bg: #0d47a1;
+  --alert-info-text: #cff4fc;
+  --alert-info-border: #b6effb;
+
+  --alert-success-bg: #145a32;
+  --alert-success-text: var(--color-text-light);
+  --alert-success-border: #145a32;
+
+  --alert-warning-bg: #b7791f;
+  --alert-warning-text: var(--color-text-light);
+  --alert-warning-border: #b7791f;
+
+  --alert-danger-bg: #991b1b;
+  --alert-danger-text: var(--color-text-light);
+  --alert-danger-border: var(--color-danger);
+
+  /* Stili per le card */
+  --card-bg: #333333;
+  --card-color: #f0f0f0;
+  --card-border-color: var(--color-border);
+
+  /* Stili per Accordion */
+  --accordion-header-bg: #2a2a2a;
+  --accordion-header-hover-bg: #383838;
+  --accordion-panel-bg: var(--card-bg);
+  --accordion-icon-color: #a0a0a0;
+
+  /* Stili per i form */
+  --form-bg: #1a1a1a;
+  --form-color: #f0f0f0;
+  --form-border-color: #555;
+  --form-focus-border-color: var(--color-primary);
+  --form-focus-shadow-color: rgba(97, 218, 251, 0.25);
+  --form-disabled-bg: #333;
+  --form-disabled-color: #888;
+  --form-error-border-color: var(--color-danger);
+  --form-label-color: #e0e0e0;
+  --form-error-text-color: var(--color-danger);
+  --toggle-bg-off: #555;
+  --toggle-bg-on: var(--color-primary);
+  --toggle-handle-bg: #fff;
+
+  /* Stili per CodeBlock */
+  --code-bg: #1e1e1e;
+  --code-color: #d4d4d4;
+}
+
+/* Tema Chiaro */
+:root[data-theme="light"] {
+  /* Colori di base */
+  --color-primary: #007bff; /* Blu Bootstrap */
+  --color-secondary: #6c757d;
+  --color-danger: #dc3545;
+  --color-text-light: #212529; /* Testo scuro su sfondo chiaro */
+  --color-text-dark: #f8f9fa; /* Testo chiaro su elementi primari */
+  --color-background: #ffffff;
+  --color-border: #dee2e6;
+
+  /* Stili per i bottoni */
+  --btn-primary-bg: var(--color-primary);
+  --btn-primary-text: #ffffff;
+  --btn-primary-border: var(--color-primary);
+
+  --btn-secondary-bg: transparent;
+  --btn-secondary-text: #212529;
+  --btn-secondary-border: var(--color-secondary);
+
+  /* Stili per gli alert */
+  --alert-info-bg: #cce5ff;
+  --alert-info-text: #004085;
+  --alert-info-border: #b8daff;
+  --alert-success-bg: #d4edda;
+  --alert-success-text: #155724;
+  --alert-success-border: #c3e6cb;
+  --alert-warning-bg: #fff3cd;
+  --alert-warning-text: #856404;
+  --alert-warning-border: #ffeeba;
+  --alert-danger-bg: #f8d7da;
+  --alert-danger-text: #721c24;
+  --alert-danger-border: #f5c6cb;
+
+  /* Stili per le card */
+  --card-bg: #ffffff;
+  --card-color: #212529;
+  --card-border-color: var(--color-border);
+
+  /* Stili per Accordion */
+  --accordion-header-bg: #f7f7f7;
+  --accordion-header-hover-bg: #e9e9e9;
+  --accordion-panel-bg: var(--card-bg);
+  --accordion-icon-color: #6c757d;
+
+  /* Stili per i form */
+  --form-bg: #f8f9fa;
+  --form-color: #495057;
+  --form-border-color: #ced4da;
+  --form-focus-border-color: #80bdff;
+  --form-focus-shadow-color: rgba(0, 123, 255, 0.25);
+  --form-disabled-bg: #e9ecef;
+  --form-disabled-color: #6c757d;
+  --form-label-color: #212529;
+  --toggle-bg-off: #ced4da;
+
+  /* Stili per CodeBlock */
+  --code-bg: #f6f8fa;
+  --code-color: #24292e;
+}
+
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1rem;
+  text-align: left;
+  width: 100%; /* Assicura che il container occupi tutta la larghezza disponibile */
+}
+
+.app-container {
+  padding-top: 4rem;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text-light);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}

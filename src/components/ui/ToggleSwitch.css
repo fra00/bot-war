@@ -1,0 +1,82 @@
+.toggle-switch-wrapper {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none; /* Evita la selezione del testo del label */
+}
+
+.toggle-switch-label {
+  margin-right: 0.75rem;
+  font-size: 1em;
+  color: var(--form-label-color);
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px; /* Larghezza del contenitore */
+  height: 28px; /* Altezza del contenitore */
+  flex-shrink: 0;
+}
+
+/* Nasconde il checkbox di default */
+.toggle-switch-checkbox {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* Lo sfondo dello switch */
+.toggle-switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--toggle-bg-off);
+  border-radius: 28px;
+  transition: background-color 0.2s ease-in-out;
+}
+
+/* Il cerchio che si muove */
+.toggle-switch-slider::before {
+  position: absolute;
+  content: "";
+  height: 20px; /* Diametro del cerchio */
+  width: 20px; /* Diametro del cerchio */
+  left: 4px;
+  bottom: 4px;
+  background-color: var(--toggle-handle-bg);
+  border-radius: 50%;
+  transition: transform 0.2s ease-in-out;
+}
+
+/* Stili quando il checkbox è checked */
+.toggle-switch-checkbox:checked + .toggle-switch-slider {
+  background-color: var(--toggle-bg-on);
+}
+
+.toggle-switch-checkbox:checked + .toggle-switch-slider::before {
+  transform: translateX(22px); /* Sposta il cerchio a destra */
+}
+
+/* Stile per il focus (accessibilità) */
+.toggle-switch-checkbox:focus-visible + .toggle-switch-slider {
+  box-shadow: 0 0 0 2px var(--form-bg), 0 0 0 4px var(--form-focus-border-color);
+}
+
+/* Stili per lo stato disabilitato */
+.toggle-switch-wrapper:has(.toggle-switch-checkbox:disabled) {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.toggle-switch-wrapper:has(.toggle-switch-checkbox:disabled) .toggle-switch-label {
+  color: var(--form-disabled-color);
+}
+
+.toggle-switch-checkbox:disabled + .toggle-switch-slider {
+  background-color: var(--form-disabled-bg);
+  cursor: not-allowed;
+}
