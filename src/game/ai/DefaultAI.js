@@ -10,7 +10,7 @@ const DefaultAI = {
 
   PROJECTILE_MAX_RANGE: 400, // Portata massima dei proiettili (dovrebbe corrispondere a Projectile.js)
   AGGRESSIVE_DISTANCE: 350, // Distanza sopra la quale si avvicina
-  SAFE_DISTANCE: 100, // Distanza sotto la quale si allontana
+  SAFE_DISTANCE: 60, // Distanza sotto la quale si allontana
 
   AGGRESSIVE_SPEED: 3, // Velocità di avvicinamento
   RETREAT_SPEED: -2.5, // Velocità di arretramento
@@ -27,6 +27,7 @@ const DefaultAI = {
   isEvading: false,
   evadeCounter: 0,
   evadeDirection: 1,
+  lastEvadeDirection: 0, // Per tenere traccia della direzione dell'ultima evasione
   // Stato per la manovra di evitamento ostacoli
   isAvoiding: false,
   avoidanceCounter: 0,
@@ -34,6 +35,8 @@ const DefaultAI = {
   isRepositioning: false,
   repositionDirection: 1,
   lineOfSightClear: true, // linea di tiro chiara inizialmente
+  // Stato per l'ultima posizione nota del nemico
+  lastKnownEnemyPosition: null,
 
   /**
    * @param {Object} api - L'API del robot per interagire con il gioco.
@@ -44,10 +47,15 @@ const DefaultAI = {
     const events = api.getEvents();
 
     // --- Logica Normale (Cacciatore Tattico) ---
-    const scan = api.scan() ?? {};
-    const targetAngle = scan.angle;
-    const targetDistance = scan.distance;
-    const normalizedAngle = targetAngle > 180 ? targetAngle - 360 : targetAngle;
+    const scan = api.scan();
+    const targetAngle = scan?.angle;
+    const targetDistance = scan?.distance;
+    const normalizedAngle =
+      targetAngle != null
+        ? targetAngle > 180
+          ? targetAngle - 360
+          : targetAngle
+        : null;
 
     // Controlla se il robot è stato colpito usando il sistema di eventi.
     const wasHit = events.some((e) => e.type === "PROJECTILE_HIT_ROBOT");
@@ -75,7 +83,14 @@ const DefaultAI = {
       this.isEvading = true;
       this.evadeCounter = this.EVASION_TICKS;
       // Scegli una direzione di schivata casuale (destra o sinistra)
-      this.evadeDirection = Math.random() < 0.5 ? 1 : -1;
+      this.evadeDirection =
+        this.lastEvadeDirection !== 0
+          ? this.lastEvadeDirection
+          : Math.random() < 0.5
+          ? 1
+          : -1;
+      this.lastEvadeDirection = this.evadeDirection; // Aggiorna la direzione dell'ultima evasione
+      this.lineOfSightClear = false; // Imposta la visibilità a falsa per evitare di sparare durante l'evasione
     }
 
     if (this.isEvading) {
@@ -102,9 +117,21 @@ const DefaultAI = {
         this.evadeCounter = 0;
       }
       return; // Salta la logica normale durante l'evasione
+    } else {
+      this.lastEvadeDirection = 0; // Reset della direzione di evasione
     }
 
-    if (scan) {
+    if (normalizedAngle) {
+      // --- 1. Aggiorna l'ultima posizione nota del nemico ---
+      // Calcoliamo le coordinate assolute del nemico e le salviamo.
+      const absoluteAngleToEnemy =
+        (myState.rotation + normalizedAngle) * (Math.PI / 180);
+      const enemyX =
+        myState.x + targetDistance * Math.cos(absoluteAngleToEnemy);
+      const enemyY =
+        myState.y + targetDistance * Math.sin(absoluteAngleToEnemy);
+      this.lastKnownEnemyPosition = { x: enemyX, y: enemyY };
+
       if (normalizedAngle > 1) {
         api.turnRight(Math.abs(normalizedAngle * 0.5));
       } else if (normalizedAngle < -1) {
@@ -145,11 +172,56 @@ const DefaultAI = {
         // Se è troppo vicino, allontanati per mantenere la distanza di sicurezza.
         api.moveForward(this.RETREAT_SPEED);
       }
+    } else if (this.lastKnownEnemyPosition) {
+      // --- Logica di Ricerca Intelligente: vai verso l'ultima posizione nota ---
+      const dx = this.lastKnownEnemyPosition.x - myState.x;
+      const dy = this.lastKnownEnemyPosition.y - myState.y;
+      const distanceToLastPosition = Math.sqrt(dx * dx + dy * dy);
+
+      // Se siamo abbastanza vicini, considera la posizione raggiunta e torna a cercare.
+      if (distanceToLastPosition < 20) {
+        this.lastKnownEnemyPosition = null; // Resetta la posizione
+        api.turnRight(this.SEARCH_TURN_ANGLE * 4); // Gira per cercare di nuovo
+      } else {
+        // Altrimenti, muoviti verso l'ultima posizione nota.
+        const angleToTarget = Math.atan2(dy, dx) * (180 / Math.PI);
+        let relativeAngle = angleToTarget - myState.rotation;
+
+        while (relativeAngle <= -180) relativeAngle += 360;
+        while (relativeAngle > 180) relativeAngle -= 360;
+
+        if (relativeAngle > 1) {
+          api.turnRight(Math.min(relativeAngle, this.SEARCH_TURN_ANGLE * 2));
+        } else if (relativeAngle < -1) {
+          api.turnLeft(
+            Math.min(Math.abs(relativeAngle), this.SEARCH_TURN_ANGLE * 2)
+          );
+        }
+        api.moveForward(this.SEARCH_SPEED);
+      }
     } else {
-      // --- Logica di Ricerca ---
-      // La vecchia logica anti-muro è stata rimossa, ora gestita dal sistema proattivo.
+      // --- Logica di Ricerca di Base: vai verso il centro dell'arena ---
+      const arena = api.getArenaDimensions();
+      const centerX = arena.width / 2;
+      const centerY = arena.height / 2;
+      const dx = centerX - myState.x;
+      const dy = centerY - myState.y;
+      if (Math.sqrt(dx * dx + dy * dy) < 50) {
+        api.turnRight(this.SEARCH_TURN_ANGLE * 2);
+        return;
+      }
+      const angleToCenter = Math.atan2(dy, dx) * (180 / Math.PI);
+      let relativeAngle = angleToCenter - myState.rotation;
+      while (relativeAngle <= -180) relativeAngle += 360;
+      while (relativeAngle > 180) relativeAngle -= 360;
+      if (relativeAngle > 1) {
+        api.turnRight(Math.min(relativeAngle, this.SEARCH_TURN_ANGLE * 2));
+      } else if (relativeAngle < -1) {
+        api.turnLeft(
+          Math.min(Math.abs(relativeAngle), this.SEARCH_TURN_ANGLE * 2)
+        );
+      }
       api.moveForward(this.SEARCH_SPEED);
-      api.turnRight(this.SEARCH_TURN_ANGLE);
     }
   },
 };

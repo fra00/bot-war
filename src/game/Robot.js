@@ -37,7 +37,18 @@ class Robot {
    * @param {Object} options.motor - Componente motore.
    * @param {Object} options.radar - Componente radar.
    */
-  constructor({ id, x, y, ai, rotation, armor, cannon, battery, motor, radar }) {
+  constructor({
+    id,
+    x,
+    y,
+    ai,
+    rotation,
+    armor,
+    cannon,
+    battery,
+    motor,
+    radar,
+  }) {
     /** @type {string} */
     this.id = id;
     /** @type {number} */
@@ -62,7 +73,11 @@ class Robot {
 
     // Calcolo del peso
     this.totalWeight =
-      armor.weight + cannon.weight + battery.weight + motor.weight + radar.weight;
+      armor.weight +
+      cannon.weight +
+      battery.weight +
+      motor.weight +
+      radar.weight;
     this.isOverweight = this.totalWeight > this.motor.maxWeight;
 
     /** @type {Object} */
@@ -134,23 +149,6 @@ class Robot {
     const isLineOfSightClear = (startPoint, endPoint, projectileRadius) => {
       const { width, height, obstacles } = gameState.arena;
 
-      // 1. Controlla i muri dell'arena, tenendo conto del raggio del proiettile.
-      // Definiamo un'area "sicura" all'interno della quale il centro del proiettile può muoversi.
-      const safeArea = {
-        x: projectileRadius,
-        y: projectileRadius,
-        width: width - 2 * projectileRadius,
-        height: height - 2 * projectileRadius,
-      };
-
-      // Se il punto di partenza o di arrivo è fuori dall'area sicura,
-      // la linea di tiro è ostruita dai muri. Poiché un segmento di linea
-      // con entrambi gli estremi dentro un rettangolo è interamente contenuto,
-      // questo controllo è sufficiente per i muri.
-      if (!isPointInRect(startPoint, safeArea) || !isPointInRect(endPoint, safeArea)) {
-        return false;
-      }
-
       // 2. Controlla gli ostacoli interni (logica esistente)
       for (const obstacle of obstacles) {
         if (
@@ -174,7 +172,9 @@ class Robot {
      */
     const getEvents = () => {
       // Filtra gli eventi per restituire solo quelli che riguardano questo robot.
-      return gameState.events.filter(e => e.ownerId === this.id || e.targetId === this.id);
+      return gameState.events.filter(
+        (e) => e.ownerId === this.id || e.targetId === this.id
+      );
     };
 
     return {
