@@ -7,6 +7,7 @@ import {
   standardBattery,
   standardCannon,
   standardMotor,
+  standardRadar,
 } from "../game/components.js";
 
 describe("Robot API", () => {
@@ -32,6 +33,7 @@ describe("Robot API", () => {
       cannon: { ...standardCannon },
       battery: { ...standardBattery },
       motor: { ...standardMotor },
+      radar: { ...standardRadar },
     };
 
     robot = new Robot({
@@ -291,6 +293,39 @@ describe("Robot API", () => {
       gameState.events = [relevantEvent1, irrelevantEvent, relevantEvent2];
       api = robot.getApi(gameState);
       expect(api.getEvents()).toEqual([relevantEvent1, relevantEvent2]);
+    });
+  });
+
+  describe("scan", () => {
+    it("should return null if no other robot is present", () => {
+      setup();
+      // Lo stato del gioco in setup contiene solo il robot del giocatore
+      const realGameState = { ...gameState, robots: [robot.getState()] };
+      api = robot.getApi(realGameState);
+      expect(api.scan()).toBeNull();
+    });
+
+    it("should return enemy data if within radar range", () => {
+      setup(); // Il robot è a 400, 300
+      const enemyState = { id: "opponent", x: 500, y: 300 }; // Distanza 100
+      robot.radar.range = 200; // Il nemico è all'interno del raggio
+
+      const realGameState = { ...gameState, robots: [robot.getState(), enemyState] };
+      api = robot.getApi(realGameState);
+
+      const scanResult = api.scan();
+      expect(scanResult).not.toBeNull();
+      expect(scanResult.distance).toBeCloseTo(100);
+    });
+
+    it("should return null if enemy is outside radar range", () => {
+      setup(); // Il robot è a 400, 300
+      const enemyState = { id: "opponent", x: 800, y: 300 }; // Distanza 400
+      robot.radar.range = 200; // Il nemico è fuori dal raggio
+
+      const realGameState = { ...gameState, robots: [robot.getState(), enemyState] };
+      api = robot.getApi(realGameState);
+      expect(api.scan()).toBeNull();
     });
   });
 });

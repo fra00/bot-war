@@ -58,6 +58,7 @@ class Game {
       cannon: { ...components.standardCannon },
       battery: { ...components.standardBattery },
       motor: { ...components.standardMotor },
+      radar: { ...components.standardRadar },
     };
 
     const opponentLoadout = {
@@ -65,6 +66,7 @@ class Game {
       cannon: { ...components.standardCannon },
       battery: { ...components.standardBattery },
       motor: { ...components.standardMotor },
+      radar: { ...components.standardRadar },
     };
 
     /** @type {Array<Robot>} */

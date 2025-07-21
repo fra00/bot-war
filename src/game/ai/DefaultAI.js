@@ -10,7 +10,7 @@ const DefaultAI = {
 
   PROJECTILE_MAX_RANGE: 400, // Portata massima dei proiettili (dovrebbe corrispondere a Projectile.js)
   AGGRESSIVE_DISTANCE: 350, // Distanza sopra la quale si avvicina
-  SAFE_DISTANCE: 150, // Distanza sotto la quale si allontana
+  SAFE_DISTANCE: 100, // Distanza sotto la quale si allontana
 
   AGGRESSIVE_SPEED: 3, // Velocità di avvicinamento
   RETREAT_SPEED: -2.5, // Velocità di arretramento
@@ -119,8 +119,12 @@ const DefaultAI = {
         if (Math.abs(normalizedAngle) < fireTolerance) {
           const absoluteAngleToEnemy =
             (myState.rotation + normalizedAngle) * (Math.PI / 180);
-          const endX = myState.x + this.PROJECTILE_MAX_RANGE * Math.cos(absoluteAngleToEnemy);
-          const endY = myState.y + this.PROJECTILE_MAX_RANGE * Math.sin(absoluteAngleToEnemy);
+          const endX =
+            myState.x +
+            this.PROJECTILE_MAX_RANGE * Math.cos(absoluteAngleToEnemy);
+          const endY =
+            myState.y +
+            this.PROJECTILE_MAX_RANGE * Math.sin(absoluteAngleToEnemy);
 
           this.lineOfSightClear = api.isLineOfSightClear(
             { x: myState.x, y: myState.y },

@@ -35,8 +35,9 @@ class Robot {
    * @param {Object} options.cannon - Componente cannone.
    * @param {Object} options.battery - Componente batteria.
    * @param {Object} options.motor - Componente motore.
+   * @param {Object} options.radar - Componente radar.
    */
-  constructor({ id, x, y, ai, rotation, armor, cannon, battery, motor }) {
+  constructor({ id, x, y, ai, rotation, armor, cannon, battery, motor, radar }) {
     /** @type {string} */
     this.id = id;
     /** @type {number} */
@@ -52,6 +53,7 @@ class Robot {
     this.cannon = cannon;
     this.battery = battery;
     this.motor = motor;
+    this.radar = radar;
 
     // Stato derivato dai componenti
     this.hullHp = 100; // La vita dello "scafo" è fissa
@@ -60,7 +62,7 @@ class Robot {
 
     // Calcolo del peso
     this.totalWeight =
-      armor.weight + cannon.weight + battery.weight + motor.weight;
+      armor.weight + cannon.weight + battery.weight + motor.weight + radar.weight;
     this.isOverweight = this.totalWeight > this.motor.maxWeight;
 
     /** @type {Object} */
@@ -191,6 +193,12 @@ class Robot {
           const dx = enemy.x - this.x;
           const dy = enemy.y - this.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
+
+          // Se il nemico è fuori dalla portata del radar, non viene rilevato.
+          if (distance > this.radar.range) {
+            return null;
+          }
+
           const angle =
             ((Math.atan2(dy, dx) * 180) / Math.PI - this.rotation + 360) % 360;
           return { distance, angle };
@@ -292,6 +300,7 @@ class Robot {
       energy: this.battery.energy,
       totalWeight: this.totalWeight,
       isOverweight: this.isOverweight,
+      radarRange: this.radar.range,
     };
   }
 }

@@ -1,135 +1,82 @@
 import React from "react";
-import PropTypes from "prop-types";
 
-const RobotShape = ({ robot }) => {
-  const color = robot.id === "player" ? "cyan" : "tomato";
-  const cannonColor = robot.id === "player" ? "#00ffff" : "#ff6347";
-
-  return (
-    <g
-      transform={`translate(${robot.x}, ${robot.y}) rotate(${robot.rotation})`}
-    >
-      {/* Corpo del robot */}
-      <circle
-        cx="0"
-        cy="0"
-        r="15"
-        fill={color}
-        stroke="black"
-        strokeWidth="1"
-      />
-      {/* Cannone del robot */}
-      <rect x="10" y="-2.5" width="15" height="5" fill={cannonColor} />
-      {/* "Occhio" o sensore */}
-      <circle cx="5" cy="0" r="3" fill="white" />
-      <circle cx="5" cy="0" r="1.5" fill="black" />
-    </g>
-  );
-};
-
-RobotShape.propTypes = {
-  robot: PropTypes.shape({
-    id: PropTypes.string.isRequired,
-    x: PropTypes.number.isRequired,
-    y: PropTypes.number.isRequired,
-    rotation: PropTypes.number.isRequired,
-  }).isRequired,
-};
-
-const ProjectileShape = ({ projectile }) => (
-  <circle cx={projectile.x} cy={projectile.y} r="3" fill="orange" />
-);
-
-ProjectileShape.propTypes = {
-  projectile: PropTypes.shape({
-    x: PropTypes.number.isRequired,
-    y: PropTypes.number.isRequired,
-  }).isRequired,
-};
-
-const ObstacleShape = ({ obstacle }) => (
-  <rect
-    x={obstacle.x}
-    y={obstacle.y}
-    width={obstacle.width}
-    height={obstacle.height}
-    fill="#555"
-    stroke="#333"
-    strokeWidth="2"
-    rx="4" // Angoli arrotondati
-  />
-);
-
-ObstacleShape.propTypes = {
-  obstacle: PropTypes.object.isRequired,
-};
-
-const Arena = ({ gameState }) => {
-  if (!gameState) {
-    return null;
+/**
+ * Componente che renderizza l'arena di gioco, i robot, i proiettili e gli ostacoli.
+ * @param {object} props
+ * @param {import('../../game/Game.js').GameState} props.gameState - Lo stato attuale del gioco.
+ */
+function Arena({ gameState }) {
+  if (!gameState || !gameState.arena) {
+    return null; // Non renderizzare nulla se lo stato non è pronto
   }
 
-  const { arena, robots, projectiles } = gameState;
+  const { width, height, obstacles } = gameState.arena;
+  const { robots, projectiles } = gameState;
 
   return (
-    <div className="relative">
-      {/* Arena di gioco SVG */}
-      <svg
-        width={arena.width}
-        height={arena.height}
-        style={{
-          backgroundColor: "#282c34",
-          border: "2px solid #444",
-          borderRadius: "8px",
-        }}
-      >
+    <div
+      className="relative bg-gray-800 border-2 border-gray-600"
+      style={{ width, height }}
+    >
+      <svg width={width} height={height} className="absolute top-0 left-0">
         <defs>
-          <pattern
-            id="grid"
-            width="50"
-            height="50"
-            patternUnits="userSpaceOnUse"
-          >
-            <path
-              d="M 50 0 L 0 0 0 50"
-              fill="none"
-              stroke="#444"
-              strokeWidth="1"
-            />
-          </pattern>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.5" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
-        <rect width="100%" height="100%" fill="url(#grid)" />
 
         {/* Renderizza gli ostacoli */}
-        {arena.obstacles.map((obstacle, index) => (
-          <ObstacleShape key={`obs-${index}`} obstacle={obstacle} />
+        {obstacles.map((obstacle) => (
+          <rect
+            key={obstacle.id}
+            x={obstacle.x}
+            y={obstacle.y}
+            width={obstacle.width}
+            height={obstacle.height}
+            fill="#666"
+            stroke="#444"
+            strokeWidth="2"
+          />
         ))}
+
+        {/* Renderizza i robot e il loro raggio radar */}
+        {robots.map((robot) => {
+          const angleRad = (robot.rotation * Math.PI) / 180;
+          const lineEndX = robot.x + 20 * Math.cos(angleRad);
+          const lineEndY = robot.y + 20 * Math.sin(angleRad);
+          const isPlayer = robot.id === "player";
+
+          return (
+            <g key={robot.id}>
+              {/* Cerchio del raggio del radar */}
+              <circle
+                cx={robot.x}
+                cy={robot.y}
+                r={robot.radarRange}
+                fill={isPlayer ? "rgba(97, 218, 251, 0.05)" : "rgba(224, 108, 117, 0.05)"}
+                stroke={isPlayer ? "rgba(97, 218, 251, 0.2)" : "rgba(224, 108, 117, 0.2)"}
+                strokeWidth="1"
+                strokeDasharray="4 4"
+              />
+              {/* Corpo del robot */}
+              <circle cx={robot.x} cy={robot.y} r={15} fill={isPlayer ? "#61dafb" : "#e06c75"} stroke="#fff" strokeWidth="2" style={{ filter: "url(#glow)" }} />
+              {/* Linea di direzione */}
+              <line x1={robot.x} y1={robot.y} x2={lineEndX} y2={lineEndY} stroke="#fff" strokeWidth="3" />
+            </g>
+          );
+        })}
 
         {/* Renderizza i proiettili */}
         {projectiles.map((p) => (
-          <ProjectileShape key={p.id} projectile={p} />
-        ))}
-
-        {/* Renderizza i robot */}
-        {robots.map((robot) => (
-          <RobotShape key={robot.id} robot={robot} />
+          <circle key={p.id} cx={p.x} cy={p.y} r={3} fill="#f9c74f" style={{ filter: "url(#glow)" }} />
         ))}
       </svg>
     </div>
   );
-};
-
-Arena.propTypes = {
-  gameState: PropTypes.shape({
-    arena: PropTypes.shape({
-      width: PropTypes.number,
-      height: PropTypes.number,
-      obstacles: PropTypes.array,
-    }).isRequired,
-    robots: PropTypes.array.isRequired,
-    projectiles: PropTypes.array.isRequired,
-    status: PropTypes.string,
-  }).isRequired,
-};
+}
 
 export default Arena;

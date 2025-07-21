@@ -31,3 +31,10 @@ export const standardMotor = {
   maxWeight: 75,
   energyCostPerMove: 0.2, // energia per unità di velocità
 };
+
+// --- Componenti Radar ---
+export const standardRadar = {
+  name: "Standard Radar",
+  range: 300,
+  weight: 10,
+};
