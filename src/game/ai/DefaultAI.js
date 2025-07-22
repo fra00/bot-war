@@ -6,16 +6,16 @@ const DefaultAI = {
   // --- Costanti per il bilanciamento del comportamento ---
   EVASION_TICKS: 12, // Per quanti tick dura la manovra evasiva
   EVASION_TURN_ANGLE: 90, // Di quanti gradi gira quando schiva
-  EVASION_BACKWARD_SPEED: -3, // Velocità di arretramento durante la schivata
+  EVASION_BACKWARD_PERCENT: -100, // Percentuale di velocità di arretramento durante la schivata
 
   PROJECTILE_MAX_RANGE: 400, // Portata massima dei proiettili (dovrebbe corrispondere a Projectile.js)
   AGGRESSIVE_DISTANCE: 350, // Distanza sopra la quale si avvicina
   SAFE_DISTANCE: 60, // Distanza sotto la quale si allontana
 
-  AGGRESSIVE_SPEED: 3, // Velocità di avvicinamento
-  RETREAT_SPEED: -2.5, // Velocità di arretramento
+  AGGRESSIVE_PERCENT: 100, // Percentuale di velocità di avvicinamento
+  RETREAT_PERCENT: -85, // Percentuale di velocità di arretramento
 
-  SEARCH_SPEED: 1.5, // Velocità durante la ricerca
+  SEARCH_PERCENT: 50, // Percentuale di velocità durante la ricerca
   SEARCH_TURN_ANGLE: 5, // Angolo di virata durante la ricerca
 
   // Costanti per l'evitamento degli ostacoli
@@ -68,7 +68,7 @@ const DefaultAI = {
       return;
     }
     if (this.isAvoiding && this.avoidanceCounter < 30) {
-      api.moveForward(this.AGGRESSIVE_SPEED);
+      api.moveForward(this.AGGRESSIVE_PERCENT);
       this.avoidanceCounter++;
     }
     if (this.avoidanceCounter >= 30) {
@@ -108,7 +108,7 @@ const DefaultAI = {
         this.lineOfSightClear = true; // Reset della visibilità
       } else {
         // Tick successivi: arretra per creare distanza.
-        api.moveForward(this.EVASION_BACKWARD_SPEED);
+        api.moveForward(this.EVASION_BACKWARD_PERCENT);
       }
 
       this.evadeCounter--;
@@ -167,10 +167,10 @@ const DefaultAI = {
 
       if (targetDistance > this.AGGRESSIVE_DISTANCE) {
         // Se il nemico è quasi fuori portata o fuori portata, avvicinati aggressivamente.
-        api.moveForward(this.AGGRESSIVE_SPEED);
+        api.moveForward(this.AGGRESSIVE_PERCENT);
       } else if (targetDistance < this.SAFE_DISTANCE) {
         // Se è troppo vicino, allontanati per mantenere la distanza di sicurezza.
-        api.moveForward(this.RETREAT_SPEED);
+        api.moveForward(this.RETREAT_PERCENT);
       }
     } else if (this.lastKnownEnemyPosition) {
       // --- Logica di Ricerca Intelligente: vai verso l'ultima posizione nota ---
@@ -197,7 +197,7 @@ const DefaultAI = {
             Math.min(Math.abs(relativeAngle), this.SEARCH_TURN_ANGLE * 2)
           );
         }
-        api.moveForward(this.SEARCH_SPEED);
+        api.moveForward(this.SEARCH_PERCENT);
       }
     } else {
       // --- Logica di Ricerca di Base: vai verso il centro dell'arena ---
@@ -221,7 +221,7 @@ const DefaultAI = {
           Math.min(Math.abs(relativeAngle), this.SEARCH_TURN_ANGLE * 2)
         );
       }
-      api.moveForward(this.SEARCH_SPEED);
+      api.moveForward(this.SEARCH_PERCENT);
     }
   },
 };

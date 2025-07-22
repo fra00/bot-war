@@ -179,7 +179,8 @@ class Robot {
 
     return {
       // Azioni di movimento
-      moveForward: (speed = 1) => setAction("MOVE_FORWARD", { speed }),
+      moveForward: (percentage = 100) =>
+        setAction("MOVE_FORWARD", { percentage }),
       turnLeft: (degrees = 5) => setAction("TURN_LEFT", { degrees }),
       turnRight: (degrees = 5) => setAction("TURN_RIGHT", { degrees }),
 

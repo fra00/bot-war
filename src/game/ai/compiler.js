@@ -27,7 +27,7 @@ export const compileAI = (code) => {
   try {
     // Crea un'API fittizia completa per il test.
     const mockApi = {
-      moveForward: () => {},
+      moveForward: (percentage) => {},
       turnLeft: () => {},
       turnRight: () => {},
       fire: () => {},

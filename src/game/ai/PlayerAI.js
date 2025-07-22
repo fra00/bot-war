@@ -4,7 +4,7 @@ const initialPlayerCode = `// IA "Cacciatore Tattico" con stato.
 // Puoi aggiungere altre proprietà all'oggetto per mantenere uno stato tra i tick.
 //
 // API disponibili:
-// api.moveForward(speed)
+// api.moveForward(percentage) // Muove il bot in avanti (100%) o indietro (-100%)
 // api.turnLeft(degrees)
 // api.turnRight(degrees)
 // api.fire()
@@ -16,16 +16,16 @@ const initialPlayerCode = `// IA "Cacciatore Tattico" con stato.
   // --- Costanti per il bilanciamento del comportamento ---
   EVASION_TICKS: 12, // Per quanti tick dura la manovra evasiva
   EVASION_TURN_ANGLE: 90, // Di quanti gradi gira quando schiva
-  EVASION_BACKWARD_SPEED: -3, // Velocità di arretramento durante la schivata
+  EVASION_BACKWARD_PERCENT: -100, // Percentuale di velocità per la schivata
 
   PROJECTILE_MAX_RANGE: 450, // Portata massima dei proiettili (da components.js)
   AGGRESSIVE_DISTANCE: 350, // Distanza sopra la quale si avvicina
   SAFE_DISTANCE: 150, // Distanza sotto la quale si allontana
 
-  AGGRESSIVE_SPEED: 3, // Velocità di avvicinamento
-  RETREAT_SPEED: -2.5, // Velocità di arretramento
+  AGGRESSIVE_PERCENT: 100, // Percentuale di velocità per l'avvicinamento
+  RETREAT_PERCENT: -85, // Percentuale di velocità per l'arretramento
 
-  SEARCH_SPEED: 1.5, // Velocità durante la ricerca
+  SEARCH_PERCENT: 50, // Percentuale di velocità per la ricerca
   SEARCH_TURN_ANGLE: 5, // Angolo di virata durante la ricerca
 
   // Costanti per l'evitamento degli ostacoli
@@ -89,7 +89,7 @@ const initialPlayerCode = `// IA "Cacciatore Tattico" con stato.
         api.turnRight(this.EVASION_TURN_ANGLE * this.evadeDirection);
         this.evadeDirection = 0;
       } else {
-        api.moveForward(this.EVASION_BACKWARD_SPEED);
+        api.moveForward(this.EVASION_BACKWARD_PERCENT);
       }
 
       this.evadeCounter--;
@@ -124,7 +124,7 @@ const initialPlayerCode = `// IA "Cacciatore Tattico" con stato.
 
       if (this.isRepositioning) {
         api.turnRight(45 * this.repositionDirection);
-        api.moveForward(this.AGGRESSIVE_SPEED);
+        api.moveForward(this.AGGRESSIVE_PERCENT);
         return;
       }
 
@@ -142,12 +142,12 @@ const initialPlayerCode = `// IA "Cacciatore Tattico" con stato.
       }
 
       if (targetDistance > this.AGGRESSIVE_DISTANCE) {
-        api.moveForward(this.AGGRESSIVE_SPEED);
+        api.moveForward(this.AGGRESSIVE_PERCENT);
       } else if (targetDistance < this.SAFE_DISTANCE) {
-        api.moveForward(this.RETREAT_SPEED);
+        api.moveForward(this.RETREAT_PERCENT);
       }
     } else {
-      api.moveForward(this.SEARCH_SPEED);
+      api.moveForward(this.SEARCH_PERCENT);
       api.turnRight(this.SEARCH_TURN_ANGLE);
     }
   },

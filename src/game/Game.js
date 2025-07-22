@@ -113,17 +113,18 @@ class Game {
 
       switch (action.type) {
         case "MOVE_FORWARD": {
-          const requestedSpeed = action.payload.speed || 0;
-          // Applica il limite di velocità del motore
-          const effectiveSpeed = Math.max(
-            -robot.motor.maxSpeed,
-            Math.min(requestedSpeed, robot.motor.maxSpeed)
+          // La velocità è ora una percentuale della velocità massima del motore.
+          const requestedPercentage = action.payload.percentage || 0;
+          // Limita la percentuale tra -100 e 100
+          const clampedPercentage = Math.max(
+            -100,
+            Math.min(requestedPercentage, 100)
           );
+          const effectiveSpeed =
+            robot.motor.maxSpeed * (clampedPercentage / 100);
 
           // Applica la penalità di velocità per il sovrappeso
-          const finalSpeed = robot.isOverweight
-            ? effectiveSpeed * 0.5
-            : effectiveSpeed;
+          const finalSpeed = robot.isOverweight ? effectiveSpeed * 0.5 : effectiveSpeed;
 
           // Consuma energia per il movimento
           const energyCost = Math.abs(finalSpeed) * robot.motor.energyCostPerMove;
