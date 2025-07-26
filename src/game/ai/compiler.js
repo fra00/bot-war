@@ -27,22 +27,30 @@ export const compileAI = (code) => {
   try {
     // Crea un'API fittizia completa per il test.
     const mockApi = {
-      moveForward: (percentage) => {},
-      turnLeft: () => {},
-      turnRight: () => {},
+      move: (distance, speedPercentage) => {},
+      moveTo: (x, y, speedPercentage) => {},
+      rotate: (percentage) => {},
+      aimAt: (x, y, speedPercentage) => {},
+      stop: () => {},
       fire: () => {},
       scan: () => null,
       getArenaDimensions: () => ({ width: 800, height: 600, obstacles: [] }),
       getState: () => ({}),
       getEvents: () => [],
-      isLineOfSightClear: () => true,
+      isLineOfSightClear: (targetPosition) => true,
       isObstacleAhead: () => false,
+      isQueueEmpty: () => true,
+      log: (level, message) => console.log(`[${level}] ${message}`),
     };
+    // Eseguiamo la validazione sull'oggetto appena creato.
+    // Questo potrebbe mutarne lo stato, il che è indesiderato per l'oggetto finale.
     aiObject.run(mockApi);
   } catch (e) {
     // Se la chiamata di prova fallisce, l'errore è nel codice dell'IA.
     // Rilanciamo un errore più descrittivo che include il messaggio originale.
     throw new Error(`Error during AI validation: ${e.message}`);
   }
-  return aiObject;
+  // Se la validazione ha successo, restituiamo una NUOVA istanza pulita dell'oggetto AI,
+  // per assicurarci che lo stato non sia stato mutato dalla chiamata di validazione.
+  return factory();
 };

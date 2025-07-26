@@ -1,71 +1,101 @@
-import React from "react";
+import React, { useState } from "react";
 import PropTypes from "prop-types";
 import Box from "../ui/Box";
 import Card from "../ui/Card";
 import CardHeader from "../ui/CardHeader";
 import ProgressBar from "../ui/ProgressBar";
-import { standardArmor, standardBattery } from "../../game/components.js";
+import Button from "../ui/Button";
+import Textarea from "../ui/Textarea";
 
-const BotInfo = ({ bot, color }) => (
-  <Card className="mb-4">
-    <CardHeader>
-      <span style={{ color }} className="font-bold capitalize">
-        {bot.id}
-      </span>
-    </CardHeader>
-    <div className="p-4 text-sm space-y-3">
-      <div>
-        <div className="flex justify-between">
-          <span>Hull</span>
-          <span>{Math.round(bot.hullHp)} / 100</span>
+const BotInfo = ({ bot, color }) => {
+  const [showLogs, setShowLogs] = useState(false);
+  const toggleLogs = () => setShowLogs(!showLogs);
+
+  return (
+    <Card className="mb-4 flex flex-col" style={{ minHeight: "260px" }}>
+      <CardHeader className="flex justify-between items-center flex-shrink-0">
+        <span style={{ color }} className="font-bold capitalize">
+          {bot.id}
+        </span>
+        <Button onClick={toggleLogs} size="small" variant="ghost">
+          {showLogs ? "Info" : "Log"}
+        </Button>
+      </CardHeader>
+      {showLogs ? (
+        <div className="p-2 flex-grow">
+          <Textarea
+            readOnly
+            value={
+              bot.logs && bot.logs.length > 0
+                ? bot.logs.reverse().join("\n")
+                : "Nessun log."
+            }
+            className="w-full h-full text-xs resize-none bg-transparent border-0 focus:ring-0"
+          />
         </div>
-        <ProgressBar progress={bot.hullHp} />
-      </div>
-      <div>
-        <div className="flex justify-between">
-          <span>Armor</span>
-          <span>
-            {Math.round(bot.armorHp)} / {standardArmor.maxHp}
-          </span>
+      ) : (
+        <div className="p-4 text-sm space-y-3">
+          <div>
+            <div className="flex justify-between">
+              <span>Hull</span>
+              <span>{Math.round(bot.hullHp)} / 100</span>
+            </div>
+            <ProgressBar progress={bot.hullHp} />
+          </div>
+          <div>
+            <div className="flex justify-between">
+              <span>Armor</span>
+              <span>
+                {bot.armorHp.toFixed(0)} / {bot.maxArmorHp}
+              </span>
+            </div>
+            <ProgressBar
+              progress={
+                bot.maxArmorHp > 0 ? (bot.armorHp / bot.maxArmorHp) * 100 : 0
+              }
+            />
+          </div>
+          <div>
+            <div className="flex justify-between">
+              <span>Energy</span>
+              <span>
+                {bot.energy.toFixed(1)} / {bot.maxEnergy}
+              </span>
+            </div>
+            <ProgressBar
+              progress={
+                bot.maxEnergy > 0 ? (bot.energy / bot.maxEnergy) * 100 : 0
+              }
+            />
+          </div>
+          <div className="pt-2">
+            <p>
+              Weight: {bot.totalWeight}{" "}
+              {bot.isOverweight && (
+                <span className="text-yellow-400 font-bold">(Overweight)</span>
+              )}
+            </p>
+          </div>
         </div>
-        <ProgressBar progress={(bot.armorHp / standardArmor.maxHp) * 100} />
-      </div>
-      <div>
-        <div className="flex justify-between">
-          <span>Energy</span>
-          <span>
-            {Math.round(bot.energy)} / {standardBattery.maxEnergy}
-          </span>
-        </div>
-        <ProgressBar progress={(bot.energy / standardBattery.maxEnergy) * 100} />
-      </div>
-      <div className="pt-2">
-        <p>
-          Weight: {bot.totalWeight}{" "}
-          {bot.isOverweight && (
-            <span className="text-yellow-400 font-bold">(Overweight)</span>
-          )}
-        </p>
-        <p>
-          Position: ({Math.round(bot.x)}, {Math.round(bot.y)})
-        </p>
-        <p>Angle: {Math.round(bot.rotation)}°</p>
-      </div>
-    </div>
-  </Card>
-);
+      )}
+    </Card>
+  );
+};
 
 BotInfo.propTypes = {
   bot: PropTypes.shape({
     id: PropTypes.string.isRequired,
     hullHp: PropTypes.number.isRequired,
     armorHp: PropTypes.number.isRequired,
+    maxArmorHp: PropTypes.number.isRequired,
     energy: PropTypes.number.isRequired,
+    maxEnergy: PropTypes.number.isRequired,
     totalWeight: PropTypes.number.isRequired,
     isOverweight: PropTypes.bool.isRequired,
     x: PropTypes.number.isRequired,
     y: PropTypes.number.isRequired,
     rotation: PropTypes.number.isRequired,
+    logs: PropTypes.arrayOf(PropTypes.string),
   }).isRequired,
   color: PropTypes.string.isRequired,
 };
@@ -88,18 +118,14 @@ const BotInfoPlaceholder = ({ name, color }) => (
       <div>
         <div className="flex justify-between">
           <span>Armor</span>
-          <span>
-            {standardArmor.maxHp} / {standardArmor.maxHp}
-          </span>
+          <span>50 / 50</span>
         </div>
         <ProgressBar progress={100} />
       </div>
       <div>
         <div className="flex justify-between">
           <span>Energy</span>
-          <span>
-            {standardBattery.maxEnergy} / {standardBattery.maxEnergy}
-          </span>
+          <span>100 / 100</span>
         </div>
         <ProgressBar progress={100} />
       </div>

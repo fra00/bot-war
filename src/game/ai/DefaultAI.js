@@ -1,227 +1,246 @@
 /**
- * IA "Cacciatore Tattico" con manovre evasive.
- * Coordina mira, movimento e fuoco, e schiva quando viene colpito.
+ * IA di default minimale.
+ * Non esegue alcuna azione. Serve come placeholder.
  */
 const DefaultAI = {
-  // --- Costanti per il bilanciamento del comportamento ---
-  EVASION_TICKS: 12, // Per quanti tick dura la manovra evasiva
-  EVASION_TURN_ANGLE: 90, // Di quanti gradi gira quando schiva
-  EVASION_BACKWARD_PERCENT: -100, // Percentuale di velocità di arretramento durante la schivata
-
-  PROJECTILE_MAX_RANGE: 400, // Portata massima dei proiettili (dovrebbe corrispondere a Projectile.js)
-  AGGRESSIVE_DISTANCE: 350, // Distanza sopra la quale si avvicina
-  SAFE_DISTANCE: 60, // Distanza sotto la quale si allontana
-
-  AGGRESSIVE_PERCENT: 100, // Percentuale di velocità di avvicinamento
-  RETREAT_PERCENT: -85, // Percentuale di velocità di arretramento
-
-  SEARCH_PERCENT: 50, // Percentuale di velocità durante la ricerca
-  SEARCH_TURN_ANGLE: 5, // Angolo di virata durante la ricerca
-
-  // Costanti per l'evitamento degli ostacoli
-  AVOIDANCE_PROBE_DISTANCE: 40, // Distanza in avanti per controllare la presenza di ostacoli
-  AVOIDANCE_TURN_ANGLE: 30, // Angolo di virata per evitare un ostacolo
-  ROBOT_RADIUS: 15, // Raggio di collisione del robot
-
-  // Stato interno per gestire le manovre evasive.
-  isEvading: false,
-  evadeCounter: 0,
-  evadeDirection: 1,
-  lastEvadeDirection: 0, // Per tenere traccia della direzione dell'ultima evasione
-  // Stato per la manovra di evitamento ostacoli
-  isAvoiding: false,
-  avoidanceCounter: 0,
-  // Stato per il riposizionamento tattico
-  isRepositioning: false,
-  repositionDirection: 1,
-  lineOfSightClear: true, // linea di tiro chiara inizialmente
-  // Stato per l'ultima posizione nota del nemico
-  lastKnownEnemyPosition: null,
+  // L'oggetto 'state' mantiene i dati tra i tick.
+  state: {},
 
   /**
    * @param {Object} api - L'API del robot per interagire con il gioco.
    */
   run: function (api) {
-    // Usa 'function' per accedere a 'this'
-    const myState = api.getState();
+    // Inizializzazione al primo tick
+    if (typeof this.state.current === "undefined") {
+      this.state.current = "SEARCHING";
+      this.state.lastKnownEnemyPosition = null;
+      this.state.evasionGraceTicks = 0; // Contatore per il periodo di grazia dell'evasione
+    }
+
+    // Decrementa il contatore del periodo di grazia per l'evasione ad ogni tick.
+    if (this.state.evasionGraceTicks > 0) {
+      this.state.evasionGraceTicks--;
+    }
+
     const events = api.getEvents();
-
-    // --- Logica Normale (Cacciatore Tattico) ---
-    const scan = api.scan();
-    const targetAngle = scan?.angle;
-    const targetDistance = scan?.distance;
-    const normalizedAngle =
-      targetAngle != null
-        ? targetAngle > 180
-          ? targetAngle - 360
-          : targetAngle
-        : null;
-
-    // Controlla se il robot è stato colpito usando il sistema di eventi.
-    const wasHit = events.some((e) => e.type === "PROJECTILE_HIT_ROBOT");
-
-    // --- controllo ostacolo ---
-    const hasObstacle = api.isObstacleAhead(this.AVOIDANCE_PROBE_DISTANCE);
-    if (hasObstacle && !this.isAvoiding) {
-      api.turnRight(this.EVASION_TURN_ANGLE);
-      this.isAvoiding = true;
-      return;
-    }
-    if (this.isAvoiding && this.avoidanceCounter < 30) {
-      api.moveForward(this.AGGRESSIVE_PERCENT);
-      this.avoidanceCounter++;
-    }
-    if (this.avoidanceCounter >= 30) {
-      this.isAvoiding = false;
-      this.avoidanceCounter = 0;
-      return; // Esce dalla funzione per evitare ulteriori azioni
+    api.log("", `Current State: ${this.state.current}`);
+    // --- Gestione delle Transizioni di Stato ---
+    // Se veniamo colpiti E non siamo nel periodo di grazia, iniziamo una nuova evasione.
+    if (
+      events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
+      this.state.evasionGraceTicks <= 0
+    ) {
+      this.state.current = "EVADING"; // Change state to EVADING
+      api.stop(); // Svuota la coda per reagire subito
+      this.state.evasionGraceTicks = 120; // Imposta un periodo di grazia (es. 60 tick)
     }
 
-    // --- Logica di Manovra Evasiva ---
-    // Se viene colpito e non sta già schivando, inizia una manovra evasiva.
-    if ((!this.lineOfSightClear || wasHit) && !this.isEvading) {
-      this.isEvading = true;
-      this.evadeCounter = this.EVASION_TICKS;
-      // Scegli una direzione di schivata casuale (destra o sinistra)
-      this.evadeDirection =
-        this.lastEvadeDirection !== 0
-          ? this.lastEvadeDirection
-          : Math.random() < 0.5
-          ? 1
-          : -1;
-      this.lastEvadeDirection = this.evadeDirection; // Aggiorna la direzione dell'ultima evasione
-      this.lineOfSightClear = false; // Imposta la visibilità a falsa per evitare di sparare durante l'evasione
+    // Se il bot si scontra con un muro, deve sbloccarsi.
+    if (
+      events.some(
+        (e) => e.type === "ACTION_STOPPED" && e.reason === "COLLISION"
+      )
+    ) {
+      this.state.current = "UNSTUCKING";
+      api.stop(); // Assicura che la coda sia pulita
     }
 
-    if (this.isEvading) {
-      // La manovra evasiva è una sequenza: prima gira, poi arretra.
-      // Usiamo evadeDirection per eseguire la virata solo il primo tick.
-      if (this.evadeDirection !== 0) {
-        // Primo tick di evasione: gira.
-        if (this.evadeDirection > 0) {
-          api.turnRight(this.EVASION_TURN_ANGLE);
-        } else {
-          api.turnLeft(this.EVASION_TURN_ANGLE);
+    if (events.some((e) => e.type === "ENEMY_DETECTED")) {
+      this.state.current = "ATTACKING";
+      api.stop(); // Interrompe la ricerca per attaccare
+    }
+
+    // --- Logica della Macchina a Stati ---
+    switch (this.state.current) {
+      case "UNSTUCKING":
+        // Se il bot è bloccato, esegue una semplice manovra per liberarsi:
+        // arretra un po' e poi gira.
+        if (api.isQueueEmpty()) {
+          api.move(-50); // Arretra di 50 pixel
+          api.rotate(90); // Gira a destra di 90 gradi
         }
-        // Imposta a 0 per assicurarsi che i prossimi tick eseguano solo il movimento.
-        this.evadeDirection = 0;
-        this.lineOfSightClear = true; // Reset della visibilità
-      } else {
-        // Tick successivi: arretra per creare distanza.
-        api.moveForward(this.EVASION_BACKWARD_PERCENT);
-      }
+        // Una volta completata la rotazione, torna a cercare per ricalcolare la situazione.
+        if (events.some((e) => e.type === "ROTATION_COMPLETED")) {
+          this.state.current = "SEARCHING";
+        }
+        break;
 
-      this.evadeCounter--;
-      if (this.evadeCounter <= 0) {
-        this.isEvading = false;
-        this.evadeCounter = 0;
-      }
-      return; // Salta la logica normale durante l'evasione
-    } else {
-      this.lastEvadeDirection = 0; // Reset della direzione di evasione
-    }
+      case "SEARCHING":
+        // Rendi lo stato di ricerca "proattivo". Controlla sempre se un nemico è visibile.
+        // Questo è più robusto che affidarsi solo all'evento ENEMY_DETECTED per la ri-acquisizione.
+        const potentialTarget = api.scan();
+        if (potentialTarget) {
+          this.state.current = "ATTACKING";
+          api.stop(); // Interrompe il pattugliamento per attaccare immediatamente.
+          break; // Esce per rieseguire la logica al prossimo tick con il nuovo stato.
+        }
 
-    if (normalizedAngle) {
-      // --- 1. Aggiorna l'ultima posizione nota del nemico ---
-      // Calcoliamo le coordinate assolute del nemico e le salviamo.
-      const absoluteAngleToEnemy =
-        (myState.rotation + normalizedAngle) * (Math.PI / 180);
-      const enemyX =
-        myState.x + targetDistance * Math.cos(absoluteAngleToEnemy);
-      const enemyY =
-        myState.y + targetDistance * Math.sin(absoluteAngleToEnemy);
-      this.lastKnownEnemyPosition = { x: enemyX, y: enemyY };
+        // Se abbiamo un'ultima posizione nota, la nostra priorità è andare lì.
+        if (this.state.lastKnownEnemyPosition) {
+          if (api.isQueueEmpty()) {
+            api.moveTo(
+              this.state.lastKnownEnemyPosition.x,
+              this.state.lastKnownEnemyPosition.y
+            );
+            // Se moveTo non ha accodato comandi (es. percorso non trovato),
+            // la coda è ancora vuota. In questo caso, abbandoniamo la caccia
+            // per evitare un loop infinito.
+            if (api.isQueueEmpty()) {
+              this.state.lastKnownEnemyPosition = null;
+            }
+          }
+          // Se arriviamo a destinazione e non troviamo ancora nulla, abbandoniamo la pista.
+          // Se il movimento verso l'ultima posizione nota è completato e non abbiamo
+          // ancora trovato il nemico, abbandoniamo la pista.
+          if (events.some((e) => e.type === "MOVE_COMPLETED")) {
+            this.state.lastKnownEnemyPosition = null;
+          }
+          break;
+        }
 
-      if (normalizedAngle > 1) {
-        api.turnRight(Math.abs(normalizedAngle * 0.5));
-      } else if (normalizedAngle < -1) {
-        api.turnLeft(Math.abs(normalizedAngle * 0.5));
-      }
+        // Se non viene trovato alcun nemico e il bot è inattivo, continua a pattugliare.
+        if (api.isQueueEmpty()) {
+          const arena = api.getArenaDimensions();
+          const randomX = Math.random() * arena.width;
+          const randomY = Math.random() * arena.height;
+          api.moveTo(randomX, randomY);
+        }
+        break;
 
-      // --- 3. Posizionamento strategico basato sulla portata ---
-      const fireTolerance = targetDistance < this.SAFE_DISTANCE ? 10 : 5;
+      case "ATTACKING":
+        const enemy = api.scan();
+        if (!enemy) {
+          // Se abbiamo un'ultima posizione nota, andiamo a caccia.
+          this.state.current = "SEARCHING";
+          api.stop(); // Interrompe le manovre di attacco per iniziare subito la caccia.
+          break;
+        }
 
-      // Se il nemico è a portata di tiro, spara.
-      if (targetDistance < this.PROJECTILE_MAX_RANGE) {
-        if (Math.abs(normalizedAngle) < fireTolerance) {
-          const absoluteAngleToEnemy =
-            (myState.rotation + normalizedAngle) * (Math.PI / 180);
-          const endX =
-            myState.x +
-            this.PROJECTILE_MAX_RANGE * Math.cos(absoluteAngleToEnemy);
-          const endY =
-            myState.y +
-            this.PROJECTILE_MAX_RANGE * Math.sin(absoluteAngleToEnemy);
+        // Aggiorniamo costantemente l'ultima posizione nota finché vediamo il nemico.
+        this.state.lastKnownEnemyPosition = { x: enemy.x, y: enemy.y };
 
-          this.lineOfSightClear = api.isLineOfSightClear(
-            { x: myState.x, y: myState.y },
-            { x: endX, y: endY },
-            3 // Projectile.RADIUS
-          );
+        // --- LOGICA DI FUOCO (ogni tick) ---
+        // Spara se la mira è buona e la linea di tiro è libera.
+        // `enemy.angle < 5` è una buona approssimazione per "essere in mira".
+        // `api.fire()` è un'azione istantanea, non interferisce con il movimento.
+        if (enemy.angle < 5 && api.isLineOfSightClear(enemy)) {
+          api.fire();
+        }
 
-          if (this.lineOfSightClear) {
-            api.fire();
+        // --- LOGICA DI MOVIMENTO (solo quando il bot è inattivo) ---
+        // Se il bot ha finito la sua sequenza di mosse precedente, ne pianifica una nuova.
+        if (api.isQueueEmpty()) {
+          const arena = api.getArenaDimensions();
+          const optimalDistance = 250;
+          const tooCloseDistance = 150;
+          const isLosClear = api.isLineOfSightClear(enemy);
+
+          // Priorità 1: Se la linea di tiro è bloccata, usa moveTo per riposizionarti.
+          if (!isLosClear) {
+            const self = api.getState();
+            const dx = enemy.x - self.x;
+            const dy = enemy.y - self.y;
+
+            // Calcola un punto di fiancheggiamento a 90 gradi e a 150px di distanza
+            const flankDistance = 150;
+            const randomDirection = Math.random() < 0.5 ? 1 : -1;
+            const perp_dx = -dy * randomDirection;
+            const perp_dy = dx * randomDirection;
+            const len = Math.sqrt(perp_dx * perp_dx + perp_dy * perp_dy) || 1;
+            const targetX = self.x + (perp_dx / len) * flankDistance;
+            const targetY = self.y + (perp_dy / len) * flankDistance;
+
+            // Assicura che le coordinate di destinazione siano all'interno dell'arena.
+            const clampedX = Math.max(0, Math.min(arena.width, targetX));
+            const clampedY = Math.max(0, Math.min(arena.height, targetY));
+
+            api.moveTo(clampedX, clampedY);
+          } else {
+            // Priorità 2: Se la linea di tiro è libera, gestisci la distanza (kiting).
+            api.aimAt(enemy.x, enemy.y);
+            if (enemy.distance < tooCloseDistance) {
+              api.move(-80); // Troppo vicino, arretra (kiting).
+            } else if (enemy.distance > optimalDistance + 50) {
+              api.move(80); // Troppo lontano, avvicinati.
+            }
+          }
+          break;
+        }
+        break;
+      case "EVADING":
+        if (api.isQueueEmpty()) {
+          const obstacles = api.scanObstacles();
+          const enemyPos = this.state.lastKnownEnemyPosition;
+          const MAX_COVER_DISTANCE = 150;
+          let coverFoundAndValid = false;
+
+          // Se c'è un ostacolo abbastanza vicino e sappiamo dov'è il nemico...
+          if (
+            obstacles.length > 0 &&
+            enemyPos &&
+            obstacles[0].distance < MAX_COVER_DISTANCE
+          ) {
+            const cover = obstacles[0];
+
+            // ...calcola un punto di copertura sicuro dietro di esso.
+            const vec = {
+              x: cover.x + cover.width / 2 - enemyPos.x,
+              y: cover.y + cover.height / 2 - enemyPos.y,
+            };
+            const len = Math.sqrt(vec.x * vec.x + vec.y * vec.y) || 1;
+            const norm = { x: vec.x / len, y: vec.y / len };
+            const hideDistance = 40;
+            const hidePos = {
+              x: cover.x + cover.width / 2 + norm.x * hideDistance,
+              y: cover.y + cover.height / 2 + norm.y * hideDistance,
+            };
+
+            // Se la posizione di copertura è valida, muoviti lì.
+            if (api.isPositionValid(hidePos)) {
+              api.moveTo(hidePos.x, hidePos.y);
+              coverFoundAndValid = true;
+            }
+          }
+          // Se non è stata trovata una copertura valida, tenta una manovra evasiva casuale ma sicura.
+          if (!coverFoundAndValid) {
+            let evasionManeuverSet = false;
+            const selfState = api.getState();
+
+            // Tenta fino a 5 volte di trovare una posizione di evasione valida.
+            for (let i = 0; i < 5; i++) {
+              const turnDirection = Math.random() < 0.5 ? 1 : -1;
+              const randomAngle = (60 + Math.random() * 40) * turnDirection;
+              const randomDistance = 80 + Math.random() * 50;
+
+              // Calcola il punto di destinazione
+              const angleInRad =
+                (selfState.rotation + randomAngle) * (Math.PI / 180);
+              const destX = selfState.x + randomDistance * Math.cos(angleInRad);
+              const destY = selfState.y + randomDistance * Math.sin(angleInRad);
+
+              if (api.isPositionValid({ x: destX, y: destY })) {
+                api.moveTo(destX, destY);
+                evasionManeuverSet = true;
+                break; // Esci dal loop una volta trovata una manovra valida
+              }
+            }
+            // Se dopo tutti i tentativi non è stata trovata una posizione valida,
+            // esegui una manovra di fallback sicura (es. girati sul posto).
+            if (!evasionManeuverSet) {
+              api.rotate(180);
+            }
           }
         }
-      }
-
-      if (targetDistance > this.AGGRESSIVE_DISTANCE) {
-        // Se il nemico è quasi fuori portata o fuori portata, avvicinati aggressivamente.
-        api.moveForward(this.AGGRESSIVE_PERCENT);
-      } else if (targetDistance < this.SAFE_DISTANCE) {
-        // Se è troppo vicino, allontanati per mantenere la distanza di sicurezza.
-        api.moveForward(this.RETREAT_PERCENT);
-      }
-    } else if (this.lastKnownEnemyPosition) {
-      // --- Logica di Ricerca Intelligente: vai verso l'ultima posizione nota ---
-      const dx = this.lastKnownEnemyPosition.x - myState.x;
-      const dy = this.lastKnownEnemyPosition.y - myState.y;
-      const distanceToLastPosition = Math.sqrt(dx * dx + dy * dy);
-
-      // Se siamo abbastanza vicini, considera la posizione raggiunta e torna a cercare.
-      if (distanceToLastPosition < 20) {
-        this.lastKnownEnemyPosition = null; // Resetta la posizione
-        api.turnRight(this.SEARCH_TURN_ANGLE * 4); // Gira per cercare di nuovo
-      } else {
-        // Altrimenti, muoviti verso l'ultima posizione nota.
-        const angleToTarget = Math.atan2(dy, dx) * (180 / Math.PI);
-        let relativeAngle = angleToTarget - myState.rotation;
-
-        while (relativeAngle <= -180) relativeAngle += 360;
-        while (relativeAngle > 180) relativeAngle -= 360;
-
-        if (relativeAngle > 1) {
-          api.turnRight(Math.min(relativeAngle, this.SEARCH_TURN_ANGLE * 2));
-        } else if (relativeAngle < -1) {
-          api.turnLeft(
-            Math.min(Math.abs(relativeAngle), this.SEARCH_TURN_ANGLE * 2)
-          );
+        // Una volta completata la manovra, torna a cercare.
+        if (
+          events.some(
+            (e) => e.type === "MOVE_COMPLETED" || e.type === "ACTION_STOPPED"
+          )
+        ) {
+          this.state.current = "SEARCHING"; // Torna a cercare dopo l'evasione
+          this.state.evasionGraceTicks = 0; // Resetta il periodo di grazia
         }
-        api.moveForward(this.SEARCH_PERCENT);
-      }
-    } else {
-      // --- Logica di Ricerca di Base: vai verso il centro dell'arena ---
-      const arena = api.getArenaDimensions();
-      const centerX = arena.width / 2;
-      const centerY = arena.height / 2;
-      const dx = centerX - myState.x;
-      const dy = centerY - myState.y;
-      if (Math.sqrt(dx * dx + dy * dy) < 50) {
-        api.turnRight(this.SEARCH_TURN_ANGLE * 2);
-        return;
-      }
-      const angleToCenter = Math.atan2(dy, dx) * (180 / Math.PI);
-      let relativeAngle = angleToCenter - myState.rotation;
-      while (relativeAngle <= -180) relativeAngle += 360;
-      while (relativeAngle > 180) relativeAngle -= 360;
-      if (relativeAngle > 1) {
-        api.turnRight(Math.min(relativeAngle, this.SEARCH_TURN_ANGLE * 2));
-      } else if (relativeAngle < -1) {
-        api.turnLeft(
-          Math.min(Math.abs(relativeAngle), this.SEARCH_TURN_ANGLE * 2)
-        );
-      }
-      api.moveForward(this.SEARCH_PERCENT);
+        break;
     }
   },
 };

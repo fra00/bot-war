@@ -1,0 +1,27 @@
+graph TD
+A[Inizio Tick] --> B{Aggiorna Stati Interni};
+B --> C{Sono in stato di Evasione?};
+C -- Sì --> D[Esegui Azione di Evasione];
+D --> Z[Fine Tick];
+C -- No --> E{Sono in stato di Evitamento Ostacolo?};
+E -- Sì --> F[Esegui Azione di Evitamento];
+F --> Z;
+E -- No --> G{C'è un ostacolo imminente?};
+G -- Sì --> H[Attiva Stato di Evitamento];
+H --> F;
+G -- No --> I{Scan rileva il nemico?};
+I -- No --> J[Esegui Logica di Ricerca];
+J --> Z;
+I -- Sì --> K[Calcola Posizione Predetta];
+K --> L{Mira Predetta è perfetta E LOS è libera?};
+L -- Sì --> M[Azione: Fire];
+M --> Z;
+L -- No --> N{Calcola Angolo di Attacco Ideale};
+N --> O{Errore di mira/posizionamento è grande?};
+O -- Sì --> P[Azione: Rotate per correggere];
+P --> Z;
+O -- No --> Q{Sono troppo vicino al nemico?};
+Q -- Sì --> R[Azione: MoveForward(-100)];
+R --> Z;
+Q -- No --> S[Azione: MoveForward(100)];
+S --> Z;

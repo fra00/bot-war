@@ -1,8 +1,12 @@
 import Arena from "./Arena.js";
 import Robot from "./Robot.js";
 import Projectile from "./Projectile.js";
-import * as components from "./components.js";
-import { circleIntersectsRectangle } from "./geometryHelpers/index.js";
+import { updateProjectiles } from "./systems/projectileSystem.js";
+import { processActiveCommands } from "./systems/commandSystem.js";
+import { executeNextActions } from "./systems/actionSystem.js";
+import { updateRobotStates } from "./systems/robotStateSystem.js";
+import { setupGame } from "./gameSetup.js";
+import { scanForEnemy, scanForObstacles } from "./systems/perceptionSystem.js";
 
 /**
  * @typedef {Object} GameState
@@ -10,7 +14,14 @@ import { circleIntersectsRectangle } from "./geometryHelpers/index.js";
  * @property {Array<import('./Robot.js').RobotState>} robots
  * @property {Array<Object>} projectiles
  * @property {string} status - 'idle', 'running', 'finished'
- * @property {Array<Object>} events - La coda di eventi del tick corrente
+ * @property {Array<Object>} events - La coda di eventi del tick precedente. Esempi di eventi:
+ * - `{type: 'HIT_BY_PROJECTILE', robotId: string, ownerId: string, damage: number}`
+ * - `{type: 'ENEMY_HIT', ownerId: string, targetId: string, damage: number}`
+ * - `{type: 'PROJECTILE_HIT_WALL', ...}`
+ * - `{type: 'PROJECTILE_HIT_OBSTACLE', ...}`
+ * - `{type: 'MOVE_COMPLETED', robotId: string}`
+ * - `{type: 'ROTATION_COMPLETED', robotId: string}`
+ * - `{type: 'ACTION_STOPPED', robotId: string, commandType: 'MOVE'|'ROTATE', reason: 'USER_COMMAND'|'COLLISION'|'NO_ENERGY'}`
  * @property {?string} winner - L'ID del robot vincitore
  */
 
@@ -31,6 +42,12 @@ class Game {
     this.events = [];
     /** @type {Array<Object>} */
     this.lastTickEvents = [];
+    /**
+     * Tracks which robots have detected each other to fire ENEMY_DETECTED once.
+     * Key is the robot ID, value is a Set of detected enemy IDs.
+     * @type {Object<string, Set<string>>}
+     */
+    this.detectionState = {};
     this.reset();
   }
 
@@ -38,48 +55,20 @@ class Game {
    * Resetta lo stato del gioco alla configurazione iniziale.
    */
   reset() {
-    /** @type {Arena} */
     this.events = [];
     this.lastTickEvents = [];
-    this.arena = new Arena(800, 600);
-
-    // Definisce i punti di partenza dei robot per usarli come zone sicure
-    const spawnPoints = [
-      { x: 100, y: 300 },
-      { x: 700, y: 300 },
-    ];
-
-    // Genera ostacoli casuali, evitando le zone di partenza
-    this.arena.generateObstacles(5, spawnPoints);
-
-    // Definisce le configurazioni (loadout) dei robot
-    const playerLoadout = {
-      armor: { ...components.standardArmor },
-      cannon: { ...components.standardCannon },
-      battery: { ...components.standardBattery },
-      motor: { ...components.standardMotor },
-      radar: { ...components.standardRadar },
+    this.projectileCounter = 0;
+    this.detectionState = {
+      player: new Set(),
+      opponent: new Set(),
     };
 
-    const opponentLoadout = {
-      armor: { ...components.standardArmor },
-      cannon: { ...components.standardCannon },
-      battery: { ...components.standardBattery },
-      motor: { ...components.standardMotor },
-      radar: { ...components.standardRadar },
-    };
+    const { arena, robots } = setupGame(this.playerAI, this.defaultAI);
 
+    /** @type {Arena} */
+    this.arena = arena;
     /** @type {Array<Robot>} */
-    this.robots = [
-      new Robot({ id: "player", x: spawnPoints[0].x, y: spawnPoints[0].y, ai: this.playerAI, ...playerLoadout }),
-      new Robot({
-        id: "opponent",
-        x: spawnPoints[1].x,
-        y: spawnPoints[1].y,
-        ai: this.defaultAI,
-        ...opponentLoadout,
-      }),
-    ];
+    this.robots = robots;
 
     /** @type {Array<Projectile>} */
     this.projectiles = [];
@@ -98,108 +87,81 @@ class Game {
       return;
     }
 
-    // L'IA deve vedere lo stato del gioco che include gli eventi del tick precedente.
+    // 1. Aggiorna stati passivi (cooldown, energia).
+    updateRobotStates(this.robots);
+
+    // 2. Processa i comandi asincroni (movimento/rotazione) che continuano dall'ultimo tick.
+    // Questa funzione restituisce gli eventi generati (es. MOVE_COMPLETED).
+    const { newEvents: commandEvents } = processActiveCommands(this.robots, this.arena);
+
+    // 3. Prepara lo stato del gioco per il nuovo ciclo di decisioni dell'IA.
+    // L'IA deve vedere gli eventi del tick PRECEDENTE, quindi `getGameState` usa `this.lastTickEvents`.
     const gameState = this.getGameState();
 
-    // Ora che lo stato è stato catturato per le IA, possiamo preparare la coda per gli eventi di questo tick.
+    // 4. Azzera la coda degli eventi per il tick CORRENTE.
     this.events = [];
-    // 1. Ogni robot decide la sua prossima mossa
+
+    // 5. Esegui la percezione per ogni robot e genera eventi di rilevamento.
+    // Questo viene fatto centralmente per garantire coerenza.
+    this.robots.forEach((robot) => {
+      // L'API `scan` del robot ora restituisce semplicemente questo risultato.
+      robot.lastScanResult = scanForEnemy(robot, this.robots.map(r => r.getState()));
+      // Eseguiamo anche la scansione degli ostacoli
+      robot.lastObstaclesScan = scanForObstacles(robot, this.arena.obstacles);
+
+      const enemyId = this.robots.find(r => r.id !== robot.id)?.id;
+
+      if (robot.lastScanResult && enemyId) {
+        if (!this.detectionState[robot.id].has(enemyId)) {
+          this.detectionState[robot.id].add(enemyId);
+          this.events.push({
+            type: "ENEMY_DETECTED",
+            robotId: robot.id,
+            target: robot.lastScanResult,
+          });
+        }
+      }
+      else if (enemyId) {
+        // Se il nemico non è più visibile, resetta lo stato di rilevamento.
+        this.detectionState[robot.id].delete(enemyId);
+      }
+    });
+
+    // 6. Aggiungi gli eventi generati dai comandi asincroni alla nuova coda.
+    this.events.push(...commandEvents);
+
+    // 7. Ogni robot decide la sua prossima mossa in base allo stato aggiornato.
     this.robots.forEach((robot) => robot.computeNextAction(gameState));
 
-    // 2. Esegui le azioni
-    this.robots.forEach((robot) => {
-      const action = robot.nextAction;
-      if (!action) return;
+    // 8. Esegui le azioni sincrone (es. fuoco) e avvia nuovi comandi asincroni.
+    const {
+      newProjectiles,
+      newEvents: actionEvents,
+      updatedProjectileCounter,
+    } = executeNextActions(this.robots, this.projectileCounter);
+    this.projectiles.push(...newProjectiles);
+    this.events.push(...actionEvents);
+    this.projectileCounter = updatedProjectileCounter;
 
-      switch (action.type) {
-        case "MOVE_FORWARD": {
-          // La velocità è ora una percentuale della velocità massima del motore.
-          const requestedPercentage = action.payload.percentage || 0;
-          // Limita la percentuale tra -100 e 100
-          const clampedPercentage = Math.max(
-            -100,
-            Math.min(requestedPercentage, 100)
-          );
-          const effectiveSpeed =
-            robot.motor.maxSpeed * (clampedPercentage / 100);
+    // 9. Aggiorna i proiettili e gestisce le collisioni.
+    const { remainingProjectiles, newEvents: projectileEvents } = updateProjectiles(
+      this.projectiles,
+      this.robots,
+      this.arena
+    );
+    this.projectiles = remainingProjectiles;
+    this.events.push(...projectileEvents); // Aggiunge eventi di proiettile
 
-          // Applica la penalità di velocità per il sovrappeso
-          const finalSpeed = robot.isOverweight ? effectiveSpeed * 0.5 : effectiveSpeed;
-
-          // Consuma energia per il movimento
-          const energyCost = Math.abs(finalSpeed) * robot.motor.energyCostPerMove;
-          if (!robot.consumeEnergy(energyCost)) {
-            break; // Energia insufficiente
-          }
-
-          const angleRad = robot.rotation * (Math.PI / 180);
-          const newX = robot.x + finalSpeed * Math.cos(angleRad);
-          const newY = robot.y + finalSpeed * Math.sin(angleRad);
-          // Passa il raggio del robot per una collisione più accurata
-          if (this.arena.isPositionValid({ x: newX, y: newY }, Robot.RADIUS)) {
-            robot.x = newX;
-            robot.y = newY;
-          }
-          break;
-        }
-        case "TURN_LEFT": {
-          if (!robot.consumeEnergy(0.1)) break; // Anche la rotazione consuma energia
-          robot.rotation =
-            (robot.rotation - action.payload.degrees + 360) % 360;
-          break;
-        }
-        case "TURN_RIGHT": {
-          if (!robot.consumeEnergy(0.1)) break;
-          robot.rotation = (robot.rotation + action.payload.degrees) % 360;
-          break;
-        }
-        case "FIRE": {
-          if (robot.cannonCooldown > 0) break; // Controlla il cooldown
-
-          // Consuma energia in base al cannone
-          if (robot.consumeEnergy(robot.cannon.energyCost)) {
-            // Imposta il cooldown in base alla cadenza di tiro del cannone
-            robot.cannonCooldown = robot.cannon.fireRate;
-
-            const projectileId = `proj-${this.projectileCounter++}`;
-            const projectile = new Projectile({
-              id: projectileId,
-              ownerId: robot.id,
-              x: robot.x,
-              y: robot.y,
-              rotation: robot.rotation,
-              damage: robot.cannon.damage, // Passa il danno dal cannone
-              maxRange: robot.cannon.range, // Passa la portata dal cannone
-            });
-            this.projectiles.push(projectile);
-          }
-          break;
-        }
-      }
-    });
-
-    // 3. Aggiorna i proiettili e gestisce le collisioni.
-    // La logica è stata estratta in un metodo helper per pulizia.
-    this.projectiles = this._updateProjectiles();
-
-    // 4. Ricarica energia e controlla la fine della partita
-    this.robots.forEach((robot) => {
-      // Usa il tasso di ricarica della batteria
-      if (robot.battery.energy < robot.battery.maxEnergy) {
-        robot.battery.energy += robot.battery.rechargeRate;
-        if (robot.battery.energy > robot.battery.maxEnergy) {
-          robot.battery.energy = robot.battery.maxEnergy;
-        }
-      }
-    });
-
+    // 10. Controlla le condizioni di fine partita.
     const aliveRobots = this.robots.filter((r) => r.hullHp > 0);
     if (aliveRobots.length <= 1) {
       this.status = "finished";
       this.winner = aliveRobots.length === 1 ? aliveRobots[0].id : null;
+      this.lastTickEvents = this.events; // Salva gli eventi finali
+      return;
     }
 
-    // Alla fine del tick, gli eventi generati diventano gli eventi del "tick precedente" per il frame successivo.
+    // 11. Alla fine del tick, gli eventi generati diventano gli eventi del "tick precedente" per il frame successivo.
     this.lastTickEvents = this.events;
   }
 
@@ -229,79 +191,6 @@ class Game {
       events: this.lastTickEvents, // L'IA vede gli eventi del tick precedente
       winner: this.winner,
     };
-  }
-
-  /**
-   * Aggiorna tutti i proiettili, controlla le collisioni e genera eventi.
-   * @private
-   * @returns {Array<Projectile>} La lista dei proiettili ancora attivi.
-   */
-  _updateProjectiles() {
-    const remainingProjectiles = [];
-    for (const projectile of this.projectiles) {
-      projectile.update();
-
-      let shouldBeRemoved = false;
-
-      // Controlla se il proiettile colpisce un muro
-      if (
-        !this.arena.isPositionValid(
-          { x: projectile.x, y: projectile.y },
-          Projectile.RADIUS
-        )
-      ) {
-        this.events.push({
-          type: "PROJECTILE_HIT_WALL",
-          projectileId: projectile.id,
-          ownerId: projectile.ownerId,
-          position: { x: projectile.x, y: projectile.y },
-        });
-        shouldBeRemoved = true;
-      }
-
-      // Controlla se il proiettile ha esaurito la sua portata
-      if (!shouldBeRemoved && projectile.distanceTraveled > projectile.maxRange) {
-        shouldBeRemoved = true;
-      }
-
-      // Controlla collisioni con gli ostacoli
-      if (!shouldBeRemoved) {
-        for (const obstacle of this.arena.obstacles) {
-          if (
-            circleIntersectsRectangle(
-              { x: projectile.x, y: projectile.y, radius: Projectile.RADIUS },
-              obstacle
-            )
-          ) {
-            this.events.push({
-              type: "PROJECTILE_HIT_OBSTACLE",
-              projectileId: projectile.id,
-              ownerId: projectile.ownerId,
-              obstacleId: obstacle.id,
-            });
-            shouldBeRemoved = true;
-            break; // Un proiettile colpisce un solo ostacolo
-          }
-        }
-      }
-
-      // Controlla collisioni con i robot nemici
-      if (!shouldBeRemoved) {
-        for (const robot of this.robots) {
-          if (robot.id !== projectile.ownerId && projectile.checkCollision(robot)) {
-            robot.takeDamage(projectile.damage); // Usa il danno del proiettile
-            this.events.push({ type: "PROJECTILE_HIT_ROBOT", projectileId: projectile.id, ownerId: projectile.ownerId, targetId: robot.id, damage: projectile.damage });
-            shouldBeRemoved = true;
-            break; // Un proiettile colpisce un solo robot e poi sparisce
-          }
-        }
-      }
-
-      if (!shouldBeRemoved) {
-        remainingProjectiles.push(projectile);
-      }
-    }
-    return remainingProjectiles;
   }
 }
 

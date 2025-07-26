@@ -1,8 +1,16 @@
 import {
-  projectileIntersectsObstacle,
-  circleIntersectsRectangle,
-  isPointInRect,
-} from "./geometryHelpers/index.js";
+  scanForEnemy,
+  checkLineOfSight,
+  scanForObstacles,
+  isPositionWalkable,
+  checkForObstacleAhead,
+} from "./systems/perceptionSystem.js";
+import { createNavigationGrid } from "./systems/navigationGrid.js";
+import { findPath } from "./systems/pathfindingSystem.js";
+import {
+  generateCommandsForPath,
+  generateAimCommand,
+} from "./systems/navigationSystem.js";
 
 /**
  * @typedef {Object} RobotState
@@ -86,11 +94,30 @@ class Robot {
     this.cannonCooldown = 0;
 
     /**
-     * L'azione che il robot intende eseguire nel prossimo tick.
-     * @type {?{type: string, payload: any}}
+     * Le azioni che il robot intende eseguire nel prossimo tick.
+     * @type {Array<{type: string, payload: any}>}
      * @private
      */
-    this.nextAction = null;
+    this.nextActions = [];
+
+    /**
+     * A queue of commands to be executed by the robot. The first command in the queue
+     * is the active one.
+     * @type {Array<Object>}
+     */
+    this.commandQueue = [];
+
+    /**
+     * The result of the last obstacle scan.
+     * @type {Array<Object>}
+     */
+    this.lastObstaclesScan = [];
+
+    /**
+     * A list of log entries created by the AI.
+     * @type {Array<string>}
+     */
+    this.logs = [];
   }
 
   /**
@@ -131,38 +158,8 @@ class Robot {
    */
   getApi(gameState) {
     const setAction = (type, payload = {}) => {
-      if (!this.nextAction) {
-        // Permette una sola azione per tick
-        this.nextAction = { type, payload };
-      }
-    };
-
-    // Ora la funzione isLineOfSightClear è basata sulla logica del proiettile con raggio
-    /**
-     * Verifica se la linea di tiro tra due punti è libera da ostacoli,
-     * tenendo conto del raggio del proiettile.
-     * @param {{x: number, y: number}} startPoint - Il punto di partenza del proiettile.
-     * @param {{x: number, y: number}} endPoint - Il punto di arrivo del proiettile.
-     * @param {number} projectileRadius - Il raggio del proiettile.
-     * @returns {boolean} - True se la linea di tiro è libera, false altrimenti.
-     */
-    const isLineOfSightClear = (startPoint, endPoint, projectileRadius) => {
-      const { width, height, obstacles } = gameState.arena;
-
-      // 2. Controlla gli ostacoli interni (logica esistente)
-      for (const obstacle of obstacles) {
-        if (
-          projectileIntersectsObstacle(
-            startPoint,
-            endPoint,
-            projectileRadius,
-            obstacle
-          )
-        ) {
-          return false; // Ostacolo rilevato
-        }
-      }
-      return true; // Nessun ostacolo sul percorso
+      // Aggiunge un'azione alla coda delle azioni da eseguire in questo tick.
+      this.nextActions.push({ type, payload });
     };
 
     /**
@@ -172,40 +169,103 @@ class Robot {
      */
     const getEvents = () => {
       // Filtra gli eventi per restituire solo quelli che riguardano questo robot.
-      return gameState.events.filter(
-        (e) => e.ownerId === this.id || e.targetId === this.id
-      );
+      return gameState.events.filter((e) => {
+        switch (e.type) {
+          // Evento per il robot che viene colpito
+          case "HIT_BY_PROJECTILE":
+            return e.robotId === this.id;
+
+          // Eventi per il robot che ha sparato
+          case "ENEMY_HIT":
+          case "PROJECTILE_HIT_WALL":
+          case "PROJECTILE_HIT_OBSTACLE":
+            return e.ownerId === this.id;
+
+          // Eventi generici del robot (movimento, rilevamento, etc.)
+          case "MOVE_COMPLETED":
+          case "ROTATION_COMPLETED":
+          case "ACTION_STOPPED":
+          case "ENEMY_DETECTED":
+            return e.robotId === this.id;
+
+          // Evento non specifico, non dovrebbe accadere ma lo gestiamo
+          default:
+            return false;
+        }
+      });
     };
 
     return {
-      // Azioni di movimento
-      moveForward: (percentage = 100) =>
-        setAction("MOVE_FORWARD", { percentage }),
-      turnLeft: (degrees = 5) => setAction("TURN_LEFT", { degrees }),
-      turnRight: (degrees = 5) => setAction("TURN_RIGHT", { degrees }),
+      // --- Azioni di Debug ---
+      log: (...args) => {
+        const message = args
+          .map((arg) => {
+            if (typeof arg === "object" && arg !== null) {
+              return JSON.stringify(arg);
+            }
+            return String(arg);
+          })
+          .join(" ");
+        this.logs.push(message);
+        // Limita la dimensione dell'array di log per evitare problemi di memoria
+        if (this.logs.length > 100) {
+          this.logs.shift();
+        }
+      },
+      // --- Azioni Asincrone ---
+      move: (distance, speedPercentage = 100) =>
+        setAction("START_MOVE", { distance, speedPercentage }),
 
+      moveTo: (targetX, targetY, speedPercentage = 100) => {
+        const cellSize = Robot.RADIUS * 2;
+        const grid = createNavigationGrid(gameState.arena, Robot.RADIUS);
+
+        const startCoords = { x: Math.floor(this.x / cellSize), y: Math.floor(this.y / cellSize) };
+        const endCoords = { x: Math.floor(targetX / cellSize), y: Math.floor(targetY / cellSize) };
+
+        const path = findPath(grid, startCoords, endCoords);
+
+        if (path && path.length > 1) {
+          path.shift(); // Rimuove il nodo di partenza
+          const actions = generateCommandsForPath(
+            path,
+            { x: this.x, y: this.y },
+            this.rotation,
+            cellSize,
+            speedPercentage
+          );
+          this.nextActions.push(...actions);
+        }
+      },
+
+      rotate: (angle, speedPercentage = 100) =>
+        setAction("START_ROTATE", { angle, speedPercentage }),
+
+      stop: () => {
+        // Stop ha la priorità e cancella le altre azioni pianificate per questo tick.
+        this.nextActions = [{ type: "STOP_ACTION" }];
+      },
+
+      aimAt: (targetX, targetY, speedPercentage = 100) => {
+        const command = generateAimCommand(
+          { x: this.x, y: this.y },
+          this.rotation,
+          { x: targetX, y: targetY },
+          speedPercentage
+        );
+        if (command) {
+          setAction(command.type, command.payload);
+        }
+      },
+
+      // --- Azioni Sincrone ---
       // Azioni di combattimento
       fire: () => setAction("FIRE"),
 
       // Azioni di scansione/percezione
-      scan: () => {
-        const enemy = gameState.robots.find((r) => r.id !== this.id);
-        if (enemy) {
-          const dx = enemy.x - this.x;
-          const dy = enemy.y - this.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
+      scan: () => this.lastScanResult,
 
-          // Se il nemico è fuori dalla portata del radar, non viene rilevato.
-          if (distance > this.radar.range) {
-            return null;
-          }
-
-          const angle =
-            ((Math.atan2(dy, dx) * 180) / Math.PI - this.rotation + 360) % 360;
-          return { distance, angle };
-        }
-        return null;
-      },
+      scanObstacles: () => this.lastObstaclesScan,
 
       // Informazioni sull'arena
       getArenaDimensions: () => gameState.arena,
@@ -219,58 +279,24 @@ class Robot {
         energy: this.battery.energy,
       }),
 
-      /**
-       * Verifica se la linea di tiro tra due punti è libera da ostacoli.
-       * @param {{x: number, y: number}} startPoint - Il punto di partenza (il mio bot).
-       * @param {{x: number, y: number}} endPoint - Il punto di arrivo (il nemico).
-       * @returns {boolean} - True se la linea di tiro è libera.
-       */
-      isLineOfSightClear,
+      isQueueEmpty: () => this.commandQueue.length === 0,
+
+      isLineOfSightClear: (targetPosition) =>
+        checkLineOfSight(
+          { x: this.x, y: this.y },
+          targetPosition,
+          this.cannon.projectileRadius,
+          gameState.arena.obstacles
+        ),
+
+      isPositionValid: (position) =>
+        isPositionWalkable(position, Robot.RADIUS, gameState.arena),
 
       // Eventi
       getEvents,
 
-      /**
-       * Ritorna true se c'è un ostacolo molto vicino nella direzione di movimento.
-       * Utile per evitare collisioni imminenti.
-       * @param {number} [probeDistance=30] - Distanza di controllo in pixel.
-       * @returns {boolean}
-       */
-      isObstacleAhead: (probeDistance = 30) => {
-        const arena = gameState.arena;
-        const angleRad = this.rotation * (Math.PI / 180);
-
-        // Calcola la posizione futura del centro del robot
-        const futureX = this.x + probeDistance * Math.cos(angleRad);
-        const futureY = this.y + probeDistance * Math.sin(angleRad);
-
-        console.log(`futureX: ${futureX}, futureY: ${futureY}`);
-
-        const robotRadius = Robot.RADIUS;
-
-        // Controlla se il volume di collisione del robot (un cerchio)
-        // si scontrerebbe con i muri dell'arena nella posizione futura.
-        if (
-          futureX - robotRadius < 0 ||
-          futureX + robotRadius > arena.width ||
-          futureY - robotRadius < 0 ||
-          futureY + robotRadius > arena.height
-        ) {
-          return true;
-        }
-
-        // Controlla se il volume di collisione del robot (un cerchio)
-        // si scontrerebbe con un ostacolo (un rettangolo).
-        // Usa la funzione helper per evitare la duplicazione della logica di collisione.
-        for (const obstacle of arena.obstacles) {
-          const futureCircle = { x: futureX, y: futureY, radius: robotRadius };
-          if (circleIntersectsRectangle(futureCircle, obstacle)) {
-            return true; // Collisione con un ostacolo
-          }
-        }
-
-        return false; // Il percorso è libero
-      },
+      isObstacleAhead: (probeDistance = 30) =>
+        checkForObstacleAhead(this, gameState.arena, probeDistance),
     };
   }
 
@@ -279,10 +305,10 @@ class Robot {
    * @param {import('./Game.js').GameState} gameState
    */
   computeNextAction(gameState) {
-    this.nextAction = null; // Resetta l'azione precedente
-    if (this.cannonCooldown > 0) {
-      this.cannonCooldown--;
-    }
+    this.nextActions = []; // Resetta le azioni per il tick corrente
+    // L'IA viene eseguita ad ogni tick, anche se un comando asincrono è attivo.
+    // Questo le permette di reagire a eventi (es. essere colpiti) e, se necessario,
+    // inviare un comando `stop()` o pianificare la mossa successiva.
     this.ai.run(this.getApi(gameState));
   }
 
@@ -298,10 +324,13 @@ class Robot {
       rotation: this.rotation,
       hullHp: this.hullHp,
       armorHp: this.armor.hp,
+      maxArmorHp: this.armor.maxHp,
       energy: this.battery.energy,
+      maxEnergy: this.battery.maxEnergy,
       totalWeight: this.totalWeight,
       isOverweight: this.isOverweight,
       radarRange: this.radar.range,
+      logs: this.logs,
     };
   }
 }
