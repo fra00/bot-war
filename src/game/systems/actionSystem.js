@@ -88,6 +88,10 @@ export function executeNextActions(robots, projectileCounter) {
           }
           break;
         }
+        case "END_SEQUENCE": {
+          robot.commandQueue.push({ type: "END_SEQUENCE" });
+          break;
+        }
       }
     });
   });

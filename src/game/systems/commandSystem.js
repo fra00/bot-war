@@ -115,6 +115,11 @@ export function processActiveCommands(robots, arena) {
         }
         break;
       }
+      case "END_SEQUENCE": {
+        newEvents.push({ type: "SEQUENCE_COMPLETED", robotId: robot.id });
+        robot.commandQueue.shift(); // Rimuovi il comando completato
+        break;
+      }
     }
   });
 

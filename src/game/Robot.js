@@ -75,7 +75,8 @@ class Robot {
     this.radar = radar;
 
     // Stato derivato dai componenti
-    this.hullHp = 100; // La vita dello "scafo" è fissa
+    this.maxHullHp = 100; // La vita dello "scafo" è fissa
+    this.hullHp = this.maxHullHp;
     this.armor.hp = this.armor.maxHp; // Inizializza l'armatura al massimo
     this.battery.energy = this.battery.maxEnergy; // Inizializza l'energia al massimo
 
@@ -186,6 +187,7 @@ class Robot {
           case "ROTATION_COMPLETED":
           case "ACTION_STOPPED":
           case "ENEMY_DETECTED":
+          case "SEQUENCE_COMPLETED":
             return e.robotId === this.id;
 
           // Evento non specifico, non dovrebbe accadere ma lo gestiamo
@@ -220,8 +222,14 @@ class Robot {
         const cellSize = Robot.RADIUS * 2;
         const grid = createNavigationGrid(gameState.arena, Robot.RADIUS);
 
-        const startCoords = { x: Math.floor(this.x / cellSize), y: Math.floor(this.y / cellSize) };
-        const endCoords = { x: Math.floor(targetX / cellSize), y: Math.floor(targetY / cellSize) };
+        const startCoords = {
+          x: Math.floor(this.x / cellSize),
+          y: Math.floor(this.y / cellSize),
+        };
+        const endCoords = {
+          x: Math.floor(targetX / cellSize),
+          y: Math.floor(targetY / cellSize),
+        };
 
         const path = findPath(grid, startCoords, endCoords);
 
@@ -234,7 +242,8 @@ class Robot {
             cellSize,
             speedPercentage
           );
-          this.nextActions.push(...actions);
+          // moveTo ora si comporta come una sequenza, aggiungendo il marcatore alla fine.
+          this.nextActions.push(...actions, { type: "END_SEQUENCE" });
         }
       },
 
@@ -258,6 +267,12 @@ class Robot {
         }
       },
 
+      sequence: (actions) => {
+        // Accoda le azioni e il marcatore di fine sequenza.
+        this.nextActions.push(...actions);
+        this.nextActions.push({ type: "END_SEQUENCE" });
+      },
+
       // --- Azioni Sincrone ---
       // Azioni di combattimento
       fire: () => setAction("FIRE"),
@@ -278,6 +293,30 @@ class Robot {
         hp: this.hullHp + this.armor.hp, // L'IA vede la vita totale
         energy: this.battery.energy,
       }),
+
+      /**
+       * Restituisce lo stato attuale della batteria.
+       * @returns {{energy: number, maxEnergy: number}}
+       */
+      getBatteryState: () => ({
+        energy: this.battery.energy,
+        maxEnergy: this.battery.maxEnergy,
+      }),
+
+      /**
+       * Restituisce lo stato attuale dell'armatura.
+       * @returns {{hp: number, maxHp: number}}
+       */
+      getArmorState: () => ({
+        hp: this.armor.hp,
+        maxHp: this.armor.maxHp,
+      }),
+
+      /**
+       * Restituisce lo stato attuale dello scafo.
+       * @returns {{hp: number, maxHp: number}}
+       */
+      getHullState: () => ({ hp: this.hullHp, maxHp: this.maxHullHp }),
 
       isQueueEmpty: () => this.commandQueue.length === 0,
 
@@ -323,6 +362,7 @@ class Robot {
       y: this.y,
       rotation: this.rotation,
       hullHp: this.hullHp,
+      maxHullHp: this.maxHullHp,
       armorHp: this.armor.hp,
       maxArmorHp: this.armor.maxHp,
       energy: this.battery.energy,

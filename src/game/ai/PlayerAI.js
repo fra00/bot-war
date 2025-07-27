@@ -1,4 +1,4 @@
-import DefaultAI from "./DefaultAI.js";
+import DefaultAIBase from "./DefaultAIBase.js";
 
 // Converte l'oggetto AI di default in una stringa di codice sorgente.
 // Questo assicura che il codice di partenza del giocatore sia sempre
@@ -8,8 +8,8 @@ import DefaultAI from "./DefaultAI.js";
 //    // Inserisci qui la tua logica di gioco.
 //  }
 const initialPlayerCode = `({
-  state: ${JSON.stringify(DefaultAI.state, null, 2)},
-  run: ${DefaultAI.run.toString()}
+  state: ${JSON.stringify(DefaultAIBase.state, null, 2)},
+  run: ${DefaultAIBase.run.toString()}
 })`;
 
 export default initialPlayerCode;

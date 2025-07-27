@@ -12,7 +12,7 @@ export const standardCannon = {
   damage: 10,
   fireRate: 20, // tick tra un colpo e l'altro (cooldown)
   range: 450,
-  energyCost: 2,
+  energyCost: 5, // energia per colpo
   projectileRadius: 3,
 };
 
@@ -28,11 +28,11 @@ export const standardBattery = {
 export const standardMotor = {
   name: "Standard Motor",
   weight: 25,
-  maxSpeed: 3,
+  maxSpeed: 2,
   maxRotationSpeed: 5, // Gradi per tick al 100%
-  maxWeight: 75,
-  energyCostPerMove: 0.05, // energia per unità di velocità
-  energyCostPerRotation: 0.01, // energia per grado di rotazione
+  maxWeight: 90, // Peso massimo supportato
+  energyCostPerMove: 0.06, // energia per unità di velocità
+  energyCostPerRotation: 0.02, // energia per grado di rotazione
 };
 
 // --- Componenti Radar ---
