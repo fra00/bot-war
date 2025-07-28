@@ -99,6 +99,7 @@ Le seguenti variabili sono disponibili globalmente e definite in `src/App.css`:
 
 ### 1. Layout e Struttura
 
+- `Article`
 - `Box`
 - `Grid`
 - `Card`, `CardHeader`, `CardFooter`
@@ -141,6 +142,33 @@ Le seguenti variabili sono disponibili globalmente e definite in `src/App.css`:
 ---
 
 ## 1. Layout e Struttura
+
+### Componente: `Article`
+
+**Scopo:**
+Un componente wrapper per contenuti di testo estesi, come post di blog o documentazione. Utilizza le classi `prose` del plugin `@tailwindcss/typography` per una formattazione tipografica di alta qualità e reattiva ai temi.
+
+**Nota importante:**
+Per un corretto funzionamento dei temi (chiaro/scuro), è necessario configurare il plugin `@tailwindcss/typography` nel file `tailwind.config.js` per utilizzare le variabili CSS della libreria. Vedere i commenti nel file `Article.css` per un esempio di configurazione.
+
+**Props (API):**
+
+| Prop        | Tipo   | Default | Richiesto | Descrizione                                        |
+| ----------- | ------ | ------- | --------- | -------------------------------------------------- |
+| `children`  | `node` | -       | Sì        | Il contenuto HTML dell'articolo (h1, p, ul, etc.). |
+| `className` | `string` | `''`    | No        | Classi CSS aggiuntive.                             |
+
+**Esempio di Utilizzo:**
+
+```jsx
+<Article>
+  <h1>Titolo dell'Articolo</h1>
+  <p>Questo è un paragrafo di introduzione.</p>
+  <h2>Sottotitolo</h2>
+</Article>
+```
+
+---
 
 ### Componente: `Box`
 

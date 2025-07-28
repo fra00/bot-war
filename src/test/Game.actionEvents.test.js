@@ -19,8 +19,10 @@ describe("Game Engine - Asynchronous Action Events", () => {
     game.start();
     const player = game.robots.find((r) => r.id === "player");
     // The robot is overweight (80 > 75), so speed is halved.
-    const effectiveSpeed = player.motor.maxSpeed * (player.isOverweight ? 0.5 : 1); // 3 * 0.5 = 1.5
-    const ticksToComplete = Math.ceil(distance / effectiveSpeed); // ceil(50 / 1.5) = 34
+    // Movement speed is rounded, so 1.5 becomes 2.
+    const baseSpeed = player.motor.maxSpeed * (player.isOverweight ? 0.5 : 1);
+    const effectiveSpeed = Math.round(baseSpeed);
+    const ticksToComplete = Math.ceil(distance / effectiveSpeed);
 
     // Action: Esegui i tick necessari per completare l'azione.
     // Il primo tick avvia il comando, i successivi lo eseguono.
@@ -119,31 +121,33 @@ describe("Game Engine - Asynchronous Action Events", () => {
     const player = game.robots.find((r) => r.id === "player");
 
     // Position the robot near a wall and make it move towards it
+    // Force the overweight condition for this test to be deterministic
+    player.motor.maxWeight = 75;
+    player.isOverweight = player.totalWeight > player.motor.maxWeight;
+    expect(player.isOverweight).toBe(true);
+
     player.x = game.arena.width - 20; // 780
     player.rotation = 0; // Facing the right wall
 
     // Action:
-    // The robot is overweight, so its speed is halved (3 * 0.5 = 1.5px/tick).
+    // The robot is overweight, so its speed is halved and rounded.
     // The wall is at 800. Robot radius is 15.
     // It will collide when x > 800 - 15 = 785.
+    const baseSpeed = player.motor.maxSpeed * (player.isOverweight ? 0.5 : 1);
+    const effectiveSpeed = Math.round(baseSpeed);
 
     // Tick 0: AI calls api.move(). The game engine sets the activeCommand.
     game.tick();
     expect(player.commandQueue.length).toBe(1);
 
-    // Tick 1: The robot moves one step to x = 780 + 1.5 = 781.5.
-    game.tick();
-    expect(player.x).toBe(781.5);
-
-    // Tick 2: The robot moves to x = 781.5 + 1.5 = 783.
-    game.tick();
-    expect(player.x).toBe(783);
-
-    // Tick 3: The robot moves to x = 783 + 1.5 = 784.5.
-    game.tick();
-    expect(player.x).toBe(784.5);
-
-    // Tick 4: The robot attempts to move to x=786, collides, and the action is stopped.
+    // Simulate ticks until collision
+    const initialX = player.x;
+    let currentX = initialX;
+    while (currentX + effectiveSpeed <= game.arena.width - player.radius) {
+      game.tick();
+      currentX += effectiveSpeed;
+      expect(player.x).toBe(currentX);
+    }
     game.tick();
 
     // Assert
@@ -155,7 +159,7 @@ describe("Game Engine - Asynchronous Action Events", () => {
     expect(actionStoppedEvent.reason).toBe("COLLISION");
     expect(player.commandQueue.length).toBe(0);
     // The robot should not have moved on the collision tick
-    expect(player.x).toBe(784.5);
+    expect(player.x).toBe(currentX);
   });
 
   it("should generate an ACTION_STOPPED event if the robot runs out of energy", () => {
@@ -235,8 +239,9 @@ describe("Game Engine - Asynchronous Action Events", () => {
     expect(player.commandQueue[0].type).toBe("MOVE");
 
     // Esegui i tick per il movimento
-    const effectiveSpeed = player.motor.maxSpeed * (player.isOverweight ? 0.5 : 1); // 1.5
-    const ticksForMove = Math.ceil(50 / effectiveSpeed); // 34
+    const baseSpeed = player.motor.maxSpeed * (player.isOverweight ? 0.5 : 1);
+    const effectiveSpeed = Math.round(baseSpeed);
+    const ticksForMove = Math.ceil(50 / effectiveSpeed);
     for (let i = 0; i < ticksForMove; i++) {
       game.tick();
     }

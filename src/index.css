@@ -1,3 +1,12 @@
+/*
+  Assicurati che il tuo file CSS principale (in questo caso `src/index.css`,
+  importato in `main.jsx`) contenga queste tre direttive di Tailwind.
+  Sono necessarie per iniettare gli stili di base, dei componenti e delle utility di Tailwind.
+*/
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;

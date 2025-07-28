@@ -98,6 +98,28 @@ api.stop()
       // Ora la coda è vuota, puoi pianificare una manovra evasiva.
     }
 
+api.sequence(actions)
+
+    Accoda una serie di comandi personalizzati che verranno eseguiti in sequenza.
+    Questo è un comando avanzato per creare catene di azioni complesse.
+
+    Parametri:
+    - `actions` (Array<Object>): Un array di oggetti azione, dove ogni oggetto ha la forma `{ type: string, payload: any }`. I tipi e i payload devono corrispondere a quelli usati internamente (es. `{ type: 'START_MOVE', payload: { distance: 100 } }`).
+
+    Comportamento:
+    - Le azioni vengono aggiunte alla coda di comandi.
+    - Al termine dell'intera sequenza, viene generato un evento `SEQUENCE_COMPLETED`.
+
+    Esempio:
+    // Accoda una sequenza per muoversi a zig-zag
+    const zigZag = [
+      { type: 'START_ROTATE', payload: { angle: 45 } },
+      { type: 'START_MOVE', payload: { distance: 100 } },
+      { type: 'START_ROTATE', payload: { angle: -90 } },
+      { type: 'START_MOVE', payload: { distance: 100 } },
+    ];
+    api.sequence(zigZag);
+
 ---
 
 ## Azioni di Debug
@@ -115,6 +137,7 @@ api.log(...args)
     if (enemy) {
       api.log("Nemico trovato a distanza:", enemy.distance);
     }
+
 ---
 
 ## Comandi di Combattimento e Mira
@@ -208,6 +231,24 @@ api.getState()
     - `hp` (number): Punti vita totali (scafo + armatura).
     - `energy` (number): Energia rimanente.
 
+api.getHullState()
+
+    Restituisce lo stato attuale dello scafo del robot.
+
+    Valore di ritorno: Un oggetto `{ hp: number, maxHp: number }`.
+
+api.getArmorState()
+
+    Restituisce lo stato attuale dell'armatura del robot.
+
+    Valore di ritorno: Un oggetto `{ hp: number, maxHp: number }`.
+
+api.getBatteryState()
+
+    Restituisce lo stato attuale della batteria del robot.
+
+    Valore di ritorno: Un oggetto `{ energy: number, maxEnergy: number }`.
+
 api.getArenaDimensions()
 
     Restituisce le dimensioni e gli ostacoli dell'arena.
@@ -215,6 +256,9 @@ api.getArenaDimensions()
 api.isObstacleAhead(probeDistance)
 
     Controlla la presenza di un ostacolo (muro o oggetto) di fronte al robot.
+
+    Parametri:
+    - `probeDistance` (number, opzionale, default: 30): La distanza in pixel davanti al robot da controllare.
 
 api.isLineOfSightClear(targetPosition)
 
@@ -263,3 +307,35 @@ api.getEvents()
     - `PROJECTILE_HIT_WALL`: Un tuo proiettile ha colpito un muro dell'arena.
     - `PROJECTILE_HIT_OBSTACLE`: Un tuo proiettile ha colpito un ostacolo.
     - `ENEMY_DETECTED`: Il radar ha rilevato un nemico che non era visibile nel tick precedente. Contiene i dati del bersaglio.
+    - `SEQUENCE_COMPLETED`: Una sequenza di azioni (da `moveTo` o `sequence`) è terminata con successo.
+
+## La Struttura di Base
+
+Ogni IA è un oggetto JavaScript con due elementi principali:
+
+1.  Un oggetto `state` per memorizzare informazioni tra un tick e l'altro (come lo stato attuale del bot).
+2.  Una funzione `run(api)` che viene eseguita ad ogni tick del gioco.
+
+Iniziamo con lo scheletro della nostra IA. Copia questo codice nell'editor:
+
+```javascript
+({
+  // L'oggetto 'state' mantiene i dati tra i tick.
+  // Lo inizializzeremo al primo tick.
+  state: {},
+
+  /**
+   * La funzione run viene chiamata ad ogni tick del gioco.
+   * @param {object} api - L'API per controllare il tuo bot.
+   */
+  run: function (api) {
+    // Inizializzazione al primo tick
+    if (typeof this.state.current === "undefined") {
+      this.state.current = "SEARCHING"; // Inizia cercando il nemico
+      console.log("Bot inizializzato. Stato iniziale: SEARCHING");
+    }
+
+    // Qui inseriremo la logica della nostra macchina a stati.
+  },
+});
+```

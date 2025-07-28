@@ -10,18 +10,21 @@ import { scanForEnemy, scanForObstacles } from "./systems/perceptionSystem.js";
 
 /**
  * @typedef {Object} GameState
- * @property {import('./Arena.js').Dimensions} arena
+ * @property {Object} arena - Le dimensioni e gli ostacoli dell'arena.
+ * @property {number} arena.width
+ * @property {number} arena.height
+ * @property {Array<import('./Arena.js').Obstacle>} arena.obstacles
  * @property {Array<import('./Robot.js').RobotState>} robots
  * @property {Array<Object>} projectiles
  * @property {string} status - 'idle', 'running', 'finished'
  * @property {Array<Object>} events - La coda di eventi del tick precedente. Esempi di eventi:
+ * - `{type: 'ENEMY_DETECTED', robotId: string, target: Object}`
  * - `{type: 'HIT_BY_PROJECTILE', robotId: string, ownerId: string, damage: number}`
- * - `{type: 'ENEMY_HIT', ownerId: string, targetId: string, damage: number}`
- * - `{type: 'PROJECTILE_HIT_WALL', ...}`
- * - `{type: 'PROJECTILE_HIT_OBSTACLE', ...}`
+ * - `{type: 'ENEMY_HIT', ownerId: string, targetId: string, damage: number}` - `{type: 'PROJECTILE_HIT_WALL', ...}` - `{type: 'PROJECTILE_HIT_OBSTACLE', ...}`
  * - `{type: 'MOVE_COMPLETED', robotId: string}`
  * - `{type: 'ROTATION_COMPLETED', robotId: string}`
  * - `{type: 'ACTION_STOPPED', robotId: string, commandType: 'MOVE'|'ROTATE', reason: 'USER_COMMAND'|'COLLISION'|'NO_ENERGY'}`
+ * - `{type: 'SEQUENCE_COMPLETED', robotId: string}`
  * @property {?string} winner - L'ID del robot vincitore
  */
 

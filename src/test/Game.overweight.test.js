@@ -3,7 +3,7 @@ import Game from "../game/Game.js";
 
 describe("Game Engine - Overweight Penalties", () => {
   it("should apply overweight penalty to movement speed", () => {
-    // Setup: L'IA avvia un movimento. Il robot di default è in sovrappeso.
+    // Setup: L'IA avvia un movimento.
     let commandSent = false;
     const movingAI = {
       run: (api) => {
@@ -18,6 +18,10 @@ describe("Game Engine - Overweight Penalties", () => {
     game.start();
 
     const player = game.robots.find((r) => r.id === "player");
+    // Forziamo la condizione di sovrappeso per il test, rendendolo indipendente
+    // dalla configurazione di default dei componenti.
+    player.motor.maxWeight = 75;
+    player.isOverweight = player.totalWeight > player.motor.maxWeight;
     const initialX = player.x;
     const maxSpeed = player.motor.maxSpeed; // e.g. 3
 
@@ -27,8 +31,8 @@ describe("Game Engine - Overweight Penalties", () => {
     game.tick(); // AI sets the command
     game.tick(); // Game executes one step of the command
 
-    // Assert: La distanza percorsa è la metà della velocità massima.
-    const expectedDistance = maxSpeed * 0.5;
+    // Assert: La distanza percorsa è la metà della velocità massima, arrotondata.
+    const expectedDistance = Math.round(maxSpeed * 0.5);
     expect(player.x).toBe(initialX + expectedDistance);
   });
 
@@ -65,7 +69,7 @@ describe("Game Engine - Overweight Penalties", () => {
   });
 
   it("should apply overweight penalty to rotation speed", () => {
-    // Setup: L'IA avvia una rotazione. Il robot di default è in sovrappeso.
+    // Setup: L'IA avvia una rotazione.
     let commandSent = false;
     const rotatingAI = {
       run: (api) => {
@@ -80,6 +84,9 @@ describe("Game Engine - Overweight Penalties", () => {
     game.start();
 
     const player = game.robots.find((r) => r.id === "player");
+    // Forziamo la condizione di sovrappeso per il test.
+    player.motor.maxWeight = 75;
+    player.isOverweight = player.totalWeight > player.motor.maxWeight;
     const initialRotation = player.rotation;
     const maxRotationSpeed = player.motor.maxRotationSpeed; // e.g. 5
 

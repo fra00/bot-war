@@ -54,7 +54,26 @@ describe("Robot State", () => {
     });
 
     it("should correctly calculate totalWeight and isOverweight (true)", () => {
-      setup(); // Default loadout weight is 80, maxWeight is 75
+      // Usa un motore più debole per forzare la condizione di sovrappeso per questo test.
+      const weakMotor = { ...standardMotor, maxWeight: 75 };
+      setup({ motor: weakMotor });
+      const state = robot.getState();
+
+      const expectedWeight =
+        standardArmor.weight +
+        standardCannon.weight +
+        standardBattery.weight +
+        weakMotor.weight +
+        standardRadar.weight;
+
+      expect(state.totalWeight).toBe(expectedWeight);
+      expect(state.isOverweight).toBe(true);
+    });
+
+    it("should correctly calculate totalWeight and isOverweight (false)", () => {
+      // La configurazione di default non è in sovrappeso (80 < 90)
+      setup();
+
       const state = robot.getState();
 
       const expectedWeight =
@@ -65,35 +84,25 @@ describe("Robot State", () => {
         standardRadar.weight;
 
       expect(state.totalWeight).toBe(expectedWeight);
-      expect(state.isOverweight).toBe(true);
-    });
-
-    it("should correctly calculate totalWeight and isOverweight (false)", () => {
-      const lightCannon = { ...standardCannon, weight: 5 }; // Total weight = 70
-      setup({ cannon: lightCannon }); // maxWeight is 75
-
-      const state = robot.getState();
-
-      const expectedWeight =
-        standardArmor.weight +
-        lightCannon.weight +
-        standardBattery.weight +
-        standardMotor.weight +
-        standardRadar.weight;
-
-      expect(state.totalWeight).toBe(expectedWeight);
       expect(state.isOverweight).toBe(false);
     });
 
     it("should reflect updated state after taking damage and consuming energy", () => {
+      // La configurazione di default non è in sovrappeso.
       setup();
+      const OVERWEIGHT_ENERGY_MULTIPLIER = 1.5; // From Robot.js logic
+      const baseEnergyCost = 10;
+      const expectedEnergyCost = robot.isOverweight
+        ? baseEnergyCost * OVERWEIGHT_ENERGY_MULTIPLIER
+        : baseEnergyCost;
+
       robot.takeDamage(20);
-      robot.consumeEnergy(10); // Overweight cost = 15
+      robot.consumeEnergy(baseEnergyCost);
       const state = robot.getState();
 
       expect(state.armorHp).toBe(standardArmor.maxHp - 20);
       expect(state.hullHp).toBe(100);
-      expect(state.energy).toBe(standardBattery.maxEnergy - 15);
+      expect(state.energy).toBe(standardBattery.maxEnergy - expectedEnergyCost);
     });
   });
 });

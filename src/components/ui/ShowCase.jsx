@@ -6,6 +6,7 @@ import { Tabs, TabList, Tab, TabPanels, TabPanel } from "./Tabs";
 // Examples: Layout e Struttura
 import ExampleAccordion from "./example/ExampleAccordion";
 import ExampleBox from "./example/ExampleBox";
+import ExampleArticle from "./example/ExampleArticle";
 import ExampleGrid from "./example/ExampleGrid";
 import ExampleBreadcrumbs from "./example/ExampleBreadcrumbs";
 import ExampleCard from "./example/ExampleCard";
@@ -57,6 +58,7 @@ function ShowCase() {
           <TabPanel>
             <ExampleToolbar />
             <ExampleBox />
+            <ExampleArticle />
             <ExampleGrid />
             <ExampleCard />
             <ExampleModal />

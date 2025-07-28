@@ -206,6 +206,10 @@ const DefaultAIBase = {
 
         // --- LOGICA DI MOVIMENTO (solo quando il bot è inattivo) ---
         // Se il bot ha finito la sua sequenza di mosse precedente, ne pianifica una nuova.
+        api.log(
+          "Attacco in corso contro il nemico queue empty:",
+          api.isQueueEmpty()
+        );
         if (api.isQueueEmpty()) {
           const arena = api.getArenaDimensions();
           const optimalDistance = 250;

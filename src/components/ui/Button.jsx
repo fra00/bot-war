@@ -40,7 +40,7 @@ const Button = React.forwardRef(({
   const classNames = [
     'button',
     variant,
-    // Aggiungere classi per la size se necessario, es: `button-${size}`
+    size, // Aggiunge la classe per la dimensione (es. 'small', 'medium')
     className, // Permette di aggiungere classi custom dall'esterno
   ].filter(Boolean).join(' ');
 

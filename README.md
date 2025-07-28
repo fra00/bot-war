@@ -73,6 +73,7 @@ La libreria include una vasta gamma di componenti, raggruppati nelle seguenti ca
 #### Layout e Struttura
 
 - `Box`
+- `Article`
 - `Grid` & `GridItem`
 - `Card`, `CardHeader`, `CardFooter`
 - `Modal`

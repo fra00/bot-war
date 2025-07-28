@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import { createPortal } from 'react-dom';
 import Card from './Card';
 import CardHeader from './CardHeader';
 import './Modal.css';
@@ -29,7 +30,7 @@ import CardFooter from './CardFooter';
  *   </>
  * );
  */
-const Modal = ({ isOpen, onClose, title, children }) => {
+const Modal = ({ isOpen, onClose, title, children, fullscreen = false }) => {
   if (!isOpen) {
     return null;
   }
@@ -42,9 +43,9 @@ const Modal = ({ isOpen, onClose, title, children }) => {
   );
   const content = childrenArray.filter((child) => child !== footer);
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={handleContentClick}>
+  const modalContent = (
+    <div className={`modal-overlay ${fullscreen ? 'fullscreen' : ''}`} onClick={onClose}>
+      <div className={`modal-content ${fullscreen ? 'fullscreen' : ''}`} onClick={handleContentClick}>
         <Card className="modal-card">
           {title && <CardHeader>{title}</CardHeader>}
           <button className="modal-close-button" onClick={onClose}>
@@ -56,6 +57,10 @@ const Modal = ({ isOpen, onClose, title, children }) => {
       </div>
     </div>
   );
+
+  // Usiamo un portale per renderizzare il modale direttamente nel body.
+  // Questo previene problemi di z-index e stacking context causati da elementi genitori.
+  return createPortal(modalContent, document.body);
 };
 
 Modal.propTypes = {
@@ -63,6 +68,7 @@ Modal.propTypes = {
   onClose: PropTypes.func.isRequired,
   title: PropTypes.string,
   children: PropTypes.node,
+  fullscreen: PropTypes.bool,
 };
 
 export default Modal;

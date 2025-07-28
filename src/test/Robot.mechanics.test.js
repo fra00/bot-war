@@ -14,13 +14,12 @@ describe("Robot Mechanics", () => {
   // Helper to set up a clean robot for each test
   const setup = (config = {}) => {
     const loadout = {
-      armor: { ...standardArmor }, // maxHp: 50, weight: 20
-      cannon: { ...standardCannon }, // weight: 15
-      battery: { ...standardBattery }, // maxEnergy: 100, weight: 10
-      motor: { ...standardMotor }, // maxWeight: 75, weight: 25
-      radar: { ...standardRadar }, // weight: 10
+      armor: { ...standardArmor },
+      cannon: { ...standardCannon },
+      battery: { ...standardBattery },
+      motor: { ...standardMotor },
+      radar: { ...standardRadar },
       // Total weight: 20 + 15 + 10 + 25 + 10 = 80
-      // isOverweight: true (80 > 75)
     };
 
     robot = new Robot({
@@ -57,32 +56,56 @@ describe("Robot Mechanics", () => {
   });
 
   describe("consumeEnergy", () => {
-    it("should consume energy and return true if there is enough", () => {
-      setup(); // isOverweight is true by default
-      robot.battery.energy = 50;
-      const consumed = robot.consumeEnergy(10); // cost = 10 * 1.5 = 15
+    // Questo è un moltiplicatore implicito nella classe Robot. Lo definiamo qui
+    // per rendere i test robusti e leggibili.
+    const OVERWEIGHT_ENERGY_MULTIPLIER = 1.5;
+
+    it("should consume more energy when overweight", () => {
+      // Setup: Crea un motore debole per forzare la condizione di sovrappeso.
+      const weakMotor = { ...standardMotor, maxWeight: 75 }; // totalWeight (80) > maxWeight (75)
+      setup({ motor: weakMotor });
+      expect(robot.isOverweight).toBe(true);
+
+      const initialEnergy = 50;
+      const baseCost = 10;
+      robot.battery.energy = initialEnergy;
+
+      const expectedCost = baseCost * OVERWEIGHT_ENERGY_MULTIPLIER;
+      const consumed = robot.consumeEnergy(baseCost);
+
       expect(consumed).toBe(true);
-      expect(robot.battery.energy).toBe(35);
+      expect(robot.battery.energy).toBe(initialEnergy - expectedCost);
     });
 
-    it("should not consume energy and return false if there is not enough", () => {
-      setup();
-      robot.battery.energy = 10;
-      const consumed = robot.consumeEnergy(10); // cost = 15
+    it("should not consume energy and return false if there is not enough (when overweight)", () => {
+      // Setup: Crea un motore debole per forzare la condizione di sovrappeso.
+      const weakMotor = { ...standardMotor, maxWeight: 75 };
+      setup({ motor: weakMotor });
+      expect(robot.isOverweight).toBe(true);
+
+      const initialEnergy = 10;
+      const baseCost = 10;
+      robot.battery.energy = initialEnergy;
+
+      const expectedCost = baseCost * OVERWEIGHT_ENERGY_MULTIPLIER; // 15
+      expect(initialEnergy).toBeLessThan(expectedCost); // Sanity check for the test itself
+
+      const consumed = robot.consumeEnergy(baseCost);
       expect(consumed).toBe(false);
-      expect(robot.battery.energy).toBe(10); // Energy should not change
+      expect(robot.battery.energy).toBe(initialEnergy); // L'energia non dovrebbe cambiare
     });
 
     it("should consume the correct amount when not overweight", () => {
-      // Modify motor to not be overweight
-      const lightMotor = { ...standardMotor, maxWeight: 100 }; // 80 < 100
-      setup({ motor: lightMotor });
-
+      // La configurazione di default non è in sovrappeso (peso 80 < max 90)
+      setup();
       expect(robot.isOverweight).toBe(false);
-      robot.battery.energy = 50;
-      const consumed = robot.consumeEnergy(10); // cost = 10
+      const initialEnergy = 50;
+      const baseCost = 10;
+      robot.battery.energy = initialEnergy;
+
+      const consumed = robot.consumeEnergy(baseCost);
       expect(consumed).toBe(true);
-      expect(robot.battery.energy).toBe(40);
+      expect(robot.battery.energy).toBe(initialEnergy - baseCost); // No multiplier
     });
   });
 });

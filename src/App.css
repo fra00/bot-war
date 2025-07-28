@@ -25,6 +25,11 @@
   --btn-secondary-text: var(--color-text-light);
   --btn-secondary-border: var(--color-secondary);
 
+  /* Stili per bottone Ghost */
+  --btn-ghost-bg: transparent;
+  --btn-ghost-text: var(--color-text-light);
+  --btn-ghost-hover-bg: rgba(255, 255, 255, 0.1);
+
   /* Stili per gli alert */
   --alert-info-bg: #0d47a1;
   --alert-info-text: #cff4fc;
@@ -92,6 +97,11 @@
   --btn-secondary-bg: transparent;
   --btn-secondary-text: #212529;
   --btn-secondary-border: var(--color-secondary);
+
+  /* Stili per bottone Ghost (tema chiaro) */
+  --btn-ghost-bg: transparent;
+  --btn-ghost-text: var(--color-text-light); /* In tema chiaro, questa variabile punta a un colore scuro */
+  --btn-ghost-hover-bg: rgba(0, 0, 0, 0.05);
 
   /* Stili per gli alert */
   --alert-info-bg: #cce5ff;

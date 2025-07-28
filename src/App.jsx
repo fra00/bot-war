@@ -4,7 +4,7 @@ import DefaultAI from "./game/ai/DefaultAI";
 import Arena from "./components/game/Arena";
 import initialPlayerCode from "./game/ai/PlayerAI";
 import Button from "./components/ui/Button";
-import Drawer from "./components/ui/Drawer";
+import Drawer from "./components/ui/Drawer"; // Mantenuto per il log
 import useDisclosure from "./components/ui/useDisclosure";
 import CardHeader from "./components/ui/CardHeader";
 import GameInfoPanel from "./components/game/GameInfoPanel";
@@ -12,6 +12,7 @@ import AIEditorPanel from "./components/game/AIEditorPanel";
 import Toolbar from "./components/ui/Toolbar";
 import GameOverModal from "./components/game/GameOverModal";
 import { compileAI } from "./game/ai/compiler";
+import ApiDocsModal from "./components/docs/ApiDocsModal";
 
 // Questo componente UI è stato estratto per risolvere una violazione delle "Rules of Hooks".
 // L'hook `useEffect` non può essere chiamato all'interno della render prop di GameManager.
@@ -34,6 +35,7 @@ const GameUI = ({
   onGameOver,
   onGameOverClose,
   onRestart,
+  onApiDocsOpen,
 }) => {
   // Effetto per aprire il modale di fine partita
   useEffect(() => {
@@ -45,10 +47,7 @@ const GameUI = ({
   return (
     <>
       <Toolbar title="Bot War" showThemeSwitcher={true} className="mb-4">
-        <Button
-          onClick={controls.start}
-          disabled={gameState.status !== "idle"}
-        >
+        <Button onClick={controls.start} disabled={gameState.status !== "idle"}>
           Avvia
         </Button>
         <Button onClick={controls.reset} variant="secondary">
@@ -56,6 +55,9 @@ const GameUI = ({
         </Button>
         <Button onClick={onEditorOpen} variant="ghost">
           Editor AI
+        </Button>
+        <Button onClick={onApiDocsOpen} variant="ghost">
+          API Docs
         </Button>
       </Toolbar>
       {/* Layout principale a due colonne (fisso) con grid di Tailwind */}
@@ -70,19 +72,29 @@ const GameUI = ({
         </div>
       </div>
 
-      {/* Drawer per l'editor AI a sinistra */}
-      <Drawer isOpen={isEditorOpen} onClose={onEditorClose} position="left">
-        <AIEditorPanel
-          code={playerCode}
-          onCodeChange={onCodeChange}
-          onUpdate={onUpdate}
-          compileError={compileError}
-          isGameRunning={gameState.status === "running"}
-        />
-      </Drawer>
+      {/* Dialog a schermo intero per l'editor AI.
+          Utilizziamo un div con posizionamento fisso invece del componente Modal
+          per avere il controllo completo sulle dimensioni e ottenere un layout a schermo intero. */}
+      {isEditorOpen && (
+        <div className="fixed inset-0 z-50 bg-background-primary p-4">
+          <AIEditorPanel
+            code={playerCode}
+            onCodeChange={onCodeChange}
+            onUpdate={onUpdate}
+            compileError={compileError}
+            isGameRunning={gameState.status === "running"}
+            onClose={onEditorClose}
+          />
+        </div>
+      )}
 
       {/* Drawer per i log a destra (con maniglia) */}
-      <Drawer isOpen={isLogOpen} onOpen={onLogOpen} onClose={onLogClose} position="right">
+      <Drawer
+        isOpen={isLogOpen}
+        onOpen={onLogOpen}
+        onClose={onLogClose}
+        position="right"
+      >
         <CardHeader>Game State Log</CardHeader>
         <div className="p-4 overflow-auto h-full">
           <pre className="bg-gray-800 p-2 rounded text-xs">
@@ -91,7 +103,12 @@ const GameUI = ({
         </div>
       </Drawer>
 
-      <GameOverModal isOpen={isGameOver} winner={gameState.winner} onRestart={onRestart} onClose={onGameOverClose} />
+      <GameOverModal
+        isOpen={isGameOver}
+        winner={gameState.winner}
+        onRestart={onRestart}
+        onClose={onGameOverClose}
+      />
     </>
   );
 };
@@ -111,6 +128,11 @@ function App() {
     isOpen: isGameOver,
     onOpen: onGameOver,
     onClose: onGameOverClose,
+  } = useDisclosure();
+  const {
+    isOpen: isApiDocsOpen,
+    onOpen: onApiDocsOpen,
+    onClose: onApiDocsClose,
   } = useDisclosure();
   const [gameKey, setGameKey] = useState(0);
   const [playerCode, setPlayerCode] = useState(initialPlayerCode);
@@ -156,9 +178,11 @@ function App() {
             onGameOver={onGameOver}
             onGameOverClose={onGameOverClose}
             onRestart={handleRestart}
+            onApiDocsOpen={onApiDocsOpen}
           />
         )}
       </GameManager>
+      <ApiDocsModal isOpen={isApiDocsOpen} onClose={onApiDocsClose} />
     </div>
   );
 }
