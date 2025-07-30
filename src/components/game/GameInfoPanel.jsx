@@ -15,9 +15,19 @@ const BotInfo = ({ bot, color, onSelectLog }) => {
       style={{ minHeight: "260px" }}
     >
       <CardHeader className="flex justify-between items-center flex-shrink-0">
-        <span style={{ color }} className="font-bold capitalize">
-          {bot.id}
-        </span>
+        <div className="flex items-center">
+          <span style={{ color }} className="font-bold">
+            {bot.name || bot.id}
+          </span>
+          {bot.isCustomAI && (
+            <span
+              title="Questa IA è controllata da uno script personalizzato"
+              className="ml-2"
+            >
+              🧠
+            </span>
+          )}
+        </div>
         <Button onClick={() => onSelectLog(bot)} size="small" variant="ghost">
           Log
         </Button>
@@ -65,6 +75,12 @@ const BotInfo = ({ bot, color, onSelectLog }) => {
               <span className="text-yellow-400 font-bold">(Overweight)</span>
             )}
           </p>
+          {/* Mostra esplicitamente lo script AI per il bot del giocatore */}
+          {bot.id === "player" && bot.name && (
+            <p className="text-xs text-gray-400 mt-1">
+              Script AI: <span className="font-semibold">{bot.name}</span>
+            </p>
+          )}
         </div>
       </div>
     </Card>
@@ -74,6 +90,8 @@ const BotInfo = ({ bot, color, onSelectLog }) => {
 BotInfo.propTypes = {
   bot: PropTypes.shape({
     id: PropTypes.string.isRequired,
+    name: PropTypes.string, // Il nome viene aggiunto in App.jsx
+    isCustomAI: PropTypes.bool,
     hullHp: PropTypes.number.isRequired,
     armorHp: PropTypes.number.isRequired,
     maxArmorHp: PropTypes.number.isRequired,
@@ -130,22 +148,22 @@ BotInfoPlaceholder.propTypes = {
 
 const GameInfoPanel = ({ gameState }) => {
   const botColors = ["#61dafb", "#e06c75"]; // Player, Enemy
-  const robots = gameState?.robots || [];
+  const bots = gameState?.bots || [];
   const [logSource, setLogSource] = useState(null);
 
   // Imposta il log del giocatore come predefinito all'avvio e quando il gioco si riavvia
   useEffect(() => {
-    if (robots.length > 0) {
+    if (bots.length > 0) {
       // Se logSource non è impostato o non è più valido (es. dopo un reset), reimpostalo.
       const currentLogSourceIsValid =
-        logSource && robots.some((r) => r.id === logSource.id);
+        logSource && bots.some((r) => r.id === logSource.id);
       if (!currentLogSourceIsValid) {
-        setLogSource(robots[0]);
+        setLogSource(bots[0]);
       }
     } else {
       setLogSource(null);
     }
-  }, [robots, logSource]);
+  }, [bots, logSource]);
 
   const handleSelectLog = (bot) => {
     setLogSource(bot);
@@ -162,7 +180,7 @@ const GameInfoPanel = ({ gameState }) => {
     return [...logSource.logs].reverse().join("\n");
   };
 
-  if (robots.length === 0) {
+  if (bots.length === 0) {
     return (
       <div className="flex flex-col h-full gap-4">
         <Box className="flex gap-4">
@@ -179,7 +197,7 @@ const GameInfoPanel = ({ gameState }) => {
   return (
     <div className="flex flex-col h-full gap-4">
       <Box className="flex gap-4">
-        {robots.map((bot, index) => (
+        {bots.map((bot, index) => (
           <BotInfo
             key={bot.id}
             bot={bot}
@@ -211,7 +229,21 @@ const GameInfoPanel = ({ gameState }) => {
 };
 
 GameInfoPanel.propTypes = {
-  gameState: PropTypes.object.isRequired,
+  gameState: PropTypes.shape({
+    // La logica in App.jsx arricchisce i bot con i loro nomi
+    bots: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.string.isRequired,
+        name: PropTypes.string,
+        isCustomAI: PropTypes.bool,
+        hullHp: PropTypes.number.isRequired,
+        armorHp: PropTypes.number.isRequired,
+        maxArmorHp: PropTypes.number.isRequired,
+        energy: PropTypes.number.isRequired,
+        maxEnergy: PropTypes.number.isRequired,
+      })
+    ),
+  }).isRequired,
 };
 
 export default GameInfoPanel;

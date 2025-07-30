@@ -15,8 +15,20 @@ export default {
   darkMode: "class", // Abilita il supporto per il tema scuro basato su classe
   theme: {
     extend: {
-      // Qui puoi estendere il tema di default di Tailwind
-      // (es. colori, font, etc.)
+      animation: {
+        "fade-in": "fadeIn 0.5s ease-in-out",
+        "fade-out": "fadeOut 0.5s ease-in-out forwards",
+      },
+      keyframes: {
+        fadeIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        fadeOut: {
+          "0%": { opacity: "1" },
+          "100%": { opacity: "0" },
+        },
+      },
     },
   },
   plugins: [

@@ -4,6 +4,7 @@ import Button from "../ui/Button";
 import Alert from "../ui/Alert";
 import Card from "../ui/Card";
 import CardHeader from "../ui/CardHeader";
+import Select from "../ui/Select";
 import CodeEditor from "./CodeEditor";
 
 /**
@@ -13,9 +14,7 @@ import CodeEditor from "./CodeEditor";
 const AIEditorPanel = ({
   code,
   onCodeChange,
-  onUpdate,
   compileError,
-  isGameRunning,
   scripts,
   activeScript,
   onSelectScript,
@@ -25,7 +24,7 @@ const AIEditorPanel = ({
   return (
     // Il contenitore principale è ora gestito dal componente Modal.
     // Rimuoviamo la Toolbar e il div contenitore esterno.
-    <div className="grid grid-cols-12 gap-4" style={{ height: "75vh" }}>
+    <div className="grid grid-cols-12 gap-4 h-full">
       {/* Colonna Sinistra: Lista Script */}
       <div className="col-span-3 flex flex-col gap-4">
         <Card className="flex-grow flex flex-col">

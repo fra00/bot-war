@@ -37,7 +37,6 @@ export function useAIScripts() {
       if (scriptToSelect) {
         setActiveScript(scriptToSelect);
         setPlayerCode(scriptToSelect.code);
-        AIScriptService.setLastActiveScriptId(scriptId);
       }
     },
     [scripts]
@@ -65,7 +64,9 @@ export function useAIScripts() {
     if (newScriptName && newScriptName.trim() !== "") {
       const newScript = {
         name: newScriptName.trim(),
-        code: `/**\n * @name ${newScriptName.trim()}\n */\n(class PlayerAI {\n  onTick(game, me) {\n    // Il tuo codice qui...\n    me.log('Tick!');\n  }\n})`,
+        // Il template precedente generava una classe, ma il nostro compilatore si aspetta un oggetto.
+        // Questo nuovo template è corretto e coerente con il resto dell'applicazione.
+        code: `({\n  state: {},\n\n  /**\n   * @param {object} api - L'API del robot per interagire con il gioco.\n   */\n  run: function (api) {\n    // Il tuo codice qui...\n    api.log('Tick!');\n  }\n})`,
       };
       const savedScript = AIScriptService.saveScript(newScript);
       setScripts((prev) => [...prev, savedScript]);
@@ -74,14 +75,29 @@ export function useAIScripts() {
   }, [scripts.length, handleSelectScript]);
 
   const handleSaveOnly = useCallback(() => {
-    if (!activeScript) return;
-    const updatedScript = { ...activeScript, code: playerCode };
-    AIScriptService.saveScript(updatedScript);
-    // Aggiorna lo stato locale per riflettere il salvataggio
-    setActiveScript(updatedScript);
-    setScripts((prev) =>
-      prev.map((s) => (s.id === updatedScript.id ? updatedScript : s))
-    );
+    if (!activeScript) return { success: false };
+
+    try {
+      // Tenta di compilare il codice per validarlo.
+      // La funzione compileAI lancerà un errore se il codice non è valido.
+      compileAI(playerCode);
+
+      // Se la compilazione ha successo, procedi con il salvataggio.
+      const updatedScript = { ...activeScript, code: playerCode };
+      AIScriptService.saveScript(updatedScript);
+      setActiveScript(updatedScript);
+      setScripts((prev) =>
+        prev.map((s) => (s.id === updatedScript.id ? updatedScript : s))
+      );
+      // Imposta questo script come l'ultimo attivo solo se il salvataggio ha successo.
+      AIScriptService.setLastActiveScriptId(updatedScript.id);
+      setCompileError(null); // Pulisci eventuali errori precedenti
+      return { success: true };
+    } catch (error) {
+      // Se la compilazione fallisce, imposta il messaggio di errore e non salvare.
+      setCompileError(`Errore di compilazione: ${error.message}`);
+      return { success: false };
+    }
   }, [playerCode, activeScript]);
 
   const handleUpdateAI = useCallback(() => {
@@ -96,7 +112,7 @@ export function useAIScripts() {
       setScripts((prev) => prev.map((s) => (s.id === updatedScript.id ? updatedScript : s)));
       return { success: true };
     } catch (error) {
-      setCompileError(`Error: ${error.message}`);
+      setCompileError(`Errore di compilazione: ${error.message}`);
       return { success: false };
     }
   }, [playerCode, activeScript]);
