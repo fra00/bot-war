@@ -157,7 +157,8 @@ const DefaultAIBase = {
           if (api.isQueueEmpty()) {
             api.moveTo(
               this.state.lastKnownEnemyPosition.x,
-              this.state.lastKnownEnemyPosition.y
+              this.state.lastKnownEnemyPosition.y,
+              70 // Usa una velocità ridotta per risparmiare energia
             );
             // Se moveTo non ha accodato comandi (es. percorso non trovato),
             // la coda è ancora vuota. In questo caso, abbandoniamo la caccia
@@ -180,7 +181,7 @@ const DefaultAIBase = {
           const arena = api.getArenaDimensions();
           const randomX = Math.random() * arena.width;
           const randomY = Math.random() * arena.height;
-          api.moveTo(randomX, randomY);
+          api.moveTo(randomX, randomY, 70); // Pattuglia a velocità ridotta
         }
         break;
 

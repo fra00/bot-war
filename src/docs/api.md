@@ -249,6 +249,8 @@ api.getBatteryState()
 
     Valore di ritorno: Un oggetto `{ energy: number, maxEnergy: number }`.
 
+    **Nota sulla Ricarica:** L'energia si ricarica passivamente ad ogni tick del gioco. La quantità di ricarica è definita dalla proprietà `rechargeRate` del componente batteria equipaggiato. Se il consumo di energia dovuto alle azioni (movimento, fuoco, etc.) è inferiore alla ricarica passiva, l'energia totale del bot aumenterà.
+
 api.getArenaDimensions()
 
     Restituisce le dimensioni e gli ostacoli dell'arena.
