@@ -1,18 +1,21 @@
 import React, { useState, useCallback, useEffect } from "react";
 import GameManager from "./components/game/GameManager";
+import AIScriptService from "./services/AIScriptService";
 import DefaultAI from "./game/ai/DefaultAI";
 import Arena from "./components/game/Arena";
-import initialPlayerCode from "./game/ai/PlayerAI";
 import Button from "./components/ui/Button";
 import Drawer from "./components/ui/Drawer"; // Mantenuto per il log
 import useDisclosure from "./components/ui/useDisclosure";
 import CardHeader from "./components/ui/CardHeader";
 import GameInfoPanel from "./components/game/GameInfoPanel";
+import CardFooter from "./components/ui/CardFooter";
 import AIEditorPanel from "./components/game/AIEditorPanel";
 import Toolbar from "./components/ui/Toolbar";
 import GameOverModal from "./components/game/GameOverModal";
 import { compileAI } from "./game/ai/compiler";
+import Modal from "./components/ui/Modal";
 import ApiDocsModal from "./components/docs/ApiDocsModal";
+import { useAIScripts } from "./hooks/useAIScripts";
 
 // Questo componente UI è stato estratto per risolvere una violazione delle "Rules of Hooks".
 // L'hook `useEffect` non può essere chiamato all'interno della render prop di GameManager.
@@ -36,6 +39,12 @@ const GameUI = ({
   onGameOverClose,
   onRestart,
   onApiDocsOpen,
+  scripts,
+  activeScript,
+  onSelectScript,
+  onDeleteScript,
+  onCreateNewScript,
+  onSaveOnly,
 }) => {
   // Effetto per aprire il modale di fine partita
   useEffect(() => {
@@ -61,13 +70,13 @@ const GameUI = ({
         </Button>
       </Toolbar>
       {/* Layout principale a due colonne (fisso) con grid di Tailwind */}
-      <div className="grid grid-cols-4 gap-4 mt-4">
-        {/* Colonna sinistra: Arena (occupa sempre 3 colonne) */}
-        <div className="col-span-3">
+      <div className="grid grid-cols-12 gap-4 mt-4">
+        {/* Colonna sinistra: Arena (occupa 3 colonne) */}
+        <div className="col-span-8">
           <Arena gameState={gameState} />
         </div>
-        {/* Colonna destra: Info Bots (occupa sempre 1 colonna) */}
-        <div className="col-span-1">
+        {/* Colonna destra: Info Bots (occupa 1 colonna) */}
+        <div className="col-span-4">
           <GameInfoPanel gameState={gameState} />
         </div>
       </div>
@@ -75,18 +84,44 @@ const GameUI = ({
       {/* Dialog a schermo intero per l'editor AI.
           Utilizziamo un div con posizionamento fisso invece del componente Modal
           per avere il controllo completo sulle dimensioni e ottenere un layout a schermo intero. */}
-      {isEditorOpen && (
-        <div className="fixed inset-0 z-50 bg-background-primary p-4">
+      <Modal
+        isOpen={isEditorOpen}
+        onClose={onEditorClose}
+        title="AI Editor"
+        fullscreen={true}
+      >
+        <div className="flex flex-col" style={{ height: "75vh" }}>
           <AIEditorPanel
+            scripts={scripts}
+            activeScript={activeScript}
             code={playerCode}
             onCodeChange={onCodeChange}
-            onUpdate={onUpdate}
             compileError={compileError}
-            isGameRunning={gameState.status === "running"}
-            onClose={onEditorClose}
+            onSelectScript={onSelectScript}
+            onDeleteScript={onDeleteScript}
+            onCreateNewScript={onCreateNewScript}
           />
+          <CardFooter>
+            <Button onClick={onSaveOnly} variant="secondary">
+              Salva Modifiche
+            </Button>
+            <Button
+              onClick={onUpdate}
+              disabled={gameState.status === "running"}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {activeScript
+                ? `Applica "${activeScript.name}" e Riavvia`
+                : "Applica e Riavvia"}
+            </Button>
+            {gameState.status === "running" && (
+              <span className="text-sm text-yellow-400 ml-4">
+                (La partita in corso verrà terminata per applicare le modifiche)
+              </span>
+            )}
+          </CardFooter>
         </div>
-      )}
+      </Modal>
 
       {/* Drawer per i log a destra (con maniglia) */}
       <Drawer
@@ -135,22 +170,27 @@ function App() {
     onClose: onApiDocsClose,
   } = useDisclosure();
   const [gameKey, setGameKey] = useState(0);
-  const [playerCode, setPlayerCode] = useState(initialPlayerCode);
-  const [playerAI, setPlayerAI] = useState(() => compileAI(initialPlayerCode));
-  const [compileError, setCompileError] = useState(null);
 
-  const handleUpdateAI = useCallback(() => {
-    try {
-      const newAI = compileAI(playerCode);
-      setPlayerAI(() => newAI);
-      setCompileError(null);
-      // Forziamo il re-mount del GameManager per usare la nuova IA.
-      // Questo è un pattern pulito per resettare completamente lo stato del gioco.
+  const {
+    scripts,
+    activeScript,
+    playerCode,
+    playerAI,
+    compileError,
+    setPlayerCode,
+    handleSelectScript,
+    handleDeleteScript,
+    handleCreateNewScript,
+    handleUpdateAI,
+    handleSaveOnly,
+  } = useAIScripts();
+
+  const handleApplyAIChanges = useCallback(() => {
+    const { success } = handleUpdateAI();
+    if (success) {
       setGameKey((k) => k + 1);
-    } catch (error) {
-      setCompileError(`Error: ${error.message}`);
     }
-  }, [playerCode]);
+  }, [handleUpdateAI]);
 
   const handleRestart = useCallback(() => {
     onGameOverClose();
@@ -159,7 +199,11 @@ function App() {
 
   return (
     <div className="p-4">
-      <GameManager key={gameKey} playerAI={playerAI} defaultAI={DefaultAI}>
+      <GameManager
+        key={gameKey}
+        playerAI={playerAI || DefaultAI}
+        defaultAI={DefaultAI}
+      >
         {({ gameState, controls }) => (
           <GameUI
             gameState={gameState}
@@ -169,7 +213,7 @@ function App() {
             onEditorClose={onEditorClose}
             playerCode={playerCode}
             onCodeChange={setPlayerCode}
-            onUpdate={handleUpdateAI}
+            onUpdate={handleApplyAIChanges}
             compileError={compileError}
             isLogOpen={isLogOpen}
             onLogOpen={onLogOpen}
@@ -179,6 +223,12 @@ function App() {
             onGameOverClose={onGameOverClose}
             onRestart={handleRestart}
             onApiDocsOpen={onApiDocsOpen}
+            scripts={scripts}
+            activeScript={activeScript}
+            onSelectScript={handleSelectScript}
+            onDeleteScript={handleDeleteScript}
+            onCreateNewScript={handleCreateNewScript}
+            onSaveOnly={handleSaveOnly}
           />
         )}
       </GameManager>

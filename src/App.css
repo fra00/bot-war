@@ -145,10 +145,6 @@
 }
 
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 1rem;
-  text-align: left;
   width: 100%; /* Assicura che il container occupi tutta la larghezza disponibile */
 }
 

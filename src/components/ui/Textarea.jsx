@@ -15,6 +15,7 @@ const Textarea = React.forwardRef(
       placeholder,
       disabled = false,
       error = null,
+      rows = 3,
       className = "",
       ...rest
     },
@@ -38,6 +39,7 @@ const Textarea = React.forwardRef(
           onChange={onChange}
           placeholder={placeholder}
           disabled={disabled}
+          rows={rows}
           aria-invalid={!!error}
           aria-describedby={error ? `${id}-error` : undefined}
           {...rest}
@@ -62,6 +64,7 @@ Textarea.propTypes = {
   placeholder: PropTypes.string,
   disabled: PropTypes.bool,
   error: PropTypes.string,
+  rows: PropTypes.number,
   className: PropTypes.string,
 };
 

@@ -8,7 +8,7 @@
   display: flex;
   justify-content: center;
   align-items: center; /* Ri-centra il modale verticalmente */
-  z-index: 1000;
+  z-index: 5000; /* Valore molto alto per garantire che sia sopra a tutto */
   padding: 2rem; /* Aggiunge un po' di spazio per schermi piccoli */
   box-sizing: border-box;
 }
