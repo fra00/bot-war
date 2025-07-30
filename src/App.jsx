@@ -55,7 +55,7 @@ const GameUI = ({
 
   return (
     <>
-      <Toolbar title="Bot War" showThemeSwitcher={true} className="mb-4">
+      <Toolbar title="Bot War" showThemeSwitcher={true}>
         <Button onClick={controls.start} disabled={gameState.status !== "idle"}>
           Avvia
         </Button>
@@ -70,7 +70,7 @@ const GameUI = ({
         </Button>
       </Toolbar>
       {/* Layout principale a due colonne (fisso) con grid di Tailwind */}
-      <div className="grid grid-cols-12 gap-4 mt-4">
+      <div className="grid grid-cols-12 gap-4">
         {/* Colonna sinistra: Arena (occupa 3 colonne) */}
         <div className="col-span-8">
           <Arena gameState={gameState} />
@@ -198,7 +198,7 @@ function App() {
   }, [onGameOverClose]);
 
   return (
-    <div className="p-4">
+    <div className="p-4 pt-20">
       <GameManager
         key={gameKey}
         playerAI={playerAI || DefaultAI}
