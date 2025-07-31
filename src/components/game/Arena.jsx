@@ -70,6 +70,42 @@ function Arena({ gameState }) {
           );
         })}
 
+        {/* Renderizza i marcatori di destinazione */}
+        {robots.map((robot) =>
+          robot.destination ? (
+            <g
+              key={`${robot.id}-destination`}
+              style={{ pointerEvents: "none" }}
+              transform={`translate(${robot.destination.x}, ${robot.destination.y})`}
+              opacity="0.7"
+            >
+              <circle
+                r="10"
+                stroke={robot.id === "player" ? "#61dafb" : "#e06c75"}
+                strokeWidth="1.5"
+                strokeDasharray="3 3"
+                fill="none"
+              />
+              <line
+                x1="-7"
+                y1="0"
+                x2="7"
+                y2="0"
+                stroke={robot.id === "player" ? "#61dafb" : "#e06c75"}
+                strokeWidth="1.5"
+              />
+              <line
+                x1="0"
+                y1="-7"
+                x2="0"
+                y2="7"
+                stroke={robot.id === "player" ? "#61dafb" : "#e06c75"}
+                strokeWidth="1.5"
+              />
+            </g>
+          ) : null
+        )}
+
         {/* Renderizza i proiettili */}
         {projectiles.map((p) => (
           <circle key={p.id} cx={p.x} cy={p.y} r={3} fill="#f9c74f" style={{ filter: "url(#glow)" }} />

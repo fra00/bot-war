@@ -74,6 +74,12 @@ class Robot {
     this.motor = motor;
     this.radar = radar;
 
+    /**
+     * The destination of the current move command, if any.
+     * @type {{x: number, y: number} | null}
+     */
+    this.destination = null;
+
     // Stato derivato dai componenti
     this.maxHullHp = 100; // La vita dello "scafo" è fissa
     this.hullHp = this.maxHullHp;
@@ -215,10 +221,18 @@ class Robot {
         }
       },
       // --- Azioni Asincrone ---
-      move: (distance, speedPercentage = 100) =>
-        setAction("START_MOVE", { distance, speedPercentage }),
+      move: (distance, speedPercentage = 100) => {
+        const angleRad = this.rotation * (Math.PI / 180);
+        const destX = this.x + distance * Math.cos(angleRad);
+        const destY = this.y + distance * Math.sin(angleRad);
+        this.destination = { x: destX, y: destY };
+        setAction("START_MOVE", { distance, speedPercentage });
+      },
 
       moveTo: (targetX, targetY, speedPercentage = 100) => {
+        // Imposta la destinazione finale per il rendering del marcatore
+        this.destination = { x: targetX, y: targetY };
+
         const cellSize = Robot.RADIUS * 2;
         const grid = createNavigationGrid(gameState.arena, Robot.RADIUS);
 
@@ -251,8 +265,9 @@ class Robot {
         setAction("START_ROTATE", { angle, speedPercentage }),
 
       stop: () => {
+        this.destination = null;
         // Stop ha la priorità e cancella le altre azioni pianificate per questo tick.
-        this.nextActions = [{ type: "STOP_ACTION" }];
+        this.nextActions = [{ type: "STOP_ACTION" }]; // Cancella le altre azioni del tick
       },
 
       aimAt: (targetX, targetY, speedPercentage = 100) => {
@@ -344,6 +359,12 @@ class Robot {
    * @param {import('./Game.js').GameState} gameState
    */
   computeNextAction(gameState) {
+    // Se la coda di comandi è vuota, significa che abbiamo raggiunto la destinazione
+    // o siamo stati fermati. In ogni caso, il marcatore di destinazione non è più necessario.
+    if (this.commandQueue.length === 0) {
+      this.destination = null;
+    }
+
     this.nextActions = []; // Resetta le azioni per il tick corrente
     // L'IA viene eseguita ad ogni tick, anche se un comando asincrono è attivo.
     // Questo le permette di reagire a eventi (es. essere colpiti) e, se necessario,
@@ -371,6 +392,7 @@ class Robot {
       isOverweight: this.isOverweight,
       radarRange: this.radar.range,
       logs: this.logs,
+      destination: this.destination,
     };
   }
 }
