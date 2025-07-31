@@ -2,7 +2,7 @@
 
 Benvenuto! Questo tutorial ti guiderà passo dopo passo nella creazione di un'intelligenza artificiale (IA) per il tuo primo robot. Imparerai a implementare una logica di base che permette al tuo bot di cercare il nemico, attaccarlo quando lo trova e tentare di schivare i colpi.
 
-Utilizzeremo i concetti fondamentali dell'API, come la **coda di comandi** e la **macchina a stati**.
+Utilizzeremo i concetti fondamentali dell'API, come la **coda di comandi**, gli **eventi** e una **macchina a stati**.
 
 ---
 
@@ -13,12 +13,11 @@ Ogni IA è un oggetto JavaScript con due elementi principali:
 1.  Un oggetto `state` per memorizzare informazioni tra un tick e l'altro (come lo stato attuale del bot).
 2.  Una funzione `run(api)` che viene eseguita ad ogni tick del gioco.
 
-Iniziamo con lo scheletro della nostra IA. Copia questo codice nell'editor:
+Copia questo scheletro migliorato nell'editor. Introduce `api.log` per il debug e `lastKnownEnemyPosition` per ricordare dove abbiamo visto il nemico l'ultima volta.
 
 ```javascript
 ({
   // L'oggetto 'state' mantiene i dati tra i tick.
-  // Lo inizializzeremo al primo tick.
   state: {},
 
   /**
@@ -26,10 +25,11 @@ Iniziamo con lo scheletro della nostra IA. Copia questo codice nell'editor:
    * @param {object} api - L'API per controllare il tuo bot.
    */
   run: function (api) {
-    // Inizializzazione al primo tick
+    // Inizializzazione al primo tick.
     if (typeof this.state.current === "undefined") {
       this.state.current = "SEARCHING"; // Inizia cercando il nemico
-      console.log("Bot inizializzato. Stato iniziale: SEARCHING");
+      this.state.lastKnownEnemyPosition = null; // Memorizza l'ultima posizione nota del nemico
+      api.log("Bot inizializzato. Stato iniziale: SEARCHING");
     }
 
     // Qui inseriremo la logica della nostra macchina a stati.
@@ -43,15 +43,15 @@ Iniziamo con lo scheletro della nostra IA. Copia questo codice nell'editor:
 
 Una macchina a stati è un modo eccellente per organizzare la logica del bot. Il nostro bot avrà tre stati principali:
 
-- `SEARCHING`: Il bot si muove nell'arena alla ricerca del nemico.
-- `ATTACKING`: Il bot ha trovato il nemico, lo mira e gli spara.
-- `EVADING`: Il bot è stato colpito e tenta una manovra evasiva.
+- **`SEARCHING`**: Il bot si muove nell'arena alla ricerca del nemico.
+- **`ATTACKING`**: Il bot ha trovato il nemico, lo mira e gli spara.
+- **`EVADING`**: Il bot è stato colpito e tenta una manovra evasiva.
 
 Aggiungiamo la struttura `switch` all'interno della funzione `run` per gestire questi stati.
 
 ```javascript
 run: function (api) {
-  // ... (codice di inizializzazione)
+  // ... (codice di inizializzazione)...
 
   // Logica della macchina a stati
   switch (this.state.current) {
@@ -103,19 +103,37 @@ if (events.some((e) => e.type === "ENEMY_DETECTED")) {
 
 ## Passo 3: Implementare lo Stato `SEARCHING`
 
-Nello stato `SEARCHING`, vogliamo che il nostro bot si muova in punti casuali dell'arena finché non trova il nemico.
+Nello stato `SEARCHING`, la logica è:
+1.  Se vediamo il nemico, passiamo subito ad `ATTACKING`.
+2.  Se abbiamo un'`lastKnownEnemyPosition`, andiamo lì per investigare.
+3.  Altrimenti, pattugliamo un punto casuale.
 
 Usiamo `api.isQueueEmpty()` per assicurarci di dare un nuovo comando solo quando il bot ha finito il movimento precedente.
 
 ```javascript
 case 'SEARCHING':
-  // Se il bot non sta facendo nulla, digli di muoversi verso un punto casuale.
+  // Controlla sempre se il nemico è visibile, anche senza l'evento ENEMY_DETECTED.
+  if (api.scan()) {
+    this.state.current = 'ATTACKING';
+    api.stop();
+    break;
+  }
+
+  // Se abbiamo perso il nemico, andiamo a controllare la sua ultima posizione nota.
+  if (this.state.lastKnownEnemyPosition && api.isQueueEmpty()) {
+    api.log("Investigo sull'ultima posizione nota del nemico...");
+    api.moveTo(this.state.lastKnownEnemyPosition.x, this.state.lastKnownEnemyPosition.y);
+    this.state.lastKnownEnemyPosition = null; // Controlla solo una volta
+    break;
+  }
+
+  // Se il bot è inattivo, digli di muoversi verso un punto casuale.
   if (api.isQueueEmpty()) {
     const arena = api.getArenaDimensions();
     const randomX = Math.random() * arena.width;
     const randomY = Math.random() * arena.height;
 
-    console.log(`Pattugliamento: mi muovo verso ${Math.round(randomX)}, ${Math.round(randomY)}`);
+    api.log(`Pattugliamento: mi muovo verso ${Math.round(randomX)}, ${Math.round(randomY)}`);
     api.moveTo(randomX, randomY);
   }
   break;
