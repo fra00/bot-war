@@ -106,7 +106,7 @@ const DefaultAIBase = {
 
         // Se siamo "in movimento per ricarica" ma la coda comandi è vuota,
         // significa che siamo arrivati e stiamo aspettando.
-        // Controlliamo costantemente se arriva un nemico.
+        // Controlliamo costantemente se arriva un nemico e ci giriamo verso il centro.
         if (this.state.isMovingToRecharge && api.isQueueEmpty()) {
           const enemy = api.scan();
           if (enemy) {
@@ -114,6 +114,9 @@ const DefaultAIBase = {
             this.state.isMovingToRecharge = false; // Forza la ricerca di un nuovo posto.
             break;
           }
+          // Se non c'è un nemico, girati verso il centro dell'arena per avere una buona visuale.
+          const arena = api.getArenaDimensions();
+          api.aimAt(arena.width / 2, arena.height / 2);
         }
 
         // Se NON ci stiamo muovendo per ricaricare e la coda è vuota,
