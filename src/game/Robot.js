@@ -80,6 +80,12 @@ class Robot {
      */
     this.destination = null;
 
+    /**
+     * The visual path for the current move command.
+     * @type {Array<{x: number, y: number}> | null}
+     */
+    this.path = null;
+
     // Stato derivato dai componenti
     this.maxHullHp = 100; // La vita dello "scafo" è fissa
     this.hullHp = this.maxHullHp;
@@ -226,12 +232,14 @@ class Robot {
         const destX = this.x + distance * Math.cos(angleRad);
         const destY = this.y + distance * Math.sin(angleRad);
         this.destination = { x: destX, y: destY };
+        this.path = [{ x: this.x, y: this.y }, { x: destX, y: destY }];
         setAction("START_MOVE", { distance, speedPercentage });
       },
 
       moveTo: (targetX, targetY, speedPercentage = 100) => {
         // Imposta la destinazione finale per il rendering del marcatore
         this.destination = { x: targetX, y: targetY };
+        this.path = null; // Resetta il percorso prima di calcolarne uno nuovo
 
         const cellSize = Robot.RADIUS * 2;
         const grid = createNavigationGrid(gameState.arena, Robot.RADIUS);
@@ -248,6 +256,15 @@ class Robot {
         const path = findPath(grid, startCoords, endCoords);
 
         if (path && path.length > 1) {
+          // Memorizza il percorso visivo in coordinate del mondo
+          const worldPath = path.map((node) => ({
+            x: node.x * cellSize + cellSize / 2,
+            y: node.y * cellSize + cellSize / 2,
+          }));
+          // Aggiunge la posizione di partenza del bot per un tracciato completo
+          worldPath.unshift({ x: this.x, y: this.y });
+          this.path = worldPath;
+
           path.shift(); // Rimuove il nodo di partenza
           const actions = generateCommandsForPath(
             path,
@@ -266,6 +283,7 @@ class Robot {
 
       stop: () => {
         this.destination = null;
+        this.path = null;
         // Stop ha la priorità e cancella le altre azioni pianificate per questo tick.
         this.nextActions = [{ type: "STOP_ACTION" }]; // Cancella le altre azioni del tick
       },
@@ -363,6 +381,7 @@ class Robot {
     // o siamo stati fermati. In ogni caso, il marcatore di destinazione non è più necessario.
     if (this.commandQueue.length === 0) {
       this.destination = null;
+      this.path = null;
     }
 
     this.nextActions = []; // Resetta le azioni per il tick corrente
@@ -393,6 +412,7 @@ class Robot {
       radarRange: this.radar.range,
       logs: this.logs,
       destination: this.destination,
+      path: this.path,
     };
   }
 }

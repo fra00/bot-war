@@ -70,6 +70,22 @@ function Arena({ gameState }) {
           );
         })}
 
+        {/* Renderizza i percorsi dei bot */}
+        {robots.map((robot) =>
+          robot.path && robot.path.length > 1 ? (
+            <polyline
+              key={`${robot.id}-path`}
+              points={robot.path.map((p) => `${p.x},${p.y}`).join(" ")}
+              fill="none"
+              stroke={robot.id === "player" ? "#61dafb" : "#e06c75"}
+              strokeWidth="1"
+              strokeDasharray="2 4"
+              opacity="0.5"
+              style={{ pointerEvents: "none" }}
+            />
+          ) : null
+        )}
+
         {/* Renderizza i marcatori di destinazione */}
         {robots.map((robot) =>
           robot.destination ? (
