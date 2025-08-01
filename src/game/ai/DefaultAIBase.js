@@ -132,23 +132,45 @@ const DefaultAIBase = {
             { x: 50, y: arena.height - 50 },
             { x: arena.width - 50, y: arena.height - 50 },
           ];
-          let bestCorner = corners[0];
 
-          if (enemyPos) {
-            let maxDistSq = 0;
-            for (const corner of corners) {
-              const dSq =
-                (corner.x - enemyPos.x) ** 2 + (corner.y - enemyPos.y) ** 2;
-              if (dSq > maxDistSq) {
-                maxDistSq = dSq;
-                bestCorner = corner;
+          // Filtra gli angoli per tenere solo quelli calpestabili.
+          const walkableCorners = corners.filter((corner) =>
+            api.isPositionValid(corner)
+          );
+
+          if (walkableCorners.length > 0) {
+            let bestCorner = walkableCorners[0];
+            if (enemyPos) {
+              let maxDistSq = 0;
+              for (const corner of walkableCorners) {
+                const dSq =
+                  (corner.x - enemyPos.x) ** 2 + (corner.y - enemyPos.y) ** 2;
+                if (dSq > maxDistSq) {
+                  maxDistSq = dSq;
+                  bestCorner = corner;
+                }
+              }
+            } else {
+              // Se non sappiamo dov'è il nemico, un angolo valido casuale va bene.
+              bestCorner =
+                walkableCorners[
+                  Math.floor(Math.random() * walkableCorners.length)
+                ];
+            }
+            api.moveTo(bestCorner.x, bestCorner.y);
+          } else {
+            // Fallback: se nessun angolo è valido (scenario improbabile ma possibile),
+            // muoviti in un punto casuale valido per evitare di rimanere bloccato.
+            api.log("Nessun angolo sicuro trovato! Scelgo un punto casuale.");
+            for (let i = 0; i < 10; i++) { // Tenta 10 volte
+              const randomX = Math.random() * arena.width;
+              const randomY = Math.random() * arena.height;
+              if (api.isPositionValid({ x: randomX, y: randomY })) {
+                api.moveTo(randomX, randomY);
+                break;
               }
             }
-          } else {
-            // Se non sappiamo dov'è il nemico, un angolo casuale va bene.
-            bestCorner = corners[Math.floor(Math.random() * corners.length)];
           }
-          api.moveTo(bestCorner.x, bestCorner.y);
 
           this.state.isMovingToRecharge = true;
         }
