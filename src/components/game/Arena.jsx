@@ -20,14 +20,43 @@ function Arena({ gameState }) {
     >
       <svg width={width} height={height} className="absolute top-0 left-0">
         <defs>
-          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="3.5" result="coloredBlur" />
+          {/* Filtro per un bagliore più intenso */}
+          <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur" />
             <feMerge>
               <feMergeNode in="coloredBlur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+
+          {/* Pattern per la griglia di sfondo */}
+          <pattern
+            id="grid"
+            width="40"
+            height="40"
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d="M 40 0 L 0 0 0 40"
+              fill="none"
+              stroke="rgba(100, 116, 139, 0.2)"
+              strokeWidth="1"
+            />
+          </pattern>
+
+          {/* Gradienti per un look metallico */}
+          <radialGradient id="player-gradient">
+            <stop offset="0%" stopColor="#a1eafb" />
+            <stop offset="100%" stopColor="#61dafb" />
+          </radialGradient>
+          <radialGradient id="enemy-gradient">
+            <stop offset="0%" stopColor="#f08c95" />
+            <stop offset="100%" stopColor="#e06c75" />
+          </radialGradient>
         </defs>
+
+        {/* Sfondo con griglia */}
+        <rect width="100%" height="100%" fill="url(#grid)" />
 
         {/* Renderizza gli ostacoli */}
         {obstacles.map((obstacle) => (
@@ -37,8 +66,8 @@ function Arena({ gameState }) {
             y={obstacle.y}
             width={obstacle.width}
             height={obstacle.height}
-            fill="#666"
-            stroke="#444"
+            fill="rgba(100, 116, 139, 0.5)"
+            stroke="rgba(150, 166, 189, 0.7)"
             strokeWidth="2"
           />
         ))}
@@ -46,8 +75,8 @@ function Arena({ gameState }) {
         {/* Renderizza i robot e il loro raggio radar */}
         {robots.map((robot) => {
           const angleRad = (robot.rotation * Math.PI) / 180;
-          const lineEndX = robot.x + 20 * Math.cos(angleRad);
-          const lineEndY = robot.y + 20 * Math.sin(angleRad);
+          const turretRadius = 8;
+          const cannonLength = 22;
           const isPlayer = robot.id === "player";
 
           return (
@@ -57,15 +86,41 @@ function Arena({ gameState }) {
                 cx={robot.x}
                 cy={robot.y}
                 r={robot.radarRange}
-                fill={isPlayer ? "rgba(97, 218, 251, 0.05)" : "rgba(224, 108, 117, 0.05)"}
-                stroke={isPlayer ? "rgba(97, 218, 251, 0.2)" : "rgba(224, 108, 117, 0.2)"}
+                fill={
+                  isPlayer
+                    ? "rgba(97, 218, 251, 0.05)"
+                    : "rgba(224, 108, 117, 0.05)"
+                }
+                stroke={
+                  isPlayer
+                    ? "rgba(97, 218, 251, 0.2)"
+                    : "rgba(224, 108, 117, 0.2)"
+                }
                 strokeWidth="1"
                 strokeDasharray="4 4"
               />
-              {/* Corpo del robot */}
-              <circle cx={robot.x} cy={robot.y} r={15} fill={isPlayer ? "#61dafb" : "#e06c75"} stroke="#fff" strokeWidth="2" style={{ filter: "url(#glow)" }} />
-              {/* Linea di direzione */}
-              <line x1={robot.x} y1={robot.y} x2={lineEndX} y2={lineEndY} stroke="#fff" strokeWidth="3" />
+              {/* Corpo del robot (chassis) */}
+              <circle
+                cx={robot.x}
+                cy={robot.y}
+                r={15}
+                fill={isPlayer ? "url(#player-gradient)" : "url(#enemy-gradient)"}
+                stroke={isPlayer ? "#c1faff" : "#ffcdd2"}
+                strokeWidth="1"
+              />
+              {/* Torretta del robot */}
+              <g transform={`rotate(${robot.rotation}, ${robot.x}, ${robot.y})`}>
+                <circle
+                  cx={robot.x}
+                  cy={robot.y}
+                  r={turretRadius}
+                  fill={isPlayer ? "#4a9fb5" : "#b0565e"}
+                  stroke={isPlayer ? "#c1faff" : "#ffcdd2"}
+                  strokeWidth="1.5"
+                />
+                {/* Cannone */}
+                <rect x={robot.x + turretRadius - 2} y={robot.y - 2} width={cannonLength} height={4} fill={isPlayer ? "#3a7f91" : "#8c454a"} rx="1" />
+              </g>
             </g>
           );
         })}
@@ -124,7 +179,16 @@ function Arena({ gameState }) {
 
         {/* Renderizza i proiettili */}
         {projectiles.map((p) => (
-          <circle key={p.id} cx={p.x} cy={p.y} r={3} fill="#f9c74f" style={{ filter: "url(#glow)" }} />
+          <g key={p.id} style={{ filter: "url(#glow)" }}>
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={4}
+              fill="#ffef99"
+              opacity="0.7"
+            />
+            <circle cx={p.x} cy={p.y} r={2} fill="#fff" />
+          </g>
         ))}
       </svg>
     </div>
