@@ -80,32 +80,48 @@ const DefaultAIBase = {
         // Condizione di uscita: se la batteria è sufficientemente carica, torna a cercare.
         if (batteryPercent >= 70) {
           this.setCurrentState("SEARCHING", api);
+          this.state.isMovingToRecharge = false; // Resetta lo stato per la prossima modalità
           break;
         }
 
-        // Se ci stiamo muovendo per ricaricare ma vediamo il nemico, il posto non è più sicuro.
-        // Annulliamo il movimento e ne cercheremo uno nuovo al prossimo tick.
-        const enemy = api.scan();
-        if (this.state.isMovingToRecharge && enemy) {
-          api.log("Nemico avvistato durante la ritirata! Cambio posto.");
-          api.stop();
-          this.state.isMovingToRecharge = false;
+        // Se abbiamo completato un movimento, significa che siamo arrivati a destinazione.
+        // Controlliamo se il posto è sicuro.
+        if (events.some((e) => e.type === "SEQUENCE_COMPLETED")) {
+          api.log("Arrivato a destinazione. Controllo sicurezza...");
+          const enemy = api.scan();
+          if (enemy) {
+            // Il posto non è sicuro. Annulliamo lo stato di "movimento per ricarica"
+            // in modo che al prossimo tick ne cerchi uno nuovo.
+            api.log("Il posto non è sicuro! Cerco un altro punto.");
+            this.state.isMovingToRecharge = false;
+          } else {
+            // Il posto è sicuro. Restiamo qui.
+            // Non facciamo nulla a 'isMovingToRecharge', così il bot sa che è "arrivato"
+            // e non deve cercare un nuovo posto.
+            api.log("Posto sicuro. In attesa e ricarica.");
+          }
+          // Usciamo per questo tick, la nuova logica verrà applicata al prossimo.
           break;
         }
 
-        // Se abbiamo finito di muoverci verso il punto di ricarica, mettiamoci in attesa.
-        if (
-          this.state.isMovingToRecharge &&
-          events.some((e) => e.type === "SEQUENCE_COMPLETED")
-        ) {
-          this.state.isMovingToRecharge = false;
-          api.log("Raggiunto punto di ricarica. In attesa...");
+        // Se siamo "in movimento per ricarica" ma la coda comandi è vuota,
+        // significa che siamo arrivati e stiamo aspettando.
+        // Controlliamo costantemente se arriva un nemico.
+        if (this.state.isMovingToRecharge && api.isQueueEmpty()) {
+          const enemy = api.scan();
+          if (enemy) {
+            api.log("Nemico avvistato mentre ricarico! Scappo.");
+            this.state.isMovingToRecharge = false; // Forza la ricerca di un nuovo posto.
+            break;
+          }
         }
 
-        // Se non ci stiamo muovendo e la coda è vuota, cerchiamo un posto sicuro.
+        // Se NON ci stiamo muovendo per ricaricare e la coda è vuota,
+        // significa che dobbiamo trovare un posto dove andare.
         if (!this.state.isMovingToRecharge && api.isQueueEmpty()) {
           api.log("Cerco un posto sicuro per ricaricare...");
           // Usa la posizione attuale del nemico se visibile, altrimenti l'ultima nota.
+          const enemy = api.scan();
           const enemyPos = enemy || this.state.lastKnownEnemyPosition;
 
           // Logica di ripiego: vai nell'angolo più lontano dal nemico.
