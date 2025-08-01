@@ -175,6 +175,22 @@ class Robot {
       this.nextActions.push({ type, payload });
     };
 
+    const log = (...args) => {
+      const message = args
+        .map((arg) => {
+          if (typeof arg === "object" && arg !== null) {
+            return JSON.stringify(arg);
+          }
+          return String(arg);
+        })
+        .join(" ");
+      this.logs.push(message);
+      // Limita la dimensione dell'array di log per evitare problemi di memoria
+      if (this.logs.length > 100) {
+        this.logs.shift();
+      }
+    };
+
     /**
      * Restituisce la lista di eventi significativi accaduti nell'ultimo tick
      * che coinvolgono questo robot (es. essere colpiti, colpire un bersaglio).
@@ -211,21 +227,7 @@ class Robot {
 
     return {
       // --- Azioni di Debug ---
-      log: (...args) => {
-        const message = args
-          .map((arg) => {
-            if (typeof arg === "object" && arg !== null) {
-              return JSON.stringify(arg);
-            }
-            return String(arg);
-          })
-          .join(" ");
-        this.logs.push(message);
-        // Limita la dimensione dell'array di log per evitare problemi di memoria
-        if (this.logs.length > 100) {
-          this.logs.shift();
-        }
-      },
+      log: log,
       // --- Azioni Asincrone ---
       move: (distance, speedPercentage = 100) => {
         const angleRad = this.rotation * (Math.PI / 180);
@@ -248,10 +250,41 @@ class Robot {
           x: Math.floor(this.x / cellSize),
           y: Math.floor(this.y / cellSize),
         };
-        const endCoords = {
+        let endCoords = {
           x: Math.floor(targetX / cellSize),
           y: Math.floor(targetY / cellSize),
         };
+
+        // --- NUOVA LOGICA DI FALLBACK ---
+        // Se il nodo di destinazione non è calpestabile, cerca il vicino più vicino che lo è.
+        // Questo risolve il problema del bot che tenta di raggiungere una posizione esatta
+        // che si trova in una cella della griglia non valida (es. troppo vicino a un muro).
+        if (!grid[endCoords.y]?.[endCoords.x]?.walkable) {
+          log(
+            `Destinazione (${endCoords.x},${endCoords.y}) non calpestabile. Cerco un'alternativa...`
+          );
+          let foundValidAlternative = false;
+          // Cerca in un'area crescente attorno alla destinazione originale
+          for (let radius = 1; radius < 5; radius++) {
+            for (let i = -radius; i <= radius; i++) {
+              for (let j = -radius; j <= radius; j++) {
+                if (i === 0 && j === 0) continue; // Salta il centro
+
+                const newY = endCoords.y + i;
+                const newX = endCoords.x + j;
+
+                if (grid[newY]?.[newX]?.walkable) {
+                  endCoords = { x: newX, y: newY };
+                  log(`Trovata alternativa valida a (${newX},${newY})`);
+                  foundValidAlternative = true;
+                  break;
+                }
+              }
+              if (foundValidAlternative) break;
+            }
+            if (foundValidAlternative) break;
+          }
+        }
 
         const path = findPath(grid, startCoords, endCoords);
 
