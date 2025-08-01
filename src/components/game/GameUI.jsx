@@ -54,9 +54,28 @@ const GameUI = ({
     }
   }, [gameState.status, onGameOver]);
 
+  const formatTime = (ms) => {
+    if (typeof ms !== "number" || ms < 0) {
+      return "00:00";
+    }
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60)
+      .toString()
+      .padStart(2, "0");
+    const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+    return `${minutes}:${seconds}`;
+  };
+
   return (
     <>
       <Toolbar title="Bot War" showThemeSwitcher={true}>
+        {(gameState.status === "running" ||
+          gameState.status === "paused" ||
+          gameState.status === "finished") && (
+          <span className="mr-4 text-lg font-mono tracking-wider text-gray-300">
+            {formatTime(gameState.elapsedTime)}
+          </span>
+        )}
         <Button onClick={controls.start} disabled={gameState.status !== "idle"}>
           Avvia
         </Button>
@@ -140,7 +159,7 @@ const GameUI = ({
 
       <GameOverModal
         isOpen={isGameOver}
-        winner={gameState.winner}
+        gameState={gameState}
         onRestart={onRestart}
         onClose={onGameOverClose}
       />

@@ -6,6 +6,7 @@ import { processActiveCommands } from "./systems/commandSystem.js";
 import { executeNextActions } from "./systems/actionSystem.js";
 import { updateRobotStates } from "./systems/robotStateSystem.js";
 import { setupGame } from "./gameSetup.js";
+import StatsTracker from "./StatsTracker.js";
 import { scanForEnemy, scanForObstacles } from "./systems/perceptionSystem.js";
 
 /**
@@ -40,6 +41,7 @@ class Game {
     this.playerAI = playerAI;
     this.defaultAI = defaultAI;
     this.projectileCounter = 0;
+    this.statsTracker = new StatsTracker();
 
     /** @type {Array<Object>} */
     this.events = [];
@@ -51,6 +53,10 @@ class Game {
      * @type {Object<string, Set<string>>}
      */
     this.detectionState = {};
+
+    // Timer state
+    this.startTime = null;
+    this.elapsedTime = 0;
     this.reset();
   }
 
@@ -61,10 +67,14 @@ class Game {
     this.events = [];
     this.lastTickEvents = [];
     this.projectileCounter = 0;
+    this.statsTracker.reset();
     this.detectionState = {
       player: new Set(),
       opponent: new Set(),
     };
+
+    this.startTime = null;
+    this.elapsedTime = 0;
 
     const { arena, robots } = setupGame(this.playerAI, this.defaultAI);
 
@@ -142,6 +152,12 @@ class Game {
       newEvents: actionEvents,
       updatedProjectileCounter,
     } = executeNextActions(this.robots, this.projectileCounter);
+
+    // Traccia i colpi sparati
+    newProjectiles.forEach(p => {
+      this.statsTracker.trackShotFired(p.ownerId);
+    });
+
     this.projectiles.push(...newProjectiles);
     this.events.push(...actionEvents);
     this.projectileCounter = updatedProjectileCounter;
@@ -153,11 +169,24 @@ class Game {
       this.arena
     );
     this.projectiles = remainingProjectiles;
-    this.events.push(...projectileEvents); // Aggiunge eventi di proiettile
+    this.events.push(...projectileEvents);
+
+    // Traccia i colpi a segno e il danno
+    projectileEvents.forEach(event => {
+      if (event.type === 'ENEMY_HIT') {
+        this.statsTracker.trackHit(event.ownerId, event.damage);
+        this.statsTracker.trackDamageTaken(event.targetId, event.damage);
+      }
+    });
 
     // 10. Controlla le condizioni di fine partita.
     const aliveRobots = this.robots.filter((r) => r.hullHp > 0);
     if (aliveRobots.length <= 1) {
+      // Finalizza il timer prima di interrompere lo stato.
+      if (this.status === "running" && this.startTime) {
+        this.elapsedTime += Date.now() - this.startTime;
+        this.startTime = null;
+      }
       this.status = "finished";
       this.winner = aliveRobots.length === 1 ? aliveRobots[0].id : null;
       this.lastTickEvents = this.events; // Salva gli eventi finali
@@ -174,6 +203,8 @@ class Game {
   start() {
     if (this.status === "idle") {
       this.status = "running";
+      this.startTime = Date.now();
+      this.elapsedTime = 0;
     }
   }
 
@@ -183,6 +214,8 @@ class Game {
   pause() {
     if (this.status === "running") {
       this.status = "paused";
+      this.elapsedTime += Date.now() - this.startTime;
+      this.startTime = null;
     }
   }
 
@@ -192,6 +225,7 @@ class Game {
   resume() {
     if (this.status === "paused") {
       this.status = "running";
+      this.startTime = Date.now();
     }
   }
 
@@ -200,6 +234,11 @@ class Game {
    * @returns {GameState}
    */
   getGameState() {
+    let currentElapsedTime = this.elapsedTime;
+    if (this.status === "running" && this.startTime) {
+      currentElapsedTime += Date.now() - this.startTime;
+    }
+
     return {
       arena: {
         width: this.arena.width,
@@ -210,7 +249,9 @@ class Game {
       projectiles: this.projectiles.map((p) => p.getState()),
       status: this.status,
       events: this.lastTickEvents, // L'IA vede gli eventi del tick precedente
+      elapsedTime: currentElapsedTime,
       winner: this.winner,
+      stats: this.statsTracker.getStats(),
     };
   }
 }
