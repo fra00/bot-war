@@ -7,12 +7,24 @@ const DefaultAIBase = {
   state: {},
 
   /**
+   * Imposta lo stato corrente e registra la transizione.
+   * @param {string} newState - Il nuovo stato da impostare.
+   * @param {Object} api - L'API del robot per il logging.
+   */
+  setCurrentState: function (newState, api) {
+    if (this.state.current !== newState) {
+      api.log(`Stato: ${this.state.current || "undefined"} -> ${newState}`);
+      this.state.current = newState;
+    }
+  },
+
+  /**
    * @param {Object} api - L'API del robot per interagire con il gioco.
    */
   run: function (api) {
     // Inizializzazione al primo tick
     if (typeof this.state.current === "undefined") {
-      this.state.current = "SEARCHING";
+      this.setCurrentState("SEARCHING", api);
       this.state.lastKnownEnemyPosition = null;
       this.state.isMovingToRecharge = false;
       this.state.evasionGraceTicks = 0; // Contatore per il periodo di grazia dell'evasione
@@ -24,7 +36,6 @@ const DefaultAIBase = {
     }
 
     const events = api.getEvents();
-    api.log("", `Current State: ${this.state.current}`);
 
     // --- Gestione Transizioni ad Alta Priorità ---
     const battery = api.getBatteryState();
@@ -32,10 +43,9 @@ const DefaultAIBase = {
 
     // Se la batteria è scarica, entra in modalità ricarica (a meno che non lo sia già)
     if (batteryPercent < 30 && this.state.current !== "RECHARGING") {
-      this.state.current = "RECHARGING";
+      this.setCurrentState("RECHARGING", api);
       this.state.isMovingToRecharge = false; // Resetta lo stato per la nuova modalità
       api.stop();
-      api.log("Batteria scarica! Entro in modalità RECHARGING.");
     }
 
     // --- Gestione delle Transizioni di Stato ---
@@ -44,7 +54,7 @@ const DefaultAIBase = {
       events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
       this.state.evasionGraceTicks <= 0
     ) {
-      this.state.current = "EVADING"; // Change state to EVADING
+      this.setCurrentState("EVADING", api); // Change state to EVADING
       api.stop(); // Svuota la coda per reagire subito
       this.state.evasionGraceTicks = 120; // Imposta un periodo di grazia (es. 60 tick)
     }
@@ -55,12 +65,12 @@ const DefaultAIBase = {
         (e) => e.type === "ACTION_STOPPED" && e.reason === "COLLISION"
       )
     ) {
-      this.state.current = "UNSTUCKING";
+      this.setCurrentState("UNSTUCKING", api);
       api.stop(); // Assicura che la coda sia pulita
     }
 
     if (events.some((e) => e.type === "ENEMY_DETECTED")) {
-      this.state.current = "ATTACKING";
+      this.setCurrentState("ATTACKING", api);
       api.stop(); // Interrompe la ricerca per attaccare
     }
 
@@ -69,8 +79,7 @@ const DefaultAIBase = {
       case "RECHARGING": {
         // Condizione di uscita: se la batteria è sufficientemente carica, torna a cercare.
         if (batteryPercent >= 70) {
-          this.state.current = "SEARCHING";
-          api.log("Batteria ricaricata. Torno in modalità SEARCHING.");
+          this.setCurrentState("SEARCHING", api);
           break;
         }
 
@@ -138,7 +147,7 @@ const DefaultAIBase = {
         }
         // Una volta completata la rotazione, torna a cercare per ricalcolare la situazione.
         if (events.some((e) => e.type === "ROTATION_COMPLETED")) {
-          this.state.current = "SEARCHING";
+          this.setCurrentState("SEARCHING", api);
         }
         break;
 
@@ -147,7 +156,7 @@ const DefaultAIBase = {
         // Questo è più robusto che affidarsi solo all'evento ENEMY_DETECTED per la ri-acquisizione.
         const potentialTarget = api.scan();
         if (potentialTarget) {
-          this.state.current = "ATTACKING";
+          this.setCurrentState("ATTACKING", api);
           api.stop(); // Interrompe il pattugliamento per attaccare immediatamente.
           break; // Esce per rieseguire la logica al prossimo tick con il nuovo stato.
         }
@@ -189,7 +198,7 @@ const DefaultAIBase = {
         const enemy = api.scan();
         if (!enemy) {
           // Se abbiamo un'ultima posizione nota, andiamo a caccia.
-          this.state.current = "SEARCHING";
+          this.setCurrentState("SEARCHING", api);
           api.stop(); // Interrompe le manovre di attacco per iniziare subito la caccia.
           break;
         }
@@ -207,10 +216,6 @@ const DefaultAIBase = {
 
         // --- LOGICA DI MOVIMENTO (solo quando il bot è inattivo) ---
         // Se il bot ha finito la sua sequenza di mosse precedente, ne pianifica una nuova.
-        api.log(
-          "Attacco in corso contro il nemico queue empty:",
-          api.isQueueEmpty()
-        );
         if (api.isQueueEmpty()) {
           const arena = api.getArenaDimensions();
           const optimalDistance = 250;
@@ -258,7 +263,7 @@ const DefaultAIBase = {
               e.type === "SEQUENCE_COMPLETED" || e.type === "ACTION_STOPPED"
           )
         ) {
-          this.state.current = "SEARCHING"; // Torna a cercare dopo l'evasione
+          this.setCurrentState("SEARCHING", api); // Torna a cercare dopo l'evasione
           this.state.evasionGraceTicks = 0; // Resetta il periodo di grazia
           break; // Esci per evitare di accodare una nuova manovra nello stesso tick.
         }
