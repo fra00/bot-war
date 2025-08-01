@@ -15,8 +15,8 @@ import { scanForEnemy, scanForObstacles } from "./systems/perceptionSystem.js";
  * @property {number} arena.height
  * @property {Array<import('./Arena.js').Obstacle>} arena.obstacles
  * @property {Array<import('./Robot.js').RobotState>} robots
- * @property {Array<Object>} projectiles
- * @property {string} status - 'idle', 'running', 'finished'
+ * @property {Array<Object>} projectiles - Gli oggetti proiettile nell'arena.
+ * @property {string} status - 'idle', 'running', 'paused', 'finished'
  * @property {Array<Object>} events - La coda di eventi del tick precedente. Esempi di eventi:
  * - `{type: 'ENEMY_DETECTED', robotId: string, target: Object}`
  * - `{type: 'HIT_BY_PROJECTILE', robotId: string, ownerId: string, damage: number}`
@@ -76,7 +76,7 @@ class Game {
     /** @type {Array<Projectile>} */
     this.projectiles = [];
 
-    /** @type {'idle' | 'running' | 'finished'} */
+    /** @type {'idle' | 'running' | 'paused' | 'finished'} */
     this.status = "idle";
     /** @type {?string} */
     this.winner = null;
@@ -173,6 +173,24 @@ class Game {
    */
   start() {
     if (this.status === "idle") {
+      this.status = "running";
+    }
+  }
+
+  /**
+   * Mette in pausa la simulazione.
+   */
+  pause() {
+    if (this.status === "running") {
+      this.status = "paused";
+    }
+  }
+
+  /**
+   * Riprende la simulazione.
+   */
+  resume() {
+    if (this.status === "paused") {
       this.status = "running";
     }
   }

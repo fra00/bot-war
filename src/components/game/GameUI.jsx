@@ -60,6 +60,19 @@ const GameUI = ({
         <Button onClick={controls.start} disabled={gameState.status !== "idle"}>
           Avvia
         </Button>
+        <Button
+          onClick={() =>
+            gameState.status === "running"
+              ? controls.pause()
+              : controls.resume()
+          }
+          disabled={
+            gameState.status !== "running" && gameState.status !== "paused"
+          }
+          variant="secondary"
+        >
+          {gameState.status === "paused" ? "Riprendi" : "Pausa"}
+        </Button>
         <Button onClick={controls.reset} variant="secondary">
           Reset
         </Button>

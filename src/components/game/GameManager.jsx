@@ -76,6 +76,14 @@ const GameManager = ({ playerAI, defaultAI, children }) => {
       gameRef.current = new Game(playerAI, defaultAI);
       setGameState(gameRef.current.getGameState());
     },
+    pause: () => {
+      gameRef.current.pause();
+      setGameState({ ...gameRef.current.getGameState() });
+    },
+    resume: () => {
+      gameRef.current.resume();
+      setGameState({ ...gameRef.current.getGameState() });
+    },
   };
 
   if (!gameState) {
