@@ -180,14 +180,24 @@ const DefaultAIBase = {
         break;
       }
       case "UNSTUCKING":
-        // Se il bot è bloccato, esegue una semplice manovra per liberarsi:
-        // arretra un po' e poi gira.
+        // Se il bot è bloccato, esegue una manovra per liberarsi.
+        // Questa logica viene eseguita solo una volta grazie al controllo isQueueEmpty.
         if (api.isQueueEmpty()) {
-          api.move(-50); // Arretra di 50 pixel
-          api.rotate(90); // Gira a destra di 90 gradi
+          api.log("Collisione rilevata! Eseguo manovra per sbloccarmi.");
+          // Manovra più robusta: arretra un po' e poi gira di un angolo casuale.
+          // Usiamo una sequenza per assicurarci che entrambe le azioni vengano considerate
+          // come un'unica manovra.
+          const randomAngle = (Math.random() < 0.5 ? 90 : -90) + (Math.random() * 30 - 15); // Gira a ~90° a dx/sx
+          api.sequence([
+            { type: "START_MOVE", payload: { distance: -60 } }, // Arretra un po' di più
+            { type: "START_ROTATE", payload: { angle: randomAngle } },
+          ]);
         }
-        // Una volta completata la rotazione, torna a cercare per ricalcolare la situazione.
-        if (events.some((e) => e.type === "ROTATION_COMPLETED")) {
+
+        // Una volta che l'intera sequenza di sblocco è completata (o interrotta),
+        // torna a cercare per ricalcolare la situazione.
+        if (events.some(e => e.type === "SEQUENCE_COMPLETED" || (e.type === "ACTION_STOPPED" && this.state.current === "UNSTUCKING"))) {
+          api.log("Manovra di sblocco completata. Ritorno in modalità SEARCHING.");
           this.setCurrentState("SEARCHING", api);
         }
         break;
