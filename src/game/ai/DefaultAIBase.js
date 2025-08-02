@@ -75,6 +75,21 @@ const DefaultAIBase = {
       api.stop(); // Interrompe la ricerca per attaccare
     }
 
+    // --- Gestione Interruzioni Proattive ---
+    // Mentre si cerca o ci si ritira, controlla sempre se un nemico appare.
+    // Questo rende il bot molto più reattivo e gli permette di interrompere
+    // lunghi percorsi di `moveTo` se si presenta un'opportunità.
+    if (
+      this.state.current === "SEARCHING" ||
+      this.state.current === "RECHARGING"
+    ) {
+      const enemy = api.scan();
+      if (enemy) {
+        this.setCurrentState("ATTACKING", api);
+        api.stop(); // Interrompe il movimento corrente per attaccare subito.
+        return; // Esce per questo tick, la logica di ATTACKING verrà eseguita al prossimo.
+      }
+    }
     // --- Logica della Macchina a Stati ---
     switch (this.state.current) {
       case "RECHARGING": {
