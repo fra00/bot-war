@@ -27,6 +27,7 @@ const DefaultAIBase = {
       this.setCurrentState("SEARCHING", api);
       this.state.lastKnownEnemyPosition = null;
       this.state.isMovingToRecharge = false;
+      this.state.isExecutingFlank = false; // Aggiungiamo il nuovo stato per la manovra di fiancheggiamento
       this.state.evasionGraceTicks = 0; // Contatore per il periodo di grazia dell'evasione
     }
 
@@ -257,6 +258,16 @@ const DefaultAIBase = {
         // Aggiorniamo costantemente l'ultima posizione nota finché vediamo il nemico.
         this.state.lastKnownEnemyPosition = { x: enemy.x, y: enemy.y };
 
+        // Se una manovra di fiancheggiamento è completata, resettiamo il flag.
+        // Questo permette al bot di pianificare una nuova azione al prossimo tick se necessario.
+        if (
+          this.state.isExecutingFlank &&
+          events.some(e => e.type === "SEQUENCE_COMPLETED" || e.type === "ACTION_STOPPED")
+        ) {
+          api.log("Manovra di fiancheggiamento completata.");
+          this.state.isExecutingFlank = false;
+        }
+
         // --- LOGICA DI FUOCO (ogni tick) ---
         // Spara se la mira è buona e la linea di tiro è libera.
         // `enemy.angle < 5` è una buona approssimazione per "essere in mira".
@@ -267,7 +278,8 @@ const DefaultAIBase = {
 
         // --- LOGICA DI MOVIMENTO (solo quando il bot è inattivo) ---
         // Se il bot ha finito la sua sequenza di mosse precedente, ne pianifica una nuova.
-        if (api.isQueueEmpty()) {
+        // Aggiungiamo il controllo !this.state.isExecutingFlank per evitare il thrashing.
+        if (api.isQueueEmpty() && !this.state.isExecutingFlank) {
           const arena = api.getArenaDimensions();
           const optimalDistance = 250;
           const tooCloseDistance = 150;
@@ -275,6 +287,7 @@ const DefaultAIBase = {
 
           // Priorità 1: Se la linea di tiro è bloccata, usa moveTo per riposizionarti.
           if (!isLosClear) {
+            api.log("Linea di tiro bloccata. Eseguo manovra di fiancheggiamento.");
             const self = api.getState();
             const dx = enemy.x - self.x;
             const dy = enemy.y - self.y;
@@ -293,6 +306,8 @@ const DefaultAIBase = {
             const clampedY = Math.max(0, Math.min(arena.height, targetY));
 
             api.moveTo(clampedX, clampedY);
+            // Impostiamo il flag per "ricordare" che stiamo eseguendo questa manovra.
+            this.state.isExecutingFlank = true;
           } else {
             // Priorità 2: Se la linea di tiro è libera, gestisci la distanza (kiting).
             api.aimAt(enemy.x, enemy.y);
