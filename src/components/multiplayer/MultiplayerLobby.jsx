@@ -7,6 +7,7 @@ import Card from "../ui/Card";
 import CardHeader from "../ui/CardHeader";
 import Spinner from "../ui/Spinner";
 import Toolbar from "../ui/Toolbar";
+import * as components from "../../game/components.js";
 import { useToast } from "../ui/toast/ToastProvider";
 
 const MultiplayerLobby = ({ onNavigate }) => {

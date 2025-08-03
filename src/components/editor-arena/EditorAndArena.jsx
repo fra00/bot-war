@@ -4,6 +4,7 @@ import GameManager from "../game/GameManager";
 import DefaultAI from "../../game/ai/DefaultAI";
 import useDisclosure from "../ui/useDisclosure";
 import ApiDocsModal from "../docs/ApiDocsModal";
+import TutorialModal from "../docs/TutorialModal";
 import { compileAI } from "../../game/ai/compiler";
 import { useAIScripts } from "../../hooks/useAIScripts";
 import { useAuth } from "../../context/AuthContext";
@@ -32,6 +33,11 @@ const EditorAndArena = ({ onNavigateBack }) => {
     isOpen: isApiDocsOpen,
     onOpen: onApiDocsOpen,
     onClose: onApiDocsClose,
+  } = useDisclosure();
+  const {
+    isOpen: isTutorialModalOpen,
+    onOpen: onTutorialModalOpen,
+    onClose: onTutorialModalClose,
   } = useDisclosure();
   const {
     isOpen: isSettingsModalOpen,
@@ -280,12 +286,14 @@ const EditorAndArena = ({ onNavigateBack }) => {
               isSettingsModalOpen={isSettingsModalOpen}
               onSettingsModalOpen={onSettingsModalOpen}
               onSettingsModalClose={onSettingsModalClose}
+              onTutorialModalOpen={onTutorialModalOpen}
               onNavigateBack={onNavigateBack}
             />
           );
         }}
       </GameManager>
       <ApiDocsModal isOpen={isApiDocsOpen} onClose={onApiDocsClose} />
+      <TutorialModal isOpen={isTutorialModalOpen} onClose={onTutorialModalClose} />
     </div>
   );
 };

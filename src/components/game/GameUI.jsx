@@ -59,6 +59,7 @@ const GameUI = ({
   isSettingsModalOpen,
   onSettingsModalOpen,
   onSettingsModalClose,
+  onTutorialModalOpen,
 }) => {
   // Effetto per aprire il modale di fine partita
   useEffect(() => {
@@ -222,6 +223,17 @@ const GameUI = ({
           >
             API Docs
           </Button>
+          <Button
+            onClick={() => {
+              onTutorialModalOpen();
+              onSettingsModalClose();
+            }}
+            className="w-full"
+            size="large"
+            variant="secondary"
+          >
+            Tutorial
+          </Button>
         </div>
         <CardFooter>
           <Button onClick={onSettingsModalClose} variant="secondary" className="w-full">
@@ -294,6 +306,8 @@ GameUI.propTypes = {
   isSettingsModalOpen: PropTypes.bool.isRequired,
   onSettingsModalOpen: PropTypes.func.isRequired,
   onSettingsModalClose: PropTypes.func.isRequired,
+  /** Funzione per aprire la modale del tutorial. */
+  onTutorialModalOpen: PropTypes.func.isRequired,
 };
 
 export default GameUI;
