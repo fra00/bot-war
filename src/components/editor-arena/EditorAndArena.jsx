@@ -34,6 +34,11 @@ const EditorAndArena = ({ onNavigateBack }) => {
     onClose: onApiDocsClose,
   } = useDisclosure();
   const {
+    isOpen: isSettingsModalOpen,
+    onOpen: onSettingsModalOpen,
+    onClose: onSettingsModalClose,
+  } = useDisclosure();
+  const {
     isOpen: isLogoutModalOpen,
     onOpen: onLogoutModalOpen,
     onClose: onLogoutModalClose,
@@ -272,6 +277,9 @@ const EditorAndArena = ({ onNavigateBack }) => {
               isLogoutModalOpen={isLogoutModalOpen}
               onLogoutModalOpen={onLogoutModalOpen}
               onLogoutModalClose={onLogoutModalClose}
+              isSettingsModalOpen={isSettingsModalOpen}
+              onSettingsModalOpen={onSettingsModalOpen}
+              onSettingsModalClose={onSettingsModalClose}
               onNavigateBack={onNavigateBack}
             />
           );

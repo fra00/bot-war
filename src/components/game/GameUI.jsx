@@ -56,6 +56,9 @@ const GameUI = ({
   isLogoutModalOpen,
   onLogoutModalOpen,
   onLogoutModalClose,
+  isSettingsModalOpen,
+  onSettingsModalOpen,
+  onSettingsModalClose,
 }) => {
   // Effetto per aprire il modale di fine partita
   useEffect(() => {
@@ -105,14 +108,8 @@ const GameUI = ({
         <Button onClick={controls.reset} variant="secondary">
           Reset
         </Button>
-        <Button onClick={onEditorOpen} variant="ghost">
-          Editor AI
-        </Button>
-        <Button onClick={onOpponentModalOpen} variant="ghost">
-          Seleziona Avversario
-        </Button>
-        <Button onClick={onApiDocsOpen} variant="ghost">
-          API Docs
+        <Button onClick={onSettingsModalOpen} variant="ghost">
+          Impostazioni
         </Button>
         <Button onClick={onNavigateBack} variant="secondary">
           Torna al Menu
@@ -188,6 +185,51 @@ const GameUI = ({
         onClose={onGameOverClose}
       />
 
+      {/* Modale per le impostazioni di gioco */}
+      <Modal
+        isOpen={isSettingsModalOpen}
+        onClose={onSettingsModalClose}
+        title="Impostazioni Partita"
+      >
+        <div className="p-4 flex flex-col gap-4">
+          <Button
+            onClick={() => {
+              onEditorOpen();
+              onSettingsModalClose();
+            }}
+            className="w-full"
+            size="large"
+          >
+            Editor AI
+          </Button>
+          <Button
+            onClick={() => {
+              onOpponentModalOpen();
+              onSettingsModalClose();
+            }}
+            className="w-full"
+            size="large"
+          >
+            Seleziona Avversario
+          </Button>
+          <Button
+            onClick={() => {
+              onApiDocsOpen();
+              onSettingsModalClose();
+            }}
+            className="w-full"
+            size="large"
+          >
+            API Docs
+          </Button>
+        </div>
+        <CardFooter>
+          <Button onClick={onSettingsModalClose} variant="secondary" className="w-full">
+            Chiudi
+          </Button>
+        </CardFooter>
+      </Modal>
+
       {/* Modale per il logout */}
       <Modal isOpen={isLogoutModalOpen} onClose={onLogoutModalClose} title="Account">
         <div className="p-4">
@@ -249,6 +291,9 @@ GameUI.propTypes = {
   isLogoutModalOpen: PropTypes.bool.isRequired,
   onLogoutModalOpen: PropTypes.func.isRequired,
   onLogoutModalClose: PropTypes.func.isRequired,
+  isSettingsModalOpen: PropTypes.bool.isRequired,
+  onSettingsModalOpen: PropTypes.func.isRequired,
+  onSettingsModalClose: PropTypes.func.isRequired,
 };
 
 export default GameUI;
