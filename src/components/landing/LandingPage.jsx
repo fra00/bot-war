@@ -62,21 +62,22 @@ const BoltIcon = (props) => (
 const LandingPage = ({ onStartGame }) => {
   return (
     <div className="bg-gray-900 text-white">
-      {/* Hero Section */}
-      <main className="relative isolate min-h-screen">
+      {/* Hero Section con immagine di sfondo */}
+      {/* Aggiunto overflow-hidden per contenere l'immagine che si ingrandisce */}
+      <main
+        className="relative isolate min-h-screen flex items-center justify-center overflow-hidden"
+      >
+        {/* Div separato per l'immagine di sfondo animata */}
         <div
-          className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80"
-          aria-hidden="true"
-        >
-          <div
-            className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[#ff80b5] to-[#9089fc] opacity-30 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"
-            style={{
-              clipPath:
-                "polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)",
-            }}
-          />
-        </div>
-        <div className="mx-auto max-w-4xl py-32 sm:py-48 lg:py-56 text-center">
+          className="absolute inset-0 w-full h-full bg-cover bg-center -z-20 animate-ken-burns"
+          style={{ backgroundImage: "url('/landing-page.png')" }}
+        />
+
+        {/* Overlay scuro per migliorare la leggibilità del testo */}
+        <div className="absolute inset-0 bg-black/60 -z-10" />
+
+        {/* Il contenuto ora è relativo per assicurare il corretto stacking context */}
+        <div className="relative mx-auto max-w-4xl py-32 sm:py-48 lg:py-56 text-center">
           <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl">
             ai-BotWars
           </h1>

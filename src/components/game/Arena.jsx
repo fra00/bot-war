@@ -74,17 +74,16 @@ function Arena({ gameState }) {
 
         {/* Renderizza i robot e il loro raggio radar */}
         {robots.map((robot) => {
-          const angleRad = (robot.rotation * Math.PI) / 180;
-          const turretRadius = 8;
-          const cannonLength = 22;
           const isPlayer = robot.id === "player";
+          const bodyColor = isPlayer ? "#4a9fb5" : "#b0565e";
+          const accentColor = isPlayer ? "#61dafb" : "#e06c75";
 
           return (
-            <g key={robot.id}>
-              {/* Cerchio del raggio del radar */}
+            <g key={robot.id} transform={`translate(${robot.x}, ${robot.y})`}>
+              {/* Cerchio del raggio del radar (non ruota) */}
               <circle
-                cx={robot.x}
-                cy={robot.y}
+                cx={0}
+                cy={0}
                 r={robot.radarRange}
                 fill={
                   isPlayer
@@ -99,27 +98,25 @@ function Arena({ gameState }) {
                 strokeWidth="1"
                 strokeDasharray="4 4"
               />
-              {/* Corpo del robot (chassis) */}
-              <circle
-                cx={robot.x}
-                cy={robot.y}
-                r={15}
-                fill={isPlayer ? "url(#player-gradient)" : "url(#enemy-gradient)"}
-                stroke={isPlayer ? "#c1faff" : "#ffcdd2"}
-                strokeWidth="1"
-              />
-              {/* Torretta del robot */}
-              <g transform={`rotate(${robot.rotation}, ${robot.x}, ${robot.y})`}>
-                <circle
-                  cx={robot.x}
-                  cy={robot.y}
-                  r={turretRadius}
-                  fill={isPlayer ? "#4a9fb5" : "#b0565e"}
-                  stroke={isPlayer ? "#c1faff" : "#ffcdd2"}
+
+              {/* Gruppo per il tank che ruota */}
+              <g transform={`rotate(${robot.rotation})`}>
+                {/* Corpo del tank */}
+                <rect
+                  x="-15"
+                  y="-12"
+                  width="30"
+                  height="24"
+                  rx="4"
+                  fill={bodyColor}
+                  stroke={accentColor}
                   strokeWidth="1.5"
                 />
                 {/* Cannone */}
-                <rect x={robot.x + turretRadius - 2} y={robot.y - 2} width={cannonLength} height={4} fill={isPlayer ? "#3a7f91" : "#8c454a"} rx="1" />
+                <rect x="10" y="-2" width="18" height="4" fill={accentColor} rx="1" />
+                {/* Dettaglio torretta (integrata) */}
+                <circle cx="0" cy="0" r="8" fill="rgba(0,0,0,0.2)" />
+                <circle cx="0" cy="0" r="6" fill={accentColor} stroke={bodyColor} strokeWidth="1" />
               </g>
             </g>
           );

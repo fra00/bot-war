@@ -18,6 +18,7 @@ export default {
       animation: {
         "fade-in": "fadeIn 0.5s ease-in-out",
         "fade-out": "fadeOut 0.5s ease-in-out forwards",
+        "ken-burns": "kenburns 30s ease-out infinite alternate",
       },
       keyframes: {
         fadeIn: {
@@ -27,6 +28,16 @@ export default {
         fadeOut: {
           "0%": { opacity: "1" },
           "100%": { opacity: "0" },
+        },
+        kenburns: {
+          "0%": {
+            transform: "scale(1) translate(0, 0)",
+            "transform-origin": "center",
+          },
+          "100%": {
+            transform: "scale(1.15) translate(5px, -5px)",
+            "transform-origin": "center",
+          },
         },
       },
     },

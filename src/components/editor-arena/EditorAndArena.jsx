@@ -156,7 +156,12 @@ const EditorAndArena = ({ onNavigateBack }) => {
           // Effetto per aggiornare le statistiche a fine partita
           useEffect(() => {
             // Esegui solo se la partita è finita, l'utente è loggato e le stats non sono già state aggiornate
-            if (gameState && gameState.status === "finished" && user && !statsUpdatedRef.current) {
+            if (
+              gameState &&
+              gameState.status === "finished" &&
+              user &&
+              !statsUpdatedRef.current
+            ) {
               statsUpdatedRef.current = true; // Impedisce aggiornamenti multipli
 
               const playerBotId = activeScript?.id;
@@ -181,13 +186,23 @@ const EditorAndArena = ({ onNavigateBack }) => {
               }
 
               // Aggiorna le statistiche per il bot del giocatore
-              FirestoreService.updateBotStats(playerBotId, playerResult, matchType)
-                .catch(err => console.error("Failed to update player stats:", err));
+              FirestoreService.updateBotStats(
+                playerBotId,
+                playerResult,
+                matchType
+              ).catch((err) =>
+                console.error("Failed to update player stats:", err)
+              );
 
               // Aggiorna le statistiche per l'avversario, se è un bot custom
               if (opponentBotId) {
-                FirestoreService.updateBotStats(opponentBotId, opponentResult, matchType)
-                  .catch(err => console.error("Failed to update opponent stats:", err));
+                FirestoreService.updateBotStats(
+                  opponentBotId,
+                  opponentResult,
+                  matchType
+                ).catch((err) =>
+                  console.error("Failed to update opponent stats:", err)
+                );
               }
             }
           }, [gameState, user, activeScript?.id, opponentScriptId]);
@@ -267,7 +282,7 @@ const EditorAndArena = ({ onNavigateBack }) => {
               onDeleteScript={handleDeleteScript}
               onCreateNewScript={handleCreateNewScript}
               onSaveOnly={handleSaveOnly}
-          onUpdateSettings={handleUpdateBotSettings}
+              onUpdateSettings={handleUpdateBotSettings}
               // Props per la nuova modale di selezione avversario
               isOpponentModalOpen={isOpponentModalOpen}
               onOpponentModalOpen={handleOpponentModalOpen}
@@ -293,7 +308,10 @@ const EditorAndArena = ({ onNavigateBack }) => {
         }}
       </GameManager>
       <ApiDocsModal isOpen={isApiDocsOpen} onClose={onApiDocsClose} />
-      <TutorialModal isOpen={isTutorialModalOpen} onClose={onTutorialModalClose} />
+      <TutorialModal
+        isOpen={isTutorialModalOpen}
+        onClose={onTutorialModalClose}
+      />
     </div>
   );
 };

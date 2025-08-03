@@ -31,8 +31,18 @@ const MainMenu = ({ onNavigate }) => {
         )}
       </Toolbar>
 
-      <div className="p-4 pt-20 animate-fade-in text-center">
-        <div className="mx-auto max-w-2xl">
+      {/* Contenitore a schermo intero per lo sfondo e il contenuto centrato */}
+      <div className="relative isolate min-h-screen flex items-center justify-center p-4">
+        {/* Immagine di sfondo */}
+        <div
+          className="absolute inset-0 w-full h-full bg-cover bg-center -z-20"
+          style={{ backgroundImage: "url('/main-menu.png')" }}
+        />
+        {/* Overlay scuro per la leggibilità */}
+        <div className="absolute inset-0 bg-black/60 -z-10" />
+
+        {/* Contenuto del menu */}
+        <div className="mx-auto max-w-2xl text-center animate-fade-in">
           <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl mb-12">
             Menu Principale
           </h1>
