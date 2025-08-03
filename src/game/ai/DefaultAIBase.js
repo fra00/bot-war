@@ -67,6 +67,7 @@ const DefaultAIBase = {
       )
     ) {
       this.setCurrentState("UNSTUCKING", api);
+      this.state.isExecutingFlank = false; // Annulla anche la manovra di fiancheggiamento se ci si blocca.
       api.stop(); // Assicura che la coda sia pulita
     }
 
@@ -266,6 +267,7 @@ const DefaultAIBase = {
         if (!enemy) {
           // Se abbiamo un'ultima posizione nota, andiamo a caccia.
           this.setCurrentState("SEARCHING", api);
+          this.state.isExecutingFlank = false; // Annulla la manovra di fiancheggiamento se perdiamo il bersaglio.
           api.stop(); // Interrompe le manovre di attacco per iniziare subito la caccia.
           break;
         }
