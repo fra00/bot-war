@@ -34,6 +34,11 @@ const EditorAndArena = ({ onNavigateBack }) => {
     onClose: onApiDocsClose,
   } = useDisclosure();
   const {
+    isOpen: isLogoutModalOpen,
+    onOpen: onLogoutModalOpen,
+    onClose: onLogoutModalClose,
+  } = useDisclosure();
+  const {
     isOpen: isOpponentModalOpen,
     onOpen: onOpponentModalOpen,
     onClose: onOpponentModalClose,
@@ -46,7 +51,7 @@ const EditorAndArena = ({ onNavigateBack }) => {
   const [opponentAI, setOpponentAI] = useState(() => DefaultAI);
   const [opponentCompileError, setOpponentCompileError] = useState(null);
 
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const {
     scripts,
     activeScript,
@@ -81,6 +86,12 @@ const EditorAndArena = ({ onNavigateBack }) => {
     onGameOverClose();
     setGameKey((k) => k + 1);
   }, [onGameOverClose]);
+
+  const handleLogout = () => {
+    logout();
+    onLogoutModalClose();
+    onNavigateBack(); // Torna al menu principale dopo il logout
+  };
 
   // Apre la modale e sincronizza lo stato temporaneo con quello attuale
   const handleOpponentModalOpen = useCallback(() => {
@@ -256,6 +267,11 @@ const EditorAndArena = ({ onNavigateBack }) => {
               onSelectOpponentScript={setTempOpponentScriptId}
               opponentCompileError={opponentCompileError}
               onClearOpponentCompileError={() => setOpponentCompileError(null)}
+              user={user}
+              onLogout={handleLogout}
+              isLogoutModalOpen={isLogoutModalOpen}
+              onLogoutModalOpen={onLogoutModalOpen}
+              onLogoutModalClose={onLogoutModalClose}
               onNavigateBack={onNavigateBack}
             />
           );

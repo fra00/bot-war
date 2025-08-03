@@ -9,6 +9,8 @@ import AIEditorModal from "./AIEditorModal";
 import LogDrawer from "./LogDrawer";
 import OpponentSelectionModal from "./OpponentSelectionModal";
 import GameOverModal from "./GameOverModal";
+import Modal from "../ui/Modal";
+import CardFooter from "../ui/CardFooter";
 
 /**
  * Componente principale dell'interfaccia di gioco.
@@ -49,6 +51,11 @@ const GameUI = ({
   onUpdateSettings,
   isLoading,
   onNavigateBack,
+  user,
+  onLogout,
+  isLogoutModalOpen,
+  onLogoutModalOpen,
+  onLogoutModalClose,
 }) => {
   // Effetto per aprire il modale di fine partita
   useEffect(() => {
@@ -110,6 +117,15 @@ const GameUI = ({
         <Button onClick={onNavigateBack} variant="secondary">
           Torna al Menu
         </Button>
+        {user ? (
+          <Button onClick={onLogoutModalOpen} variant="ghost">
+            Account ({user.email})
+          </Button>
+        ) : (
+          <Button onClick={onNavigateBack} variant="ghost">
+            Login
+          </Button>
+        )}
       </Toolbar>
 
       {opponentCompileError && (
@@ -171,6 +187,21 @@ const GameUI = ({
         onRestart={onRestart}
         onClose={onGameOverClose}
       />
+
+      {/* Modale per il logout */}
+      <Modal isOpen={isLogoutModalOpen} onClose={onLogoutModalClose} title="Account">
+        <div className="p-4">
+          <p className="text-center mb-4">Sei loggato come {user?.email}</p>
+        </div>
+        <CardFooter>
+          <Button onClick={onLogoutModalClose} variant="secondary">
+            Chiudi
+          </Button>
+          <Button onClick={onLogout} variant="danger">
+            Logout
+          </Button>
+        </CardFooter>
+      </Modal>
     </>
   );
 };
@@ -211,6 +242,13 @@ GameUI.propTypes = {
   isLoading: PropTypes.bool,
   /** Funzione per tornare al menu principale. */
   onNavigateBack: PropTypes.func.isRequired,
+  /** L'oggetto utente autenticato. */
+  user: PropTypes.object,
+  /** Funzione per eseguire il logout. */
+  onLogout: PropTypes.func.isRequired,
+  isLogoutModalOpen: PropTypes.bool.isRequired,
+  onLogoutModalOpen: PropTypes.func.isRequired,
+  onLogoutModalClose: PropTypes.func.isRequired,
 };
 
 export default GameUI;
