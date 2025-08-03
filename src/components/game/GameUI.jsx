@@ -46,6 +46,9 @@ const GameUI = ({
   onSelectOpponentScript,
   opponentCompileError,
   onClearOpponentCompileError,
+  onUpdateSettings,
+  isLoading,
+  onNavigateBack,
 }) => {
   // Effetto per aprire il modale di fine partita
   useEffect(() => {
@@ -104,6 +107,9 @@ const GameUI = ({
         <Button onClick={onApiDocsOpen} variant="ghost">
           API Docs
         </Button>
+        <Button onClick={onNavigateBack} variant="secondary">
+          Torna al Menu
+        </Button>
       </Toolbar>
 
       {opponentCompileError && (
@@ -139,6 +145,8 @@ const GameUI = ({
         onSelectScript={onSelectScript}
         onDeleteScript={onDeleteScript}
         onCreateNewScript={onCreateNewScript}
+        onUpdateSettings={onUpdateSettings}
+        isLoading={isLoading}
       />
 
       <LogDrawer
@@ -199,6 +207,10 @@ GameUI.propTypes = {
   onSelectOpponentScript: PropTypes.func.isRequired,
   opponentCompileError: PropTypes.string,
   onClearOpponentCompileError: PropTypes.func.isRequired,
+  onUpdateSettings: PropTypes.func.isRequired,
+  isLoading: PropTypes.bool,
+  /** Funzione per tornare al menu principale. */
+  onNavigateBack: PropTypes.func.isRequired,
 };
 
 export default GameUI;

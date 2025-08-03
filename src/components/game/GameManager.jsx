@@ -86,10 +86,6 @@ const GameManager = ({ playerAI, defaultAI, children }) => {
     },
   };
 
-  if (!gameState) {
-    return null;
-  }
-
   // Utilizza il pattern "render prop" per passare stato e controlli ai figli.
   return children({ gameState, controls });
 };

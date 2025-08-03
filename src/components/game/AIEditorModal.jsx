@@ -5,6 +5,10 @@ import AIEditorPanel from "./AIEditorPanel";
 import CardFooter from "../ui/CardFooter";
 import Button from "../ui/Button";
 import { useToast } from "../ui/toast/ToastProvider";
+import { useAuth } from "../../context/AuthContext";
+import useDisclosure from "../ui/useDisclosure";
+import BotSettingsModal from "./BotSettingsModal";
+import Tooltip from "../ui/Tooltip";
 
 const AIEditorModal = ({
   isOpen,
@@ -20,11 +24,19 @@ const AIEditorModal = ({
   onSelectScript,
   onDeleteScript,
   onCreateNewScript,
+  onUpdateSettings,
+  isLoading,
 }) => {
   const { addToast } = useToast();
+  const { user } = useAuth();
+  const {
+    isOpen: isSettingsOpen,
+    onOpen: onSettingsOpen,
+    onClose: onSettingsClose,
+  } = useDisclosure();
 
-  const handleSaveClick = useCallback(() => {
-    const { success } = onSaveOnly();
+  const handleSaveClick = useCallback(async () => {
+    const { success } = await onSaveOnly();
     if (success) {
       addToast("Script salvato con successo!", "success");
     } else {
@@ -34,8 +46,8 @@ const AIEditorModal = ({
     }
   }, [onSaveOnly, addToast]);
 
-  const handleUpdateClick = useCallback(() => {
-    const { success } = onUpdate();
+  const handleUpdateClick = useCallback(async () => {
+    const { success } = await onUpdate();
     if (success) {
       addToast("Script applicato con successo! Riavvio partita...", "success");
       onClose(); // Chiude la modale in caso di successo
@@ -44,6 +56,11 @@ const AIEditorModal = ({
     }
   }, [onUpdate, addToast, onClose]);
 
+  const handleSaveSettings = (settings) => {
+    if (activeScript) {
+      onUpdateSettings(activeScript.id, settings);
+    }
+  };
   return (
     <Modal
       isOpen={isOpen}
@@ -62,28 +79,54 @@ const AIEditorModal = ({
             onSelectScript={onSelectScript}
             onDeleteScript={onDeleteScript}
             onCreateNewScript={onCreateNewScript}
+            isLoading={isLoading}
           />
         </div>
         <CardFooter>
-          <Button onClick={handleSaveClick} variant="secondary">
-            Salva Modifiche
-          </Button>
-          <Button
-            onClick={handleUpdateClick}
-            disabled={gameStateStatus === "running"}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            {activeScript
-              ? `Applica "${activeScript.name}" e Riavvia`
-              : "Applica e Riavvia"}
-          </Button>
-          {gameStateStatus === "running" && (
-            <span className="text-sm text-yellow-400 ml-4">
-              (La partita in corso verrà terminata per applicare le modifiche)
-            </span>
-          )}
+          <div className="flex-grow">
+            {gameStateStatus === "running" && (
+              <span className="text-sm text-yellow-400">
+                (La partita in corso verrà terminata per applicare le modifiche)
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Tooltip
+              content="Devi effettuare il login per modificare le impostazioni cloud."
+              disabled={!!user}
+            >
+              {/* Il Tooltip ha bisogno di un div wrapper per funzionare su elementi disabilitati */}
+              <div>
+                <Button
+                  onClick={onSettingsOpen}
+                  variant="ghost"
+                  disabled={!activeScript || !user}
+                >
+                  Impostazioni Bot
+                </Button>
+              </div>
+            </Tooltip>
+            <Button onClick={handleSaveClick} variant="secondary">
+              Salva Modifiche
+            </Button>
+            <Button
+              onClick={handleUpdateClick}
+              disabled={gameStateStatus === "running"}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {activeScript
+                ? `Applica "${activeScript.name}" e Riavvia`
+                : "Applica e Riavvia"}
+            </Button>
+          </div>
         </CardFooter>
       </div>
+      <BotSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={onSettingsClose}
+        bot={activeScript}
+        onSave={handleSaveSettings}
+      />
     </Modal>
   );
 };
@@ -102,6 +145,8 @@ AIEditorModal.propTypes = {
   onSelectScript: PropTypes.func.isRequired,
   onDeleteScript: PropTypes.func.isRequired,
   onCreateNewScript: PropTypes.func.isRequired,
+  onUpdateSettings: PropTypes.func.isRequired,
+  isLoading: PropTypes.bool,
 };
 
 export default AIEditorModal;

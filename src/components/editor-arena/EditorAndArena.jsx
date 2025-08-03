@@ -1,13 +1,18 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import PropTypes from "prop-types";
 import GameManager from "../game/GameManager";
 import DefaultAI from "../../game/ai/DefaultAI";
 import useDisclosure from "../ui/useDisclosure";
 import ApiDocsModal from "../docs/ApiDocsModal";
 import { compileAI } from "../../game/ai/compiler";
 import { useAIScripts } from "../../hooks/useAIScripts";
+import { useAuth } from "../../context/AuthContext";
+import FirestoreService from "../../services/FirestoreService";
+import Arena from "../game/Arena";
+import GameInfoPanel from "../game/GameInfoPanel";
 import GameUI from "../game/GameUI";
 
-const EditorAndArena = () => {
+const EditorAndArena = ({ onNavigateBack }) => {
   const {
     isOpen: isEditorOpen,
     onOpen: onEditorOpen,
@@ -41,6 +46,7 @@ const EditorAndArena = () => {
   const [opponentAI, setOpponentAI] = useState(() => DefaultAI);
   const [opponentCompileError, setOpponentCompileError] = useState(null);
 
+  const { user } = useAuth();
   const {
     scripts,
     activeScript,
@@ -53,7 +59,15 @@ const EditorAndArena = () => {
     handleCreateNewScript,
     handleUpdateAI,
     handleSaveOnly,
+    handleUpdateBotSettings,
   } = useAIScripts();
+
+  // Ref per assicurarsi che le statistiche vengano aggiornate una sola volta per partita
+  const statsUpdatedRef = useRef(false);
+  useEffect(() => {
+    // Resetta il flag ogni volta che il gioco viene riavviato (cambia la chiave)
+    statsUpdatedRef.current = false;
+  }, [gameKey]);
 
   const handleApplyAIChanges = useCallback(() => {
     const result = handleUpdateAI();
@@ -114,7 +128,63 @@ const EditorAndArena = () => {
         defaultAI={opponentAI}
       >
         {({ gameState, controls }) => {
-          // WORKAROUND: Arricchiamo il gameState con i nomi dei bot.
+          // Gli Hook devono essere chiamati incondizionatamente.
+          // La logica che dipende da gameState viene eseguita solo quando non è null.
+
+          // Effetto per aggiornare le statistiche a fine partita
+          useEffect(() => {
+            // Esegui solo se la partita è finita, l'utente è loggato e le stats non sono già state aggiornate
+            if (gameState && gameState.status === "finished" && user && !statsUpdatedRef.current) {
+              statsUpdatedRef.current = true; // Impedisce aggiornamenti multipli
+
+              const playerBotId = activeScript?.id;
+              const opponentBotId = opponentScriptId;
+              const winnerId = gameState.winner; // 'player', 'opponent', o null
+              const matchType = "offline"; // Per ora, tutte le partite sono offline
+
+              if (!playerBotId) return;
+
+              let playerResult;
+              let opponentResult;
+
+              if (winnerId === "player") {
+                playerResult = "win";
+                opponentResult = "loss";
+              } else if (winnerId === "opponent") {
+                playerResult = "loss";
+                opponentResult = "win";
+              } else {
+                playerResult = "draw";
+                opponentResult = "draw";
+              }
+
+              // Aggiorna le statistiche per il bot del giocatore
+              FirestoreService.updateBotStats(playerBotId, playerResult, matchType)
+                .catch(err => console.error("Failed to update player stats:", err));
+
+              // Aggiorna le statistiche per l'avversario, se è un bot custom
+              if (opponentBotId) {
+                FirestoreService.updateBotStats(opponentBotId, opponentResult, matchType)
+                  .catch(err => console.error("Failed to update opponent stats:", err));
+              }
+            }
+          }, [gameState, user, activeScript?.id, opponentScriptId]);
+
+          // Se gameState non è ancora pronto, mostra un placeholder.
+          // Questo risolve l'errore degli Hook, perché gli Hook sopra
+          // vengono chiamati incondizionatamente ad ogni render.
+          if (!gameState) {
+            return (
+              <div className="grid grid-cols-12 gap-4">
+                <div className="col-span-8">
+                  <Arena gameState={null} />
+                </div>
+                <div className="col-span-4">
+                  <GameInfoPanel gameState={{}} />
+                </div>
+              </div>
+            );
+          }
           // Il GameManager non conosce il nome dello script AI del giocatore,
           // quindi lo aggiungiamo qui prima di passarlo alla UI.
           // Questo risolve il bug nella modale di fine partita e assicura
@@ -175,6 +245,7 @@ const EditorAndArena = () => {
               onDeleteScript={handleDeleteScript}
               onCreateNewScript={handleCreateNewScript}
               onSaveOnly={handleSaveOnly}
+          onUpdateSettings={handleUpdateBotSettings}
               // Props per la nuova modale di selezione avversario
               isOpponentModalOpen={isOpponentModalOpen}
               onOpponentModalOpen={handleOpponentModalOpen}
@@ -185,6 +256,7 @@ const EditorAndArena = () => {
               onSelectOpponentScript={setTempOpponentScriptId}
               opponentCompileError={opponentCompileError}
               onClearOpponentCompileError={() => setOpponentCompileError(null)}
+              onNavigateBack={onNavigateBack}
             />
           );
         }}
@@ -192,6 +264,11 @@ const EditorAndArena = () => {
       <ApiDocsModal isOpen={isApiDocsOpen} onClose={onApiDocsClose} />
     </div>
   );
+};
+
+EditorAndArena.propTypes = {
+  /** Funzione per tornare al menu principale. */
+  onNavigateBack: PropTypes.func.isRequired,
 };
 
 export default EditorAndArena;

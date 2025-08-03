@@ -9,7 +9,7 @@ import { calculateFinalStats } from "../../game/statsCalculator";
  * Modale visualizzato alla fine della partita.
  * Mostra il vincitore (o un pareggio) e offre opzioni per ricominciare o chiudere.
  */
-const GameOverModal = ({ isOpen, gameState, onRestart, onClose }) => {
+const GameOverModal = ({ isOpen, gameState, onRestart, onClose, isSaving = false }) => {
   const { winner } = gameState;
   const winnerName = winner?.name || winner?.id || "Vincitore Sconosciuto";
   const title = "Partita Terminata!";
@@ -33,11 +33,12 @@ const GameOverModal = ({ isOpen, gameState, onRestart, onClose }) => {
           <Button
             onClick={onRestart}
             className="bg-green-600 hover:bg-green-700"
+            disabled={isSaving}
           >
-            Ricomincia
+            {isSaving ? "Salvataggio..." : "Ricomincia"}
           </Button>
-          <Button onClick={onClose} variant="secondary">
-            Chiudi
+          <Button onClick={onClose} variant="secondary" disabled={isSaving}>
+            {isSaving ? "Salvataggio..." : "Chiudi"}
           </Button>
         </div>
       </div>
@@ -57,6 +58,8 @@ GameOverModal.propTypes = {
   onRestart: PropTypes.func.isRequired,
   /** Funzione da eseguire per chiudere il modale. */
   onClose: PropTypes.func.isRequired,
+  /** Indica se le statistiche sono in fase di salvataggio. */
+  isSaving: PropTypes.bool,
 };
 
 export default GameOverModal;

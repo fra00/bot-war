@@ -6,6 +6,7 @@ import Card from "../ui/Card";
 import CardHeader from "../ui/CardHeader";
 import Select from "../ui/Select";
 import CodeEditor from "./CodeEditor";
+import Spinner from "../ui/Spinner";
 
 /**
  * Un pannello che contiene l'editor di codice Monaco per l'IA del giocatore,
@@ -20,7 +21,16 @@ const AIEditorPanel = ({
   onSelectScript,
   onDeleteScript,
   onCreateNewScript,
+  isLoading,
 }) => {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full text-lg">
+        <Spinner size="large" />
+        <span className="ml-4">Caricamento script...</span>
+      </div>
+    );
+  }
   return (
     // Il contenitore principale è ora gestito dal componente Modal.
     // Rimuoviamo la Toolbar e il div contenitore esterno.
@@ -63,6 +73,7 @@ const AIEditorPanel = ({
                         }
                       }}
                       aria-label={`Elimina script ${script.name}`}
+                      className="text-white" // Aggiunto per migliorare il contrasto
                     >
                       X
                     </Button>
@@ -104,13 +115,12 @@ AIEditorPanel.propTypes = {
     PropTypes.shape({
       id: PropTypes.string.isRequired,
       name: PropTypes.string.isRequired,
-      code: PropTypes.string.isRequired,
+      // Il codice può essere in 'code' (localStorage) o 'script' (Firestore)
     })
   ).isRequired,
   activeScript: PropTypes.shape({
     id: PropTypes.string.isRequired,
     name: PropTypes.string.isRequired,
-    code: PropTypes.string.isRequired,
   }),
   code: PropTypes.string.isRequired,
   onCodeChange: PropTypes.func.isRequired,
@@ -118,6 +128,8 @@ AIEditorPanel.propTypes = {
   onSelectScript: PropTypes.func.isRequired,
   onDeleteScript: PropTypes.func.isRequired,
   onCreateNewScript: PropTypes.func.isRequired,
+  /** Indica se gli script sono in fase di caricamento. */
+  isLoading: PropTypes.bool,
 };
 
 export default AIEditorPanel;
