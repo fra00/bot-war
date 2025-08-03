@@ -104,7 +104,14 @@ const LeaderboardView = ({ onNavigate }) => {
   };
 
   return (
-    <div className="p-4 pt-20 animate-fade-in">
+    <div className="relative isolate min-h-screen p-4 pt-20 animate-fade-in">
+      {/* Sfondo e overlay */}
+      <div
+        className="absolute inset-0 -z-20 bg-cover bg-center"
+        style={{ backgroundImage: "url('/leader-board.png')" }}
+      />
+      <div className="absolute inset-0 -z-10 bg-black/60" />
+
       <Toolbar title="Classifica Multiplayer">
         <Button onClick={() => onNavigate("main-menu")} variant="secondary">
           Torna al Menu

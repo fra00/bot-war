@@ -143,7 +143,15 @@ const EditorAndArena = ({ onNavigateBack }) => {
   }, [tempOpponentScriptId, scripts, onOpponentModalClose]);
 
   return (
-    <div className="p-4 pt-20 animate-fade-in">
+    <div className="relative isolate min-h-screen p-4 pt-20 animate-fade-in">
+      {/* Div per lo sfondo, posizionato dietro al contenuto */}
+      <div
+        className="absolute inset-0 -z-20 "
+        style={{ backgroundImage: "url('/arena-background.png')" }}
+      />
+      {/* Overlay scuro per migliorare la leggibilità */}
+      <div className="absolute inset-0 -z-10 bg-black/50" />
+
       <GameManager
         key={gameKey}
         playerAI={playerAI || DefaultAI}

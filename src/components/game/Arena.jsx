@@ -1,4 +1,6 @@
 import React from "react";
+import PropTypes from "prop-types";
+import Bot from "./Bot";
 
 /**
  * Componente che renderizza l'arena di gioco, i robot, i proiettili e gli ostacoli.
@@ -72,55 +74,36 @@ function Arena({ gameState }) {
           />
         ))}
 
-        {/* Renderizza i robot e il loro raggio radar */}
-        {robots.map((robot) => {
-          const isPlayer = robot.id === "player";
-          const bodyColor = isPlayer ? "#4a9fb5" : "#b0565e";
-          const accentColor = isPlayer ? "#61dafb" : "#e06c75";
+        {/* Renderizza il raggio radar dei robot */}
+        {robots.map((robot) => (
+          <circle
+            key={`${robot.id}-radar`}
+            cx={robot.x}
+            cy={robot.y}
+            r={robot.radarRange}
+            fill={
+              robot.id === "player"
+                ? "rgba(97, 218, 251, 0.05)"
+                : "rgba(224, 108, 117, 0.05)"
+            }
+            stroke={
+              robot.id === "player"
+                ? "rgba(97, 218, 251, 0.2)"
+                : "rgba(224, 108, 117, 0.2)"
+            }
+            strokeWidth="1"
+            strokeDasharray="4 4"
+          />
+        ))}
 
-          return (
-            <g key={robot.id} transform={`translate(${robot.x}, ${robot.y})`}>
-              {/* Cerchio del raggio del radar (non ruota) */}
-              <circle
-                cx={0}
-                cy={0}
-                r={robot.radarRange}
-                fill={
-                  isPlayer
-                    ? "rgba(97, 218, 251, 0.05)"
-                    : "rgba(224, 108, 117, 0.05)"
-                }
-                stroke={
-                  isPlayer
-                    ? "rgba(97, 218, 251, 0.2)"
-                    : "rgba(224, 108, 117, 0.2)"
-                }
-                strokeWidth="1"
-                strokeDasharray="4 4"
-              />
-
-              {/* Gruppo per il tank che ruota */}
-              <g transform={`rotate(${robot.rotation})`}>
-                {/* Corpo del tank */}
-                <rect
-                  x="-15"
-                  y="-12"
-                  width="30"
-                  height="24"
-                  rx="4"
-                  fill={bodyColor}
-                  stroke={accentColor}
-                  strokeWidth="1.5"
-                />
-                {/* Cannone */}
-                <rect x="10" y="-2" width="18" height="4" fill={accentColor} rx="1" />
-                {/* Dettaglio torretta (integrata) */}
-                <circle cx="0" cy="0" r="8" fill="rgba(0,0,0,0.2)" />
-                <circle cx="0" cy="0" r="6" fill={accentColor} stroke={bodyColor} strokeWidth="1" />
-              </g>
-            </g>
-          );
-        })}
+        {/* Renderizza i bot */}
+        {robots.map((robot) => (
+          <Bot
+            key={robot.id}
+            botData={{ ...robot, angle: robot.rotation }}
+            isPlayer={robot.id === "player"}
+          />
+        ))}
 
         {/* Renderizza i percorsi dei bot */}
         {robots.map((robot) =>
@@ -177,13 +160,7 @@ function Arena({ gameState }) {
         {/* Renderizza i proiettili */}
         {projectiles.map((p) => (
           <g key={p.id} style={{ filter: "url(#glow)" }}>
-            <circle
-              cx={p.x}
-              cy={p.y}
-              r={4}
-              fill="#ffef99"
-              opacity="0.7"
-            />
+            <circle cx={p.x} cy={p.y} r={4} fill="#ffef99" opacity="0.7" />
             <circle cx={p.x} cy={p.y} r={2} fill="#fff" />
           </g>
         ))}
@@ -191,5 +168,9 @@ function Arena({ gameState }) {
     </div>
   );
 }
+
+Arena.propTypes = {
+  gameState: PropTypes.object,
+};
 
 export default Arena;
