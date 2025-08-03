@@ -87,7 +87,14 @@ const MultiplayerArena = ({ matchData, onNavigate }) => {
           Abbandona Partita
         </Button>
       </Toolbar>
-      <div className="p-4 pt-20 animate-fade-in">
+      <div className="relative isolate min-h-screen p-4 pt-20 animate-fade-in">
+        {/* Sfondo e overlay */}
+        <div
+          className="absolute inset-0 -z-20 bg-cover bg-center"
+          style={{ backgroundImage: "url('/multi-background.png')" }}
+        />
+        <div className="absolute inset-0 -z-10 bg-black/60" />
+
         <GameManager playerAI={playerAI} defaultAI={opponentAI}>
           {({ gameState, controls }) => {
             // Effetto per avviare la partita automaticamente una volta che tutto è pronto.

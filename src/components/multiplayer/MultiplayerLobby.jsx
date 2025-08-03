@@ -157,7 +157,14 @@ const MultiplayerLobby = ({ onNavigate }) => {
           Torna al Menu
         </Button>
       </Toolbar>
-      <div className="p-4 pt-20 animate-fade-in">
+      <div className="relative isolate min-h-screen p-4 pt-20 animate-fade-in">
+        {/* Sfondo e overlay */}
+        <div
+          className="absolute inset-0 -z-20 bg-cover bg-center"
+          style={{ backgroundImage: "url('/multi-background.png')" }}
+        />
+        <div className="absolute inset-0 -z-10 bg-black/60" />
+
         <div className="max-w-4xl mx-auto">
           <Card>
             <CardHeader>Seleziona il tuo Campione</CardHeader>
