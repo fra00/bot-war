@@ -32,10 +32,10 @@ const MainMenu = ({ onNavigate }) => {
       </Toolbar>
 
       {/* Contenitore a schermo intero per lo sfondo e il contenuto centrato */}
-      <div className="relative isolate min-h-screen flex items-center justify-center p-4">
+      <div className="relative isolate min-h-screen flex items-center justify-center p-4 overflow-hidden">
         {/* Immagine di sfondo */}
         <div
-          className="absolute inset-0 w-full h-full bg-cover bg-center -z-20"
+          className="absolute inset-0 w-full h-full bg-cover bg-center -z-20 animate-ken-burns"
           style={{ backgroundImage: "url('/main-menu.png')" }}
         />
         {/* Overlay scuro per la leggibilità */}

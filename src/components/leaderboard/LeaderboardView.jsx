@@ -104,10 +104,10 @@ const LeaderboardView = ({ onNavigate }) => {
   };
 
   return (
-    <div className="relative isolate min-h-screen p-4 pt-20 animate-fade-in">
+    <div className="relative isolate min-h-screen p-4 pt-20 animate-fade-in overflow-hidden">
       {/* Sfondo e overlay */}
       <div
-        className="absolute inset-0 -z-20 bg-cover bg-center"
+        className="absolute inset-0 -z-20 bg-cover bg-center animate-ken-burns"
         style={{ backgroundImage: "url('/leader-board.png')" }}
       />
       <div className="absolute inset-0 -z-10 bg-black/60" />
