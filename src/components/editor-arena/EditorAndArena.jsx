@@ -1,12 +1,15 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import GameManager from "../game/GameManager";
-import DefaultAI from "../../game/ai/DefaultAI";
+import DefaultAI from "../../game/ai/DefaultAIBase";
 import useDisclosure from "../ui/useDisclosure";
 import ApiDocsModal from "../docs/ApiDocsModal";
 import TutorialModal from "../docs/TutorialModal";
 import { compileAI } from "../../game/ai/compiler";
 import { useAIScripts } from "../../hooks/useAIScripts";
+import { useTutorial } from "../../hooks/useTutorial";
+import InteractiveTutorial from "../tutorial/InteractiveTutorial";
+import { tutorialSteps } from "../../config/tutorialSteps";
 import { useAuth } from "../../context/AuthContext";
 import FirestoreService from "../../services/FirestoreService";
 import Arena from "../game/Arena";
@@ -26,7 +29,7 @@ const EditorAndArena = ({ onNavigateBack }) => {
   } = useDisclosure();
   const {
     isOpen: isGameOver,
-    onOpen: onGameOver,
+    onOpen: onGameOverOpen,
     onClose: onGameOverClose,
   } = useDisclosure();
   const {
@@ -78,6 +81,15 @@ const EditorAndArena = ({ onNavigateBack }) => {
     handleUpdateBotSettings,
   } = useAIScripts();
 
+  const {
+    isTutorialActive,
+    currentStep,
+    currentStepIndex,
+    nextStep,
+    skipTutorial,
+    completeTutorial,
+  } = useTutorial();
+
   // Ref per assicurarsi che le statistiche vengano aggiornate una sola volta per partita
   const statsUpdatedRef = useRef(false);
   useEffect(() => {
@@ -85,13 +97,86 @@ const EditorAndArena = ({ onNavigateBack }) => {
     statsUpdatedRef.current = false;
   }, [gameKey]);
 
+  // Gestori di eventi "wrappati" per il tutorial
+  const handleCreateNewScriptWithTutorial = useCallback(
+    (name) => {
+      if (typeof name === "string") {
+        // L'utente ha confermato il nome, quindi creiamo lo script.
+        handleCreateNewScript(name);
+        // Il tutorial è al passo 1 ("Dai un nome..."), quindi avanziamo.
+        if (isTutorialActive && currentStepIndex === 3) {
+          nextStep();
+        }
+      } else {
+        // L'utente ha solo iniziato la creazione, non passiamo argomenti.
+        // Il pannello dell'editor mostrerà l'input.
+        // Il tutorial è al passo 0 ("Crea..."), quindi avanziamo.
+        if (isTutorialActive && currentStepIndex === 2) {
+          nextStep();
+        }
+      }
+    },
+    [handleCreateNewScript, isTutorialActive, currentStepIndex, nextStep]
+  );
+
   const handleApplyAIChanges = useCallback(() => {
     const result = handleUpdateAI();
     if (result.success) {
       setGameKey((k) => k + 1);
     }
     return result;
-  }, [handleUpdateAI]);
+  }, [handleUpdateAI, setGameKey]);
+
+  const handleApplyAIChangesWithTutorial = useCallback(() => {
+    const result = handleApplyAIChanges();
+    if (isTutorialActive && currentStepIndex === 8) {
+      nextStep();
+    }
+    return result;
+  }, [handleApplyAIChanges, isTutorialActive, currentStepIndex, nextStep]);
+
+  const handleBotSettingsOpenWithTutorial = useCallback(() => {
+    // Avanza quando l'utente clicca su "Impostazioni Bot" (step 5)
+    if (isTutorialActive && currentStepIndex === 5) {
+      nextStep();
+    }
+  }, [isTutorialActive, currentStepIndex, nextStep]);
+
+  const handleSettingsModalOpenWithTutorial = useCallback(() => {
+    onSettingsModalOpen();
+    // Avanza quando l'utente clicca su "Impostazioni Partita" (step 0)
+    if (isTutorialActive && currentStepIndex === 0) {
+      nextStep();
+    }
+  }, [onSettingsModalOpen, isTutorialActive, currentStepIndex, nextStep]);
+
+  const handleUpdateBotSettingsWithTutorial = useCallback(
+    (...args) => {
+      handleUpdateBotSettings(...args);
+      // Avanza dopo aver salvato le impostazioni del bot (step 7)
+      if (isTutorialActive && currentStepIndex === 7) {
+        nextStep();
+      }
+    },
+    [handleUpdateBotSettings, isTutorialActive, currentStepIndex, nextStep]
+  );
+
+  // Effetto per far avanzare il tutorial in base alle azioni dell'utente
+  useEffect(() => {
+    // Avanza dopo aver attivato il multiplayer (step 6)
+    if (
+      isTutorialActive &&
+      currentStepIndex === 6 &&
+      activeScript?.isMultiplayerEligible
+    ) {
+      nextStep();
+    }
+  }, [
+    activeScript?.isMultiplayerEligible,
+    isTutorialActive,
+    currentStepIndex,
+    nextStep,
+  ]);
 
   const handleRestart = useCallback(() => {
     onGameOverClose();
@@ -145,10 +230,7 @@ const EditorAndArena = ({ onNavigateBack }) => {
   return (
     <div className="relative isolate min-h-screen p-4 pt-20 animate-fade-in">
       {/* Div per lo sfondo, posizionato dietro al contenuto */}
-      <div
-        className="absolute inset-0 -z-20 "
-        style={{ backgroundImage: "url('/arena-background.png')" }}
-      />
+      <div className="absolute inset-0 -z-20 arena-background" />
       {/* Overlay scuro per migliorare la leggibilità */}
       <div className="absolute inset-0 -z-10 bg-black/50" />
 
@@ -269,18 +351,23 @@ const EditorAndArena = ({ onNavigateBack }) => {
             <GameUI
               gameState={enrichedGameState}
               controls={controls}
-              onEditorOpen={onEditorOpen}
+              onEditorOpen={() => {
+                onEditorOpen();
+                if (isTutorialActive && currentStepIndex === 1) {
+                  nextStep();
+                }
+              }}
               isEditorOpen={isEditorOpen}
               onEditorClose={onEditorClose}
               playerCode={playerCode}
               onCodeChange={setPlayerCode}
-              onUpdate={handleApplyAIChanges}
+              onUpdate={handleApplyAIChangesWithTutorial}
               compileError={compileError}
               isLogOpen={isLogOpen}
               onLogOpen={onLogOpen}
               onLogClose={onLogClose}
               isGameOver={isGameOver}
-              onGameOver={onGameOver}
+              onGameOver={onGameOverOpen}
               onGameOverClose={onGameOverClose}
               onRestart={handleRestart}
               onApiDocsOpen={onApiDocsOpen}
@@ -288,9 +375,9 @@ const EditorAndArena = ({ onNavigateBack }) => {
               activeScript={activeScript}
               onSelectScript={handleSelectScript}
               onDeleteScript={handleDeleteScript}
-              onCreateNewScript={handleCreateNewScript}
+              onCreateNewScript={handleCreateNewScriptWithTutorial}
               onSaveOnly={handleSaveOnly}
-              onUpdateSettings={handleUpdateBotSettings}
+              onUpdateSettings={handleUpdateBotSettingsWithTutorial}
               // Props per la nuova modale di selezione avversario
               isOpponentModalOpen={isOpponentModalOpen}
               onOpponentModalOpen={handleOpponentModalOpen}
@@ -307,9 +394,10 @@ const EditorAndArena = ({ onNavigateBack }) => {
               onLogoutModalOpen={onLogoutModalOpen}
               onLogoutModalClose={onLogoutModalClose}
               isSettingsModalOpen={isSettingsModalOpen}
-              onSettingsModalOpen={onSettingsModalOpen}
+              onSettingsModalOpen={handleSettingsModalOpenWithTutorial}
               onSettingsModalClose={onSettingsModalClose}
               onTutorialModalOpen={onTutorialModalOpen}
+              onBotSettingsOpen={handleBotSettingsOpenWithTutorial}
               onNavigateBack={onNavigateBack}
             />
           );
@@ -320,6 +408,15 @@ const EditorAndArena = ({ onNavigateBack }) => {
         isOpen={isTutorialModalOpen}
         onClose={onTutorialModalClose}
       />
+      {isTutorialActive && (
+        <InteractiveTutorial
+          step={currentStep}
+          onNext={nextStep}
+          onSkip={skipTutorial}
+          stepIndex={currentStepIndex}
+          totalSteps={tutorialSteps.length}
+        />
+      )}
     </div>
   );
 };

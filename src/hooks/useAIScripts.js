@@ -114,8 +114,7 @@ export function useAIScripts() {
     [scripts, activeScript, handleSelectScript, user, addToast]
   );
 
-  const handleCreateNewScript = useCallback(async () => {
-    const newScriptName = prompt("Inserisci il nome:", `Mio Script #${scripts.length + 1}`);
+  const handleCreateNewScript = useCallback(async (newScriptName) => {
     if (newScriptName && newScriptName.trim() !== "") {
       const code = `({\n  state: {},\n\n  /**\n   * @param {object} api - L'API del robot per interagire con il gioco.\n   */\n  run: function (api) {\n    // Il tuo codice qui...\n    api.log('Tick!');\n  }\n})`;
       const minifiedCode = minifyScript(code);
@@ -143,7 +142,7 @@ export function useAIScripts() {
       handleSelectScript(savedScript.id);
       addToast("Nuovo script creato!", "success");
     }
-  }, [scripts.length, handleSelectScript, user, addToast]);
+  }, [handleSelectScript, user, addToast]);
 
   const handleSaveOnly = useCallback(async () => {
     if (!activeScript) return { success: false };

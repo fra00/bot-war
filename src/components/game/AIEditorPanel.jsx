@@ -1,10 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import PropTypes from "prop-types";
 import Button from "../ui/Button";
 import Alert from "../ui/Alert";
 import Card from "../ui/Card";
 import CardHeader from "../ui/CardHeader";
-import Select from "../ui/Select";
+import Input from "../ui/Input";
 import CodeEditor from "./CodeEditor";
 import Spinner from "../ui/Spinner";
 
@@ -20,9 +20,33 @@ const AIEditorPanel = ({
   activeScript,
   onSelectScript,
   onDeleteScript,
-  onCreateNewScript,
+  onCreateNewScript, // This is now called with/without the name
   isLoading,
 }) => {
+  const [isCreating, setIsCreating] = useState(false);
+  const [newScriptName, setNewScriptName] = useState("");
+
+  const handleInitiateCreate = () => {
+    setIsCreating(true);
+    // Chiama la prop senza argomenti per segnalare l'inizio della creazione
+    // e permettere al tutorial di avanzare.
+    onCreateNewScript();
+  };
+
+  const handleConfirmCreate = () => {
+    if (newScriptName.trim()) {
+      // Chiama la prop con il nome per confermare la creazione
+      onCreateNewScript(newScriptName.trim());
+      setIsCreating(false);
+      setNewScriptName("");
+    }
+  };
+
+  const handleCancelCreate = () => {
+    setIsCreating(false);
+    setNewScriptName("");
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full text-lg">
@@ -83,16 +107,45 @@ const AIEditorPanel = ({
             </ul>
           </div>
           <div className="p-2 border-t border-gray-700">
-            <Button onClick={onCreateNewScript} className="w-full">
-              Nuovo Script
-            </Button>
+            {isCreating ? (
+              <div className="space-y-2">
+                <Input
+                  id="new-script-name-input"
+                  placeholder="Nome del nuovo script"
+                  value={newScriptName}
+                  onChange={(e) => setNewScriptName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleConfirmCreate()}
+                  autoFocus
+                  data-tutorial-id="script-name-input"
+                />
+                <div className="flex gap-2">
+                  <Button onClick={handleCancelCreate} variant="secondary" className="w-full">
+                    Annulla
+                  </Button>
+                  <Button onClick={handleConfirmCreate} className="w-full">
+                    Conferma
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                data-tutorial-id="new-bot-button"
+                onClick={handleInitiateCreate}
+                className="w-full"
+              >
+                Nuovo Script
+              </Button>
+            )}
           </div>
         </Card>
       </div>
 
       {/* Colonna Destra: Editor e Controlli */}
       <div className="col-span-9 flex flex-col h-full">
-        <div className="flex-grow relative rounded-md overflow-hidden border border-gray-700">
+        <div
+          data-tutorial-id="code-editor"
+          className="flex-grow relative rounded-md overflow-hidden border border-gray-700"
+        >
           <CodeEditor
             value={code}
             onChange={(value) => onCodeChange(value || "")}

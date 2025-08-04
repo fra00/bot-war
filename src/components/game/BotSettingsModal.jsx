@@ -50,6 +50,7 @@ const BotSettingsModal = ({ isOpen, onClose, bot, onSave }) => {
           onChange={handleToggleVisibility}
         />
         <ToggleSwitch
+          data-tutorial-id="multiplayer-toggle"
           label="Abilita per Multiplayer"
           description="Se attivo, questo bot potrà essere usato nelle sfide multiplayer."
           checked={settings.isMultiplayerEligible}
@@ -60,7 +61,9 @@ const BotSettingsModal = ({ isOpen, onClose, bot, onSave }) => {
         <Button onClick={onClose} variant="secondary">
           Annulla
         </Button>
-        <Button onClick={handleSaveClick}>Salva Impostazioni</Button>
+        <Button data-tutorial-id="save-settings-button" onClick={handleSaveClick}>
+          Salva Impostazioni
+        </Button>
       </CardFooter>
     </Modal>
   );

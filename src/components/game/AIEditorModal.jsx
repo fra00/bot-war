@@ -26,6 +26,7 @@ const AIEditorModal = ({
   onCreateNewScript,
   onUpdateSettings,
   isLoading,
+  onBotSettingsOpen,
 }) => {
   const { addToast } = useToast();
   const { user } = useAuth();
@@ -34,6 +35,13 @@ const AIEditorModal = ({
     onOpen: onSettingsOpen,
     onClose: onSettingsClose,
   } = useDisclosure();
+
+  const handleBotSettingsButtonClick = () => {
+    onSettingsOpen();
+    if (onBotSettingsOpen) {
+      onBotSettingsOpen();
+    }
+  };
 
   const handleSaveClick = useCallback(async () => {
     const { success } = await onSaveOnly();
@@ -98,7 +106,8 @@ const AIEditorModal = ({
               {/* Il Tooltip ha bisogno di un div wrapper per funzionare su elementi disabilitati */}
               <div>
                 <Button
-                  onClick={onSettingsOpen}
+                  data-tutorial-id="bot-settings-button"
+                  onClick={handleBotSettingsButtonClick}
                   variant="ghost"
                   disabled={!activeScript || !user}
                 >
@@ -110,6 +119,7 @@ const AIEditorModal = ({
               Salva Modifiche
             </Button>
             <Button
+              data-tutorial-id="apply-and-restart-button"
               onClick={handleUpdateClick}
               disabled={gameStateStatus === "running"}
               className="bg-green-600 hover:bg-green-700"
@@ -147,6 +157,7 @@ AIEditorModal.propTypes = {
   onCreateNewScript: PropTypes.func.isRequired,
   onUpdateSettings: PropTypes.func.isRequired,
   isLoading: PropTypes.bool,
+  onBotSettingsOpen: PropTypes.func,
 };
 
 export default AIEditorModal;

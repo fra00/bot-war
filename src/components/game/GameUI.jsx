@@ -60,6 +60,7 @@ const GameUI = ({
   onSettingsModalOpen,
   onSettingsModalClose,
   onTutorialModalOpen,
+  onBotSettingsOpen,
 }) => {
   // Effetto per aprire il modale di fine partita
   useEffect(() => {
@@ -109,7 +110,11 @@ const GameUI = ({
         <Button onClick={controls.reset} variant="secondary">
           Reset
         </Button>
-        <Button onClick={onSettingsModalOpen} variant="ghost">
+        <Button
+          data-tutorial-id="game-settings-button"
+          onClick={onSettingsModalOpen}
+          variant="ghost"
+        >
           Impostazioni
         </Button>
         <Button onClick={onNavigateBack} variant="secondary">
@@ -161,6 +166,7 @@ const GameUI = ({
         onCreateNewScript={onCreateNewScript}
         onUpdateSettings={onUpdateSettings}
         isLoading={isLoading}
+        onBotSettingsOpen={onBotSettingsOpen}
       />
 
       <LogDrawer
@@ -194,6 +200,7 @@ const GameUI = ({
       >
         <div className="p-4 flex flex-col gap-4">
           <Button
+            data-tutorial-id="open-editor-button"
             onClick={() => {
               onEditorOpen();
               onSettingsModalClose();
@@ -308,6 +315,7 @@ GameUI.propTypes = {
   onSettingsModalClose: PropTypes.func.isRequired,
   /** Funzione per aprire la modale del tutorial. */
   onTutorialModalOpen: PropTypes.func.isRequired,
+  onBotSettingsOpen: PropTypes.func,
 };
 
 export default GameUI;
