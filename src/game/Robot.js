@@ -23,7 +23,6 @@ import {
  * @property {number} energy - Energia della batteria
  * @property {number} totalWeight - Peso totale
  * @property {boolean} isOverweight - Se il robot è in sovrappeso
- */
 
 /**
  * Rappresenta un singolo robot nell'arena.

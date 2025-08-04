@@ -5,10 +5,17 @@ import "./ProgressBar.css";
 /**
  * Componente ProgressBar per visualizzare graficamente il progresso di un'operazione.
  */
-const ProgressBar = ({ progress, height = 10, className = "", ...rest }) => {
+const ProgressBar = ({
+  progress,
+  height = 10,
+  color = "#646cff",
+  className = "",
+  ...rest
+}) => {
   const progressStyle = {
     width: `${progress}%`,
     height: `${height}px`,
+    backgroundColor: color,
   };
 
   const classNames = ["progress-bar", className].filter(Boolean).join(" ");
@@ -29,6 +36,10 @@ ProgressBar.propTypes = {
    * Altezza della barra di progresso in pixel.
    */
   height: PropTypes.number,
+  /**
+   * Colore della barra di progresso.
+   */
+  color: PropTypes.string,
   /**
    * Classi CSS aggiuntive.
    */

@@ -38,7 +38,7 @@ const BotInfo = ({ bot, color, onSelectLog }) => {
             <span>Hull</span>
             <span>{Math.round(bot.hullHp)} / 100</span>
           </div>
-          <ProgressBar progress={bot.hullHp} height={6} />
+          <ProgressBar progress={bot.hullHp} height={6} color="#2ecc71" />
         </div>
         <div>
           <div className="flex justify-between">
@@ -52,6 +52,7 @@ const BotInfo = ({ bot, color, onSelectLog }) => {
               bot.maxArmorHp > 0 ? (bot.armorHp / bot.maxArmorHp) * 100 : 0
             }
             height={6}
+            color="#e74c3c"
           />
         </div>
         <div>
@@ -66,6 +67,7 @@ const BotInfo = ({ bot, color, onSelectLog }) => {
               bot.maxEnergy > 0 ? (bot.energy / bot.maxEnergy) * 100 : 0
             }
             height={6}
+            color="#3498db" // Blu per l'energia
           />
         </div>
         <div className="pt-1">

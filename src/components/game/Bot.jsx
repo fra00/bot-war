@@ -6,7 +6,17 @@ import PropTypes from 'prop-types';
  * @param {{ botData: object, isPlayer: boolean }} props
  */
 const Bot = ({ botData, isPlayer }) => {
-  const { x, y, angle, hullHp, maxHullHp } = botData;
+  const {
+    x,
+    y,
+    angle,
+    hullHp,
+    maxHullHp,
+    armorHp,
+    maxArmorHp,
+    energy,
+    maxEnergy,
+  } = botData;
 
   const bodyColor = isPlayer ? '#4A90E2' : '#C74343'; // Blu per il giocatore, Rosso per l'avversario
   const turretColor = isPlayer ? '#34495e' : '#562424';
@@ -25,15 +35,42 @@ const Bot = ({ botData, isPlayer }) => {
 
   return (
     <g transform={`translate(${x}, ${y})`}>
-      {/* Barra della vita */}
-      <g transform="translate(-20, -30)">
+      {/* Barre di stato */}
+      <g transform="translate(-20, -42)">
+        {/* Sfondo per le barre */}
         <rect x="0" y="0" width="40" height="5" fill="#333" rx="2" />
+        <rect x="0" y="6" width="40" height="5" fill="#333" rx="2" />
+        <rect x="0" y="12" width="40" height="5" fill="#333" rx="2" />
+
+        {/* Barra della vita (Scafo) */}
         <rect
           x="0"
           y="0"
-          width={(40 * hullHp) / maxHullHp}
+          width={(40 * hullHp) / (maxHullHp || 1)}
           height="5"
           fill={healthBarColor}
+          rx="2"
+          style={{ transition: 'width 0.2s ease-in-out' }}
+        />
+
+        {/* Barra dell'armatura (Scudo) */}
+        <rect
+          x="0"
+          y="6"
+          width={(40 * armorHp) / (maxArmorHp || 1)}
+          height="5"
+          fill="#e74c3c" // Rosso per lo scudo
+          rx="2"
+          style={{ transition: 'width 0.2s ease-in-out' }}
+        />
+
+        {/* Barra dell'energia (Batteria) */}
+        <rect
+          x="0"
+          y="12"
+          width={(40 * energy) / (maxEnergy || 1)}
+          height="5"
+          fill="#3498db" // Blu per l'energia
           rx="2"
           style={{ transition: 'width 0.2s ease-in-out' }}
         />
