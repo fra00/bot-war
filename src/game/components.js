@@ -10,7 +10,7 @@ export const standardCannon = {
   name: "Standard Cannon",
   weight: 15,
   damage: 10,
-  fireRate: 20, // tick tra un colpo e l'altro (cooldown)
+  fireRate: 40, // tick tra un colpo e l'altro (cooldown)
   range: 450,
   energyCost: 5, // energia per colpo
   projectileRadius: 3,
