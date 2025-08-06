@@ -118,6 +118,12 @@ class Robot {
      * @type {Array<string>}
      */
     this.logs = [];
+
+    /**
+     * An object used by the AI to persist state between ticks.
+     * @type {Object}
+     */
+    this.memory = {};
   }
 
   /**

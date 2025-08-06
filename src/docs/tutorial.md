@@ -26,9 +26,9 @@ Copia questo scheletro migliorato nell'editor. Introduce `api.log` per il debug 
    */
   run: function (api) {
     // Inizializzazione al primo tick.
-    if (typeof this.state.current === "undefined") {
-      this.state.current = "SEARCHING"; // Inizia cercando il nemico
-      this.state.lastKnownEnemyPosition = null; // Memorizza l'ultima posizione nota del nemico
+    if (typeof api.getMemory().current === "undefined") {
+      api.getMemory().current = "SEARCHING"; // Inizia cercando il nemico
+      api.getMemory().lastKnownEnemyPosition = null; // Memorizza l'ultima posizione nota del nemico
       api.log("Bot inizializzato. Stato iniziale: SEARCHING");
     }
 
@@ -54,7 +54,7 @@ run: function (api) {
   // ... (codice di inizializzazione)...
 
   // Logica della macchina a stati
-  switch (this.state.current) {
+  switch (api.getMemory().current) {
     case 'SEARCHING':
       // Logica per quando stiamo cercando
       break;
@@ -83,7 +83,7 @@ const events = api.getEvents();
 
 // Se veniamo colpiti, passiamo sempre allo stato di evasione.
 if (events.some((e) => e.type === "HIT_BY_PROJECTILE")) {
-  this.state.current = "EVADING";
+  api.getMemory().current = "EVADING";
   api.stop(); // Svuota la coda di comandi per reagire subito!
   console.log("Colpito! Nuovo stato: EVADING");
 }
@@ -91,7 +91,7 @@ if (events.some((e) => e.type === "HIT_BY_PROJECTILE")) {
 // Se rileviamo un nemico che non era visibile prima, passiamo all'attacco.
 // L'evento viene generato solo al primo avvistamento, non ad ogni tick.
 if (events.some((e) => e.type === "ENEMY_DETECTED")) {
-  this.state.current = "ATTACKING";
+  api.getMemory().current = "ATTACKING";
   api.stop(); // Interrompe l'azione di ricerca per attaccare.
   console.log("Nemico rilevato! Nuovo stato: ATTACKING");
 }
@@ -104,6 +104,7 @@ if (events.some((e) => e.type === "ENEMY_DETECTED")) {
 ## Passo 3: Implementare lo Stato `SEARCHING`
 
 Nello stato `SEARCHING`, la logica è:
+
 1.  Se vediamo il nemico, passiamo subito ad `ATTACKING`.
 2.  Se abbiamo un'`lastKnownEnemyPosition`, andiamo lì per investigare.
 3.  Altrimenti, pattugliamo un punto casuale.
@@ -114,16 +115,16 @@ Usiamo `api.isQueueEmpty()` per assicurarci di dare un nuovo comando solo quando
 case 'SEARCHING':
   // Controlla sempre se il nemico è visibile, anche senza l'evento ENEMY_DETECTED.
   if (api.scan()) {
-    this.state.current = 'ATTACKING';
+    api.getMemory().current = 'ATTACKING';
     api.stop();
     break;
   }
 
   // Se abbiamo perso il nemico, andiamo a controllare la sua ultima posizione nota.
-  if (this.state.lastKnownEnemyPosition && api.isQueueEmpty()) {
+  if (api.getMemory().lastKnownEnemyPosition && api.isQueueEmpty()) {
     api.log("Investigo sull'ultima posizione nota del nemico...");
-    api.moveTo(this.state.lastKnownEnemyPosition.x, this.state.lastKnownEnemyPosition.y);
-    this.state.lastKnownEnemyPosition = null; // Controlla solo una volta
+    api.moveTo(api.getMemory().lastKnownEnemyPosition.x, api.getMemory().lastKnownEnemyPosition.y);
+    api.getMemory().lastKnownEnemyPosition = null; // Controlla solo una volta
     break;
   }
 
@@ -157,7 +158,7 @@ case 'ATTACKING':
 
   // Se perdiamo il bersaglio, torniamo a cercare.
   if (!enemy) {
-    this.state.current = 'SEARCHING';
+    api.getMemory().current = 'SEARCHING';
     console.log('Nemico perso. Torno in stato: SEARCHING');
     break;
   }
@@ -200,7 +201,7 @@ case 'EVADING':
 
   // Una volta che la manovra evasiva è completa, torniamo a cercare.
   if (events.some(e => e.type === 'MOVE_COMPLETED')) {
-    this.state.current = 'SEARCHING';
+    api.getMemory().current = 'SEARCHING';
     console.log('Manovra completata. Torno in stato: SEARCHING');
   }
   break;
@@ -218,8 +219,8 @@ Ecco il codice completo per il tuo primo bot. Puoi copiarlo e incollarlo nell'ed
 
   run: function (api) {
     // Inizializzazione
-    if (typeof this.state.current === "undefined") {
-      this.state.current = "SEARCHING";
+    if (typeof api.getMemory().current === "undefined") {
+      api.getMemory().current = "SEARCHING";
       console.log("Bot inizializzato. Stato iniziale: SEARCHING");
     }
 
@@ -227,20 +228,20 @@ Ecco il codice completo per il tuo primo bot. Puoi copiarlo e incollarlo nell'ed
 
     // --- Gestione delle Transizioni di Stato ---
     if (events.some((e) => e.type === "HIT_BY_PROJECTILE")) {
-      this.state.current = "EVADING";
+      api.getMemory().current = "EVADING";
       api.stop();
       console.log("Colpito! Nuovo stato: EVADING");
     }
 
     // Se rileviamo un nemico che non era visibile prima, passiamo all'attacco.
     if (events.some((e) => e.type === "ENEMY_DETECTED")) {
-      this.state.current = "ATTACKING";
+      api.getMemory().current = "ATTACKING";
       api.stop();
       console.log("Nemico rilevato! Nuovo stato: ATTACKING");
     }
 
     // --- Logica della Macchina a Stati ---
-    switch (this.state.current) {
+    switch (api.getMemory().current) {
       case "SEARCHING":
         if (api.isQueueEmpty()) {
           const arena = api.getArenaDimensions();
@@ -258,7 +259,7 @@ Ecco il codice completo per il tuo primo bot. Puoi copiarlo e incollarlo nell'ed
       case "ATTACKING":
         const enemy = api.scan();
         if (!enemy) {
-          this.state.current = "SEARCHING";
+          api.getMemory().current = "SEARCHING";
           console.log("Nemico perso. Torno in stato: SEARCHING");
           break;
         }
@@ -284,7 +285,7 @@ Ecco il codice completo per il tuo primo bot. Puoi copiarlo e incollarlo nell'ed
         }
 
         if (events.some((e) => e.type === "MOVE_COMPLETED")) {
-          this.state.current = "SEARCHING";
+          api.getMemory().current = "SEARCHING";
           console.log("Manovra completata. Torno in stato: SEARCHING");
         }
         break;

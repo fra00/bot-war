@@ -40,7 +40,6 @@ const stringifyAI = (aiObject) => {
 // const initialPlayerCode = stringifyAI(DefaultAIBase);
 
 const initialPlayerCode = `({
-  state: {},
 
   run: function (api) {
     // Qui inseriremo la logica della nostra macchina a stati.

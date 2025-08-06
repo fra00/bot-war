@@ -18,7 +18,7 @@ describe("AI Compiler", () => {
         isAttacking: false
       },
       run: function(api) {
-        this.state.isAttacking = true;
+        api.getMemory().isAttacking = true;
       }
     })`;
     const ai = compileAI(validCode);

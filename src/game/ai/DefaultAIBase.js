@@ -3,18 +3,16 @@
  * Non esegue alcuna azione. Serve come placeholder.
  */
 const DefaultAIBase = {
-  // L'oggetto 'state' mantiene i dati tra i tick.
-  state: {},
-
   /**
    * Imposta lo stato corrente e registra la transizione.
    * @param {string} newState - Il nuovo stato da impostare.
    * @param {Object} api - L'API del robot per il logging.
    */
   setCurrentState: function (newState, api) {
-    if (this.state.current !== newState) {
-      api.log(`Stato: ${this.state.current || "undefined"} -> ${newState}`);
-      this.state.current = newState;
+    const memory = api.getMemory();
+    if (memory.current !== newState) {
+      api.log(`Stato: ${memory.current || "undefined"} -> ${newState}`);
+      api.updateMemory({ current: newState });
     }
   },
 
@@ -22,18 +20,24 @@ const DefaultAIBase = {
    * @param {Object} api - L'API del robot per interagire con il gioco.
    */
   run: function (api) {
+    const memory = api.getMemory();
+
     // Inizializzazione al primo tick
-    if (typeof this.state.current === "undefined") {
+    if (typeof memory.current === "undefined") {
+      api.updateMemory({
+        lastKnownEnemyPosition: null,
+        isMovingToRecharge: false,
+        isExecutingFlank: false, // Aggiungiamo il nuovo stato per la manovra di fiancheggiamento
+        evasionGraceTicks: 0, // Contatore per il periodo di grazia dell'evasione
+      });
       this.setCurrentState("SEARCHING", api);
-      this.state.lastKnownEnemyPosition = null;
-      this.state.isMovingToRecharge = false;
-      this.state.isExecutingFlank = false; // Aggiungiamo il nuovo stato per la manovra di fiancheggiamento
-      this.state.evasionGraceTicks = 0; // Contatore per il periodo di grazia dell'evasione
     }
 
     // Decrementa il contatore del periodo di grazia per l'evasione ad ogni tick.
-    if (this.state.evasionGraceTicks > 0) {
-      this.state.evasionGraceTicks--;
+    if (memory.evasionGraceTicks > 0) {
+      api.updateMemory({
+        evasionGraceTicks: memory.evasionGraceTicks - 1,
+      });
     }
 
     const events = api.getEvents();
@@ -43,9 +47,11 @@ const DefaultAIBase = {
     const batteryPercent = (battery.energy / battery.maxEnergy) * 100;
 
     // Se la batteria è scarica, entra in modalità ricarica (a meno che non lo sia già)
-    if (batteryPercent < 30 && this.state.current !== "RECHARGING") {
+    if (batteryPercent < 30 && memory.current !== "RECHARGING") {
       this.setCurrentState("RECHARGING", api);
-      this.state.isMovingToRecharge = false; // Resetta lo stato per la nuova modalità
+      api.updateMemory({
+        isMovingToRecharge: false, // Resetta lo stato per la nuova modalità
+      });
       api.stop();
     }
 
@@ -53,11 +59,13 @@ const DefaultAIBase = {
     // Se veniamo colpiti E non siamo nel periodo di grazia, iniziamo una nuova evasione.
     if (
       events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
-      this.state.evasionGraceTicks <= 0
+      memory.evasionGraceTicks <= 0
     ) {
       this.setCurrentState("EVADING", api); // Change state to EVADING
       api.stop(); // Svuota la coda per reagire subito
-      this.state.evasionGraceTicks = 120; // Imposta un periodo di grazia (es. 60 tick)
+      api.updateMemory({
+        evasionGraceTicks: 120, // Imposta un periodo di grazia (es 60 tick)
+      });
     }
 
     // Se il bot si scontra con un muro, deve sbloccarsi.
@@ -67,7 +75,9 @@ const DefaultAIBase = {
       )
     ) {
       this.setCurrentState("UNSTUCKING", api);
-      this.state.isExecutingFlank = false; // Annulla anche la manovra di fiancheggiamento se ci si blocca.
+      api.updateMemory({
+        isExecutingFlank: false, // Annulla anche la manovra di fiancheggiamento se ci si blocca
+      });
       api.stop(); // Assicura che la coda sia pulita
     }
 
@@ -80,10 +90,7 @@ const DefaultAIBase = {
     // Mentre si cerca o ci si ritira, controlla sempre se un nemico appare.
     // Questo rende il bot molto più reattivo e gli permette di interrompere
     // lunghi percorsi di `moveTo` se si presenta un'opportunità.
-    if (
-      this.state.current === "SEARCHING" ||
-      this.state.current === "RECHARGING"
-    ) {
+    if (memory.current === "SEARCHING" || memory.current === "RECHARGING") {
       const enemy = api.scan();
       if (enemy) {
         this.setCurrentState("ATTACKING", api);
@@ -92,12 +99,14 @@ const DefaultAIBase = {
       }
     }
     // --- Logica della Macchina a Stati ---
-    switch (this.state.current) {
+    switch (memory.current) {
       case "RECHARGING": {
         // Condizione di uscita: se la batteria è sufficientemente carica, torna a cercare.
         if (batteryPercent >= 70) {
           this.setCurrentState("SEARCHING", api);
-          this.state.isMovingToRecharge = false; // Resetta lo stato per la prossima modalità
+          api.updateMemory({
+            isMovingToRecharge: false, // Resetta lo stato per la prossima modalità
+          });
           break;
         }
 
@@ -110,7 +119,9 @@ const DefaultAIBase = {
             // Il posto non è sicuro. Annulliamo lo stato di "movimento per ricarica"
             // in modo che al prossimo tick ne cerchi uno nuovo.
             api.log("Il posto non è sicuro! Cerco un altro punto.");
-            this.state.isMovingToRecharge = false;
+            api.updateMemory({
+              isMovingToRecharge: false,
+            });
           } else {
             // Il posto è sicuro. Restiamo qui.
             // Non facciamo nulla a 'isMovingToRecharge', così il bot sa che è "arrivato"
@@ -124,11 +135,13 @@ const DefaultAIBase = {
         // Se siamo "in movimento per ricarica" ma la coda comandi è vuota,
         // significa che siamo arrivati e stiamo aspettando.
         // Controlliamo costantemente se arriva un nemico e ci giriamo verso il centro.
-        if (this.state.isMovingToRecharge && api.isQueueEmpty()) {
+        if (memory.isMovingToRecharge && api.isQueueEmpty()) {
           const enemy = api.scan();
           if (enemy) {
             api.log("Nemico avvistato mentre ricarico! Scappo.");
-            this.state.isMovingToRecharge = false; // Forza la ricerca di un nuovo posto.
+            api.updateMemory({
+              isMovingToRecharge: false, // Annulla il movimento per ricarica
+            });
             break;
           }
           // Se non c'è un nemico, girati verso il centro dell'arena per avere una buona visuale.
@@ -138,11 +151,11 @@ const DefaultAIBase = {
 
         // Se NON ci stiamo muovendo per ricaricare e la coda è vuota,
         // significa che dobbiamo trovare un posto dove andare.
-        if (!this.state.isMovingToRecharge && api.isQueueEmpty()) {
+        if (!memory.isMovingToRecharge && api.isQueueEmpty()) {
           api.log("Cerco un posto sicuro per ricaricare...");
           // Usa la posizione attuale del nemico se visibile, altrimenti l'ultima nota.
           const enemy = api.scan();
-          const enemyPos = enemy || this.state.lastKnownEnemyPosition;
+          const enemyPos = enemy || memory.lastKnownEnemyPosition;
 
           // Logica di ripiego: vai nell'angolo più lontano dal nemico.
           const arena = api.getArenaDimensions();
@@ -182,7 +195,8 @@ const DefaultAIBase = {
             // Fallback: se nessun angolo è valido (scenario improbabile ma possibile),
             // muoviti in un punto casuale valido per evitare di rimanere bloccato.
             api.log("Nessun angolo sicuro trovato! Scelgo un punto casuale.");
-            for (let i = 0; i < 10; i++) { // Tenta 10 volte
+            for (let i = 0; i < 10; i++) {
+              // Tenta 10 volte
               const randomX = Math.random() * arena.width;
               const randomY = Math.random() * arena.height;
               if (api.isPositionValid({ x: randomX, y: randomY })) {
@@ -192,7 +206,9 @@ const DefaultAIBase = {
             }
           }
 
-          this.state.isMovingToRecharge = true;
+          api.updateMemory({
+            isMovingToRecharge: true, // Segna che stiamo cercando un posto per ricaricare
+          });
         }
         break;
       }
@@ -204,7 +220,8 @@ const DefaultAIBase = {
           // Manovra più robusta: arretra un po' e poi gira di un angolo casuale.
           // Usiamo una sequenza per assicurarci che entrambe le azioni vengano considerate
           // come un'unica manovra.
-          const randomAngle = (Math.random() < 0.5 ? 90 : -90) + (Math.random() * 30 - 15); // Gira a ~90° a dx/sx
+          const randomAngle =
+            (Math.random() < 0.5 ? 90 : -90) + (Math.random() * 30 - 15); // Gira a ~90° a dx/sx
           api.sequence([
             { type: "START_MOVE", payload: { distance: -60 } }, // Arretra un po' di più
             { type: "START_ROTATE", payload: { angle: randomAngle } },
@@ -213,8 +230,16 @@ const DefaultAIBase = {
 
         // Una volta che l'intera sequenza di sblocco è completata (o interrotta),
         // torna a cercare per ricalcolare la situazione.
-        if (events.some(e => e.type === "SEQUENCE_COMPLETED" || (e.type === "ACTION_STOPPED" && this.state.current === "UNSTUCKING"))) {
-          api.log("Manovra di sblocco completata. Ritorno in modalità SEARCHING.");
+        if (
+          events.some(
+            (e) =>
+              e.type === "SEQUENCE_COMPLETED" ||
+              (e.type === "ACTION_STOPPED" && memory.current === "UNSTUCKING")
+          )
+        ) {
+          api.log(
+            "Manovra di sblocco completata. Ritorno in modalità SEARCHING."
+          );
           this.setCurrentState("SEARCHING", api);
         }
         break;
@@ -230,25 +255,29 @@ const DefaultAIBase = {
         }
 
         // Se abbiamo un'ultima posizione nota, la nostra priorità è andare lì.
-        if (this.state.lastKnownEnemyPosition) {
+        if (memory.lastKnownEnemyPosition) {
           if (api.isQueueEmpty()) {
             api.moveTo(
-              this.state.lastKnownEnemyPosition.x,
-              this.state.lastKnownEnemyPosition.y,
+              memory.lastKnownEnemyPosition.x,
+              memory.lastKnownEnemyPosition.y,
               70 // Usa una velocità ridotta per risparmiare energia
             );
             // Se moveTo non ha accodato comandi (es. percorso non trovato),
             // la coda è ancora vuota. In questo caso, abbandoniamo la caccia
             // per evitare un loop infinito.
             if (api.isQueueEmpty()) {
-              this.state.lastKnownEnemyPosition = null;
+              api.updateMemory({
+                lastKnownEnemyPosition: null, // Abbandona la caccia se non troviamo nulla
+              });
             }
           }
           // Se arriviamo a destinazione e non troviamo ancora nulla, abbandoniamo la pista.
           // Se il movimento verso l'ultima posizione nota è completato e non abbiamo
           // ancora trovato il nemico, abbandoniamo la pista.
           if (events.some((e) => e.type === "MOVE_COMPLETED")) {
-            this.state.lastKnownEnemyPosition = null;
+            api.updateMemory({
+              lastKnownEnemyPosition: null, // Abbandona la caccia se non troviamo nulla
+            });
           }
           break;
         }
@@ -267,22 +296,31 @@ const DefaultAIBase = {
         if (!enemy) {
           // Se abbiamo un'ultima posizione nota, andiamo a caccia.
           this.setCurrentState("SEARCHING", api);
-          this.state.isExecutingFlank = false; // Annulla la manovra di fiancheggiamento se perdiamo il bersaglio.
+          api.updateMemory({
+            isExecutingFlank: false, // Annulla la manovra di fiancheggiamento se non c'è un nemico.
+          });
           api.stop(); // Interrompe le manovre di attacco per iniziare subito la caccia.
           break;
         }
 
         // Aggiorniamo costantemente l'ultima posizione nota finché vediamo il nemico.
-        this.state.lastKnownEnemyPosition = { x: enemy.x, y: enemy.y };
+        api.updateMemory({
+          lastKnownEnemyPosition: { x: enemy.x, y: enemy.y },
+        });
 
         // Se una manovra di fiancheggiamento è completata, resettiamo il flag.
         // Questo permette al bot di pianificare una nuova azione al prossimo tick se necessario.
         if (
-          this.state.isExecutingFlank &&
-          events.some(e => e.type === "SEQUENCE_COMPLETED" || e.type === "ACTION_STOPPED")
+          memory.isExecutingFlank &&
+          events.some(
+            (e) =>
+              e.type === "SEQUENCE_COMPLETED" || e.type === "ACTION_STOPPED"
+          )
         ) {
           api.log("Manovra di fiancheggiamento completata.");
-          this.state.isExecutingFlank = false;
+          api.updateMemory({
+            isExecutingFlank: false, // Reset del flag per la prossima manovra
+          });
         }
 
         // --- LOGICA DI FUOCO (ogni tick) ---
@@ -295,8 +333,8 @@ const DefaultAIBase = {
 
         // --- LOGICA DI MOVIMENTO (solo quando il bot è inattivo) ---
         // Se il bot ha finito la sua sequenza di mosse precedente, ne pianifica una nuova.
-        // Aggiungiamo il controllo !this.state.isExecutingFlank per evitare il thrashing.
-        if (api.isQueueEmpty() && !this.state.isExecutingFlank) {
+        // Aggiungiamo il controllo !this.getMemory.isExecutingFlank per evitare il thrashing.
+        if (api.isQueueEmpty() && !memory.isExecutingFlank) {
           const arena = api.getArenaDimensions();
           const optimalDistance = 250;
           const tooCloseDistance = 150;
@@ -304,7 +342,9 @@ const DefaultAIBase = {
 
           // Priorità 1: Se la linea di tiro è bloccata, usa moveTo per riposizionarti.
           if (!isLosClear) {
-            api.log("Linea di tiro bloccata. Eseguo manovra di fiancheggiamento.");
+            api.log(
+              "Linea di tiro bloccata. Eseguo manovra di fiancheggiamento."
+            );
             const self = api.getState();
             const dx = enemy.x - self.x;
             const dy = enemy.y - self.y;
@@ -324,7 +364,9 @@ const DefaultAIBase = {
 
             api.moveTo(clampedX, clampedY);
             // Impostiamo il flag per "ricordare" che stiamo eseguendo questa manovra.
-            this.state.isExecutingFlank = true;
+            api.updateMemory({
+              isExecutingFlank: true,
+            });
           } else {
             // Priorità 2: Se la linea di tiro è libera, gestisci la distanza (kiting).
             api.aimAt(enemy.x, enemy.y);
@@ -347,14 +389,16 @@ const DefaultAIBase = {
           )
         ) {
           this.setCurrentState("SEARCHING", api); // Torna a cercare dopo l'evasione
-          this.state.evasionGraceTicks = 0; // Resetta il periodo di grazia
+          api.updateMemory({
+            evasionGraceTicks: 0, // Resetta il periodo di grazia
+          });
           break; // Esci per evitare di accodare una nuova manovra nello stesso tick.
         }
 
         // Priorità 2: Se non abbiamo finito e siamo inattivi, inizia una nuova manovra.
         if (api.isQueueEmpty()) {
           const obstacles = api.scanObstacles();
-          const enemyPos = this.state.lastKnownEnemyPosition;
+          const enemyPos = memory.lastKnownEnemyPosition;
           const MAX_COVER_DISTANCE = 150;
           let coverFoundAndValid = false;
 

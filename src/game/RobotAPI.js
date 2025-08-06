@@ -196,6 +196,33 @@ class RobotAPI {
   isPositionValid = (position) =>
     isPositionWalkable(position, Robot.RADIUS, this.gameState.arena);
 
+  // --- Memoria Persistente ---
+
+  /**
+   * Restituisce l'oggetto di memoria persistente del robot.
+   * Le modifiche a questo oggetto verranno mantenute tra i tick.
+   * @returns {Object}
+   */
+  getMemory = () => this.robot.memory;
+
+  /**
+   * Aggiorna o aggiunge proprietà all'oggetto di memoria del robot.
+   * Esegue un merge superficiale delle nuove proprietà nell'oggetto esistente.
+   * @param {Object} propertiesToUpdate - Le nuove proprietà da impostare o aggiornare.
+   * @returns {Object} Il nuovo oggetto di memoria aggiornato.
+   */
+  updateMemory = (propertiesToUpdate) => {
+    // La precedente implementazione con lo spread operator `{ ... }` creava un *nuovo* oggetto di memoria ad ogni chiamata.
+    // Questo invalidava la variabile `memory` locale in `DefaultAIBase.js`, che continuava a puntare
+    // alla vecchia versione dell'oggetto, portando a leggere dati non aggiornati.
+    // this.robot.memory = { ...this.robot.memory, ...propertiesToUpdate };
+
+    // La nuova implementazione con `Object.assign` *modifica* l'oggetto di memoria esistente.
+    // In questo modo, la variabile `memory` in `DefaultAIBase.js` mantiene un riferimento
+    // sempre valido e aggiornato per tutto il tick.
+    Object.assign(this.robot.memory, propertiesToUpdate);
+    return this.robot.memory;
+  };
   // --- Eventi ---
   getEvents = () => {
     return this.gameState.events.filter((e) => {

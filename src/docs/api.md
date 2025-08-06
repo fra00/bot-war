@@ -132,7 +132,7 @@ api.log(...args)
     - `...args` (any): Una serie di argomenti (stringhe, numeri, oggetti) da registrare. Gli oggetti verranno convertiti in stringhe JSON.
 
     Esempio:
-    api.log("Stato attuale:", this.state.current);
+    api.log("Stato attuale:", api.getMemory().current);
     const enemy = api.scan();
     if (enemy) {
       api.log("Nemico trovato a distanza:", enemy.distance);
@@ -332,8 +332,8 @@ Iniziamo con lo scheletro della nostra IA. Copia questo codice nell'editor:
    */
   run: function (api) {
     // Inizializzazione al primo tick
-    if (typeof this.state.current === "undefined") {
-      this.state.current = "SEARCHING"; // Inizia cercando il nemico
+    if (typeof api.getMemory().current === "undefined") {
+      api.getMemory().current = "SEARCHING"; // Inizia cercando il nemico
       console.log("Bot inizializzato. Stato iniziale: SEARCHING");
     }
 
