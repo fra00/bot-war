@@ -23,40 +23,12 @@ export const compileAI = (code) => {
     throw new Error("The AI object must have a 'run' method.");
   }
 
-  // Esegue un test di validazione per catturare errori di runtime immediati nel codice dell'IA.
-  try {
-    // Crea un'API fittizia completa per il test.
-    const mockApi = {
-      move: (distance, speedPercentage) => {},
-      moveTo: (x, y, speedPercentage) => {},
-      rotate: (percentage) => {},
-      aimAt: (x, y, speedPercentage) => {},
-      sequence: (actions) => {},
-      stop: () => {},
-      fire: () => {},
-      scan: () => null,
-      scanObstacles: () => [],
-      getArenaDimensions: () => ({ width: 800, height: 600, obstacles: [] }),
-      getState: () => ({}),
-      getBatteryState: () => ({ energy: 100, maxEnergy: 100 }),
-      getArmorState: () => ({ hp: 50, maxHp: 50 }),
-      getHullState: () => ({ hp: 100, maxHp: 100 }),
-      getEvents: () => [],
-      isPositionValid: (position) => true,
-      isLineOfSightClear: (targetPosition) => true,
-      isObstacleAhead: () => false,
-      isQueueEmpty: () => true,
-      log: (level, message) => console.log(`[${level}] ${message}`),
-    };
-    // Eseguiamo la validazione sull'oggetto appena creato.
-    // Questo potrebbe mutarne lo stato, il che è indesiderato per l'oggetto finale.
-    aiObject.run(mockApi);
-  } catch (e) {
-    // Se la chiamata di prova fallisce, l'errore è nel codice dell'IA.
-    // Rilanciamo un errore più descrittivo che include il messaggio originale.
-    throw new Error(`Error during AI validation: ${e.message}`);
-  }
-  // Se la validazione ha successo, restituiamo una NUOVA istanza pulita dell'oggetto AI,
-  // per assicurarci che lo stato non sia stato mutato dalla chiamata di validazione.
-  return factory();
+  // Abbiamo rimosso il test di validazione "a secco" (dry-run) per essere meno restrittivi.
+  // Questo permette all'utente di definire qualsiasi struttura di oggetto AI,
+  // purché rispetti il contratto minimo di avere un metodo `run`.
+  // Gli errori di runtime verranno ora rilevati durante la simulazione del gioco.
+
+  // Restituiamo l'oggetto AI creato. Non è più necessario creare una nuova istanza
+  // perché non eseguiamo una chiamata di test che potrebbe mutarne lo stato.
+  return aiObject;
 };
