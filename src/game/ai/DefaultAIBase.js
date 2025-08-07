@@ -341,13 +341,6 @@ const DefaultAIBase = {
           return "SEARCHING";
         }
 
-        // Se un nemico è visibile, interrompi la ricarica e attacca.
-        const enemy = api.scan();
-        if (enemy) {
-          api.log("Nemico avvistato durante la ricarica! Interrompo.");
-          return "ATTACKING";
-        }
-
         // Se abbiamo completato un movimento, siamo arrivati a destinazione.
         if (events.some((e) => e.type === "SEQUENCE_COMPLETED")) {
           api.log("Arrivato al punto di ricarica. Controllo sicurezza...");
@@ -356,7 +349,11 @@ const DefaultAIBase = {
             api.log("Il posto non è sicuro! Cerco un altro punto.");
             api.updateMemory({ isMovingToRecharge: false });
           } else {
-            api.log("Posto sicuro. In attesa e ricarica.");
+            api.log(
+              "Posto sicuro. Mi giro verso il centro e attendo la ricarica."
+            );
+            const arena = api.getArenaDimensions();
+            api.aimAt(arena.width / 2, arena.height / 2);
           }
           return; // Rimani in questo stato, la logica del prossimo tick deciderà.
         }
