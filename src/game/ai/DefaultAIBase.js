@@ -68,49 +68,80 @@ const DefaultAIBase = {
     // =================================================================
     ATTACKING: {
       onEnter: (api, memory) => {
-        api.log("Nemico ingaggiato!");
+        api.log("Nemico ingaggiato! Valuto la situazione...");
       },
       onExecute: (api, memory, events) => {
         const enemy = api.scan();
-        // Se il nemico non è più visibile, torna a cercare.
+        // Condizione di uscita: Nemico perso di vista.
         if (!enemy) {
           return "SEARCHING";
         }
 
-        // Aggiorna costantemente l'ultima posizione nota.
-        api.updateMemory({
-          lastKnownEnemyPosition: { x: enemy.x, y: enemy.y },
-        });
-
-        // Logica di fuoco: spara se la mira è buona e la linea di tiro è libera.
-        // La condizione `Math.abs(enemy.angle) < 5` assicura che si spari solo
-        // quando il cannone è puntato quasi perfettamente verso il nemico,
-        // con una tolleranza di 5 gradi in entrambe le direzioni.
+        // Azioni continue: Aggiorna la posizione e spara se possibile.
+        api.updateMemory({ lastKnownEnemyPosition: { x: enemy.x, y: enemy.y } });
         if (Math.abs(enemy.angle) < 5 && api.isLineOfSightClear(enemy)) {
           api.fire();
         }
 
-        // Logica di movimento: pianifica una nuova mossa solo se inattivo.
+        // Logica decisionale per il movimento (solo se inattivi).
         if (api.isQueueEmpty()) {
           const optimalDistance = 250;
           const tooCloseDistance = 150;
 
-          // Priorità 1: Se la linea di tiro è bloccata, fiancheggia.
+          // Mira solo quando decidi una nuova mossa.
+          api.aimAt(enemy.x, enemy.y);
+
+          // Priorità 1: Linea di tiro bloccata -> Fiancheggia.
           if (!api.isLineOfSightClear(enemy)) {
             return "FLANKING";
           }
-
-          // Priorità 2: Se la linea di tiro è libera, gestisci la distanza (kiting).
-          api.aimAt(enemy.x, enemy.y);
+          // Priorità 2: Troppo vicino -> Esegui kiting.
           if (enemy.distance < tooCloseDistance) {
-            api.move(-80); // Troppo vicino, arretra.
-          } else if (enemy.distance > optimalDistance + 50) {
+            return "KITING";
+          }
+          // Priorità 3: Troppo lontano -> Avvicinati.
+          if (enemy.distance > optimalDistance + 50) {
+            api.log("Nemico troppo lontano, mi avvicino...");
             api.move(80); // Troppo lontano, avvicinati.
           }
+          // Se siamo alla distanza ottimale, non facciamo nulla e continuiamo a sparare.
         }
       },
       onExit: (api, memory) => {
-        // Interrompi qualsiasi manovra di kiting prima di cambiare stato.
+        // Questo metodo è intenzionalmente vuoto.
+        // La chiamata a `api.stop()` è ora centralizzata in `setCurrentState`
+        // per garantire una pulizia uniforme durante ogni transizione.
+      },
+    },
+
+    // =================================================================
+    // STATO KITING
+    // =================================================================
+    KITING: {
+      onEnter: (api, memory) => {
+        api.log("Nemico troppo vicino! Eseguo kiting...");
+        api.move(-80); // Arretra per creare distanza.
+      },
+      onExecute: (api, memory, events) => {
+        const enemy = api.scan();
+        const tooCloseDistance = 150;
+
+        // Condizioni di uscita
+        if (!enemy) return "SEARCHING";
+        if (!api.isLineOfSightClear(enemy)) return "FLANKING";
+        if (enemy.distance > tooCloseDistance + 20) return "ATTACKING"; // Ristabilita distanza di sicurezza
+
+        // Azioni continue
+        api.aimAt(enemy.x, enemy.y);
+        if (Math.abs(enemy.angle) < 5) api.fire();
+
+        // Se la manovra è finita ma siamo ancora troppo vicini, rientra per muoverti ancora.
+        if (events.some(e => e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")) {
+          return "KITING";
+        }
+      },
+      onExit: (api, memory) => {
+        // La pulizia dello stop è gestita centralmente.
       },
     },
 
