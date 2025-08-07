@@ -1,4 +1,4 @@
-API di Controllo del Bot (v2)
+API di Controllo del Bot (v3)
 
 Questa documentazione descrive l'API aggiornata per programmare il tuo robot. Il sistema di controllo è asincrono, basato su eventi e ora include una coda di comandi per semplificare la programmazione di sequenze di azioni.
 
@@ -24,6 +24,88 @@ Le azioni rimangono divise in due categorie:
 Logica Guidata dagli Eventi
 
 Nonostante la coda di comandi semplifichi le sequenze, la logica reattiva è ancora fondamentale. Il tuo bot deve reagire agli eventi per interrompere le azioni pianificate e rispondere a minacce. Usa `api.getEvents()` per ricevere notifiche su eventi come `HIT_BY_PROJECTILE`.
+
+---
+
+## Architettura dell'IA: La Macchina a Stati
+
+Per creare un'IA robusta, il nostro `DefaultAIBase.js` implementa una **Macchina a Stati** con un ciclo di vita definito per ogni stato. Questo pattern è il modo consigliato per strutturare la tua logica.
+
+### Il Pattern `Enter/Execute/Exit`
+
+Ogni stato è un oggetto con tre metodi opzionali che ne definiscono il comportamento:
+
+- **`onEnter(api, memory)`**: Viene eseguito **una sola volta** quando si entra nello stato. È il posto ideale per le azioni di setup, come avviare un movimento o resettare un valore in memoria.
+- **`onExecute(api, memory, events)`**: Viene eseguito ad **ogni tick** in cui lo stato è attivo. Il suo scopo è monitorare la situazione (es. `api.scan()`) e decidere se è necessario passare a un altro stato. Per richiedere una transizione, deve **restituire una stringa** con il nome del nuovo stato (es. `return "ATTACKING";`).
+- **`onExit(api, memory)`**: Viene eseguito **una sola volta** quando si sta per lasciare lo stato. È usato per azioni di pulizia, come resettare flag specifici dello stato in memoria.
+
+### Il Motore della Macchina a Stati
+
+Il cuore del sistema è la funzione `run`, che agisce come un "motore", e la funzione `setCurrentState`, che gestisce le transizioni.
+
+1.  **`run`**: Ad ogni tick, esegue i controlli globali (es. batteria scarica, collisioni) e poi chiama `onExecute` dello stato corrente. Se `onExecute` restituisce un nuovo nome di stato, `run` chiama `setCurrentState`.
+2.  **`setCurrentState(newState, api)`**: Questa funzione è il centro di controllo delle transizioni:
+    - Chiama `onExit()` del vecchio stato.
+    - Chiama `api.stop("STATE_TRANSITION")` per interrompere qualsiasi azione in corso e pulire la coda di comandi.
+    - Aggiorna lo stato in memoria (`memory.current = newState`).
+    - Chiama `onEnter()` del nuovo stato.
+
+### Gestire le Transizioni e gli Eventi: Il Caso `ACTION_STOPPED`
+
+Un punto cruciale è la gestione dell'evento `ACTION_STOPPED`. Poiché `setCurrentState` chiama `api.stop()` ad ogni transizione, viene generato un evento `{ type: "ACTION_STOPPED", source: "STATE_TRANSITION" }`.
+
+Nel tick successivo, il nuovo stato leggerà questo evento. Se non viene gestito correttamente, potrebbe pensare che una *sua* azione sia terminata e uscire prematuramente.
+
+**La soluzione corretta** è filtrare questa `source` specifica:
+
+```javascript
+// Esempio di condizione di uscita corretta in onExecute
+if (events.some(e => e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")) {
+  // Un'azione è stata interrotta per una ragione esterna (es. collisione)
+  // o si è completata. È sicuro procedere.
+  return "SEARCHING";
+}
+```
+
+### Esempio Pratico: `SEARCHING`
+
+Nello stato `SEARCHING`, la logica di decidere dove andare è in `onExecute`, perché deve essere rivalutata ogni volta che il bot è inattivo. L'esempio seguente è più robusto di quello base.
+
+```javascript
+// In states.SEARCHING
+onExecute: (api, memory, events) => {
+  // Condizione di uscita prioritaria: se vediamo un nemico, attacchiamo.
+  const potentialTarget = api.scan();
+  if (potentialTarget) {
+    return "ATTACKING";
+  }
+
+  // Se un movimento è terminato (perché siamo arrivati o per una collisione),
+  // e stavamo inseguendo il nemico, puliamo la memoria per non rimanere bloccati.
+  if (
+    memory.lastKnownEnemyPosition &&
+    events.some(
+      (e) =>
+        e.type === "SEQUENCE_COMPLETED" ||
+        (e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")
+    )
+  ) {
+    api.updateMemory({ lastKnownEnemyPosition: null });
+  }
+
+  // Se il bot è inattivo, decide la prossima mossa.
+  if (api.isQueueEmpty()) {
+    // Priorità 1: Caccia all'ultima posizione nota.
+    if (memory.lastKnownEnemyPosition) {
+      api.moveTo(memory.lastKnownEnemyPosition.x, memory.lastKnownEnemyPosition.y);
+    } else {
+      // Priorità 2: Pattugliamento casuale.
+      const arena = api.getArenaDimensions();
+      api.moveTo(Math.random() * arena.width, Math.random() * arena.height);
+    }
+  }
+}
+```
 
 ---
 
@@ -86,9 +168,11 @@ api.stop()
     Interrompe immediatamente il comando in esecuzione e svuota l'intera coda di comandi. Questa è un'azione istantanea.
 
     Comportamento:
-    - Se un comando era attivo, viene interrotto e viene generato un evento `ACTION_STOPPED`.
+    - Se un comando era attivo, viene interrotto e viene generato un evento `ACTION_STOPPED` con una `source` specifica.
     - Tutta la `commandQueue` viene cancellata. Qualsiasi azione pianificata viene annullata.
     - È il comando principale per implementare una logica reattiva.
+
+    **Nota:** La chiamata a `stop()` accetta un parametro opzionale `source` (stringa) per identificare chi ha richiesto lo stop. Il motore della macchina a stati usa `"STATE_TRANSITION"`.
 
     Esempio:
     // Se vieni colpito mentre ti muovi, annulla tutto e fermati.
@@ -203,7 +287,7 @@ api.scan()
     Valore di ritorno:
     - Un oggetto `{ distance, angle, x, y }` se il nemico è nel raggio del radar.
       - `distance` (number): Distanza in linea d'aria dal nemico.
-      - `angle` (number): Angolo relativo al nemico in gradi (0-360), misurato in senso orario. `0` è la direzione in cui il tuo robot sta puntando.
+      - `angle` (number): Angolo relativo al nemico in gradi (da -180 a 180). `0` è la direzione in cui il tuo robot sta puntando. Un valore negativo è a sinistra, uno positivo a destra.
       - `x` (number): Coordinata X stimata del nemico.
       - `y` (number): Coordinata Y stimata del nemico.
     - `null` se il nemico non viene rilevato.
@@ -257,7 +341,28 @@ api.getArenaDimensions()
 
 api.isObstacleAhead(probeDistance)
 
-    Controlla la presenza di un ostacolo (muro o oggetto) di fronte al robot.
+    Controlla la presenza di un ostacolo (muro o oggetto) molto vicino nella direzione di movimento attuale.
+
+    Parametri:
+    - `probeDistance` (number, opzionale, default: 30): La distanza in pixel davanti al robot da controllare.
+
+api.isObstacleAhead(probeDistance)
+
+    Controlla la presenza di un ostacolo (muro o oggetto) molto vicino nella direzione di movimento attuale.
+
+    Parametri:
+    - `probeDistance` (number, opzionale, default: 30): La distanza in pixel davanti al robot da controllare.
+
+api.isObstacleAhead(probeDistance)
+
+    Controlla la presenza di un ostacolo (muro o oggetto) molto vicino nella direzione di movimento attuale.
+
+    Parametri:
+    - `probeDistance` (number, opzionale, default: 30): La distanza in pixel davanti al robot da controllare.
+
+api.isObstacleAhead(probeDistance)
+
+    Controlla la presenza di un ostacolo (muro o oggetto) molto vicino nella direzione di movimento attuale.
 
     Parametri:
     - `probeDistance` (number, opzionale, default: 30): La distanza in pixel davanti al robot da controllare.
@@ -313,31 +418,97 @@ api.getEvents()
 
 ## La Struttura di Base
 
-Ogni IA è un oggetto JavaScript con due elementi principali:
+Ogni IA è un oggetto JavaScript che deve esportare una funzione `run(api)`. Il modo consigliato per strutturare la tua IA è usare il pattern a stati descritto sopra.
 
-1.  Un oggetto `state` per memorizzare informazioni tra un tick e l'altro (come lo stato attuale del bot).
-2.  Una funzione `run(api)` che viene eseguita ad ogni tick del gioco.
-
-Iniziamo con lo scheletro della nostra IA. Copia questo codice nell'editor:
+Ecco uno scheletro di partenza che puoi copiare nell'editor:
 
 ```javascript
 ({
-  // L'oggetto 'state' mantiene i dati tra i tick.
-  // Lo inizializzeremo al primo tick.
-  state: {},
+  // La mappa degli stati definisce la logica per ogni stato dell'IA.
+  states: {
+    SEARCHING: {
+      onEnter: (api, memory) => {
+        api.log("Inizio pattugliamento...");
+      },
+      onExecute: (api, memory, events) => {
+        // Se vediamo un nemico, passiamo allo stato di attacco
+        if (api.scan()) {
+          return "ATTACKING";
+        }
+        // Se siamo inattivi, pianifichiamo un nuovo movimento
+        if (api.isQueueEmpty()) {
+          const arena = api.getArenaDimensions();
+          api.moveTo(Math.random() * arena.width, Math.random() * arena.height);
+        }
+      },
+      onExit: (api, memory) => {
+        // La pulizia delle azioni (stop) è gestita centralmente.
+      },
+    },
+    ATTACKING: {
+      // Aggiungi qui la logica per lo stato ATTACKING...
+    },
+    // Aggiungi altri stati qui...
+  },
 
   /**
    * La funzione run viene chiamata ad ogni tick del gioco.
-   * @param {object} api - L'API per controllare il tuo bot.
+   * @param {Object} api - L'API per controllare il tuo bot.
    */
   run: function (api) {
-    // Inizializzazione al primo tick
-    if (typeof api.getMemory().current === "undefined") {
-      api.getMemory().current = "SEARCHING"; // Inizia cercando il nemico
-      console.log("Bot inizializzato. Stato iniziale: SEARCHING");
+    // Inizializzazione al primo tick.
+    const memory = api.getMemory();
+    if (typeof memory.current === "undefined") {
+      api.updateMemory({
+        // Inizializza qui le variabili di memoria.
+        lastKnownEnemyPosition: null,
+        isMovingToRecharge: false,
+        evasionGraceTicks: 0,
+      });
+      this.setCurrentState("SEARCHING", api);
+      return; // Esce per questo tick, la logica inizierà dal prossimo.
     }
 
-    // Qui inseriremo la logica della nostra macchina a stati.
+    // Aggiorna stati interni ad ogni tick
+    if (memory.evasionGraceTicks > 0) {
+      api.updateMemory({ evasionGraceTicks: memory.evasionGraceTicks - 1 });
+    }
+
+    const events = api.getEvents();
+
+    // --- Gestione Transizioni ad Alta Priorità ---
+    // Questi controlli hanno la precedenza sulla logica dello stato corrente.
+    const battery = api.getBatteryState();
+    const batteryPercent = (battery.energy / battery.maxEnergy) * 100;
+
+    if (batteryPercent < 30 && memory.current !== 'RECHARGING') {
+      this.setCurrentState("RECHARGING", api);
+      return; // Interrompi il tick per dare priorità alla ricarica.
+    }
+    if (events.some(e => e.type === 'HIT_BY_PROJECTILE') && memory.evasionGraceTicks <= 0) {
+      this.setCurrentState("EVADING", api);
+      return;
+    }
+    if (events.some(e => e.type === 'ACTION_STOPPED' && e.reason === 'COLLISION')) {
+      this.setCurrentState("UNSTUCKING", api);
+      return;
+    }
+
+    // --- Esecuzione dello Stato Corrente ---
+    const currentState = this.states[memory.current];
+    if (currentState?.onExecute) {
+      const context = { batteryPercent };
+      const nextStateName = currentState.onExecute(api, memory, events, context);
+      if (nextStateName && nextStateName !== memory.current) {
+        this.setCurrentState(nextStateName, api);
+      }
+    }
+  },
+
+  // --- Motore della Macchina a Stati (non modificare) ---
+  setCurrentState: function (newState, api) {
+    // Questa funzione è già implementata in DefaultAIBase.js
+    // e gestisce il ciclo di vita onExit/onEnter.
   },
 });
 ```
