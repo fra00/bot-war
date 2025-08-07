@@ -178,11 +178,25 @@ class Robot {
       this.path = null;
     }
 
-    this.nextActions = []; // Resetta le azioni per il tick corrente
-    // L'IA viene eseguita ad ogni tick, anche se un comando asincrono è attivo.
-    // Questo le permette di reagire a eventi (es. essere colpiti) e, se necessario,
-    // inviare un comando `stop()` o pianificare la mossa successiva.
-    this.ai.run(this.getApi(gameState));
+    this.nextActions = []; // Resetta le azioni per il tick corrente.
+
+    try {
+      // L'IA viene eseguita ad ogni tick, anche se un comando asincrono è attivo.
+      // Questo le permette di reagire a eventi (es. essere colpiti) e, se necessario,
+      // inviare un comando `stop()` o pianificare la mossa successiva.
+      this.ai.run(this.getApi(gameState));
+    } catch (e) {
+      // In caso di errore di runtime nell'IA, lo registriamo e impediamo al bot di muoversi.
+      // Questo evita che il game loop si blocchi.
+      const errorMessage = `AI_RUNTIME_ERROR: ${e.message}`;
+      console.error(`Errore nell'IA del robot ${this.id}:`, e);
+
+      // Aggiungiamo l'errore ai log del bot per renderlo visibile nell'interfaccia.
+      this.logs.push(errorMessage);
+      if (this.logs.length > 100) {
+        this.logs.shift();
+      }
+    }
   }
 
   /**

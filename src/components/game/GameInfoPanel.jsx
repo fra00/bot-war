@@ -8,7 +8,7 @@ import Button from "../ui/Button";
 import Textarea from "../ui/Textarea";
 import { Tabs, TabList, Tab, TabPanels, TabPanel } from "../ui/Tabs";
 
-const BotInfo = ({ bot, color, onSelectLog }) => {
+const BotInfo = ({ bot, color, onSelectLog, isLogActive }) => {
   return (
     <Card
       className="flex flex-1 flex-col" // flex-1 per occupare lo spazio, rimosso mb-4
@@ -28,7 +28,11 @@ const BotInfo = ({ bot, color, onSelectLog }) => {
             </span>
           )}
         </div>
-        <Button onClick={() => onSelectLog(bot)} size="small" variant="ghost">
+        <Button
+          onClick={() => onSelectLog(bot)}
+          size="small"
+          variant={isLogActive ? "primary" : "ghost"}
+        >
           Log
         </Button>
       </CardHeader>
@@ -105,6 +109,7 @@ BotInfo.propTypes = {
   }).isRequired,
   color: PropTypes.string.isRequired,
   onSelectLog: PropTypes.func.isRequired,
+  isLogActive: PropTypes.bool.isRequired,
 };
 
 const BotInfoPlaceholder = ({ name, color }) => (
@@ -205,12 +210,15 @@ const GameInfoPanel = ({ gameState }) => {
             bot={bot}
             color={botColors[index]}
             onSelectLog={handleSelectLog}
+            isLogActive={logSource?.id === bot.id}
           />
         ))}
       </Box>
       <Tabs defaultIndex={0}>
         <TabList>
-          <Tab>Logs {logSource ? `(${logSource.id})` : ""}</Tab>
+          <Tab>
+            Logs {logSource ? `(${logSource.name || logSource.id})` : ""}
+          </Tab>
         </TabList>
         <TabPanels>
           <TabPanel>
