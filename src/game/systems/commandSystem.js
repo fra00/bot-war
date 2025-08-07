@@ -44,6 +44,7 @@ export function processActiveCommands(robots, arena) {
             robotId: robot.id,
             commandType: "MOVE",
             reason: "NO_ENERGY",
+            source: "ENGINE",
           });
           robot.commandQueue.shift(); // Rimuovi il comando fallito
           break;
@@ -65,6 +66,7 @@ export function processActiveCommands(robots, arena) {
             robotId: robot.id,
             commandType: "MOVE",
             reason: "COLLISION",
+            source: "ENGINE",
           });
           robot.commandQueue.shift(); // Rimuovi il comando fallito
           break;
@@ -100,6 +102,7 @@ export function processActiveCommands(robots, arena) {
             robotId: robot.id,
             commandType: "ROTATE",
             reason: "NO_ENERGY",
+            source: "ENGINE",
           });
           robot.commandQueue.shift(); // Rimuovi il comando fallito
           break;

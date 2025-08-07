@@ -25,7 +25,13 @@ export function scanForEnemy(self, allRobots) {
     return null;
   }
 
-  const angle = ((Math.atan2(dy, dx) * 180) / Math.PI - self.rotation + 360) % 360;
+  // Calcola l'angolo assoluto verso il nemico
+  const targetAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  // Calcola l'angolo relativo alla rotazione del robot
+  let angle = targetAngle - self.rotation;
+  // Normalizza l'angolo nell'intervallo [-180, 180] per una gestione più semplice
+  if (angle > 180) angle -= 360;
+  if (angle < -180) angle += 360;
   return { distance, angle, x: enemyState.x, y: enemyState.y };
 }
 

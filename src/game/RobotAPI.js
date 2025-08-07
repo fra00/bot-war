@@ -139,10 +139,11 @@ class RobotAPI {
   rotate = (angle, speedPercentage = 100) =>
     this._setAction("START_ROTATE", { angle, speedPercentage });
 
-  stop = () => {
+  stop = (source = "AI_REQUEST") => {
     this.robot.destination = null;
     this.robot.path = null;
-    this.robot.nextActions = [{ type: "STOP_ACTION" }];
+    // Passiamo la 'source' nel payload per poterla usare nell'evento
+    this.robot.nextActions = [{ type: "STOP_ACTION", payload: { source } }];
   };
 
   aimAt = (targetX, targetY, speedPercentage = 100) => {

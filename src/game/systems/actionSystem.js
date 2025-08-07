@@ -62,7 +62,8 @@ export function executeNextActions(robots, projectileCounter) {
               type: "ACTION_STOPPED",
               robotId: robot.id,
               commandType: robot.commandQueue[0].type,
-              reason: "USER_COMMAND",
+              reason: "USER_COMMAND", // Manteniamo la ragione generica
+              source: action.payload.source, // Aggiungiamo la fonte specifica
             });
             robot.commandQueue = [];
           }
