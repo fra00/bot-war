@@ -27,7 +27,6 @@ const DefaultAIBase = {
       api.updateMemory({
         lastKnownEnemyPosition: null,
         isMovingToRecharge: false,
-        isExecutingFlank: false, // Aggiungiamo il nuovo stato per la manovra di fiancheggiamento
         evasionGraceTicks: 0, // Contatore per il periodo di grazia dell'evasione
       });
       this.setCurrentState("SEARCHING", api);
@@ -75,9 +74,6 @@ const DefaultAIBase = {
       )
     ) {
       this.setCurrentState("UNSTUCKING", api);
-      api.updateMemory({
-        isExecutingFlank: false, // Annulla anche la manovra di fiancheggiamento se ci si blocca
-      });
       api.stop(); // Assicura che la coda sia pulita
     }
 
@@ -296,9 +292,6 @@ const DefaultAIBase = {
         if (!enemy) {
           // Se abbiamo un'ultima posizione nota, andiamo a caccia.
           this.setCurrentState("SEARCHING", api);
-          api.updateMemory({
-            isExecutingFlank: false, // Annulla la manovra di fiancheggiamento se non c'è un nemico.
-          });
           api.stop(); // Interrompe le manovre di attacco per iniziare subito la caccia.
           break;
         }
@@ -307,21 +300,6 @@ const DefaultAIBase = {
         api.updateMemory({
           lastKnownEnemyPosition: { x: enemy.x, y: enemy.y },
         });
-
-        // Se una manovra di fiancheggiamento è completata, resettiamo il flag.
-        // Questo permette al bot di pianificare una nuova azione al prossimo tick se necessario.
-        if (
-          memory.isExecutingFlank &&
-          events.some(
-            (e) =>
-              e.type === "SEQUENCE_COMPLETED" || e.type === "ACTION_STOPPED"
-          )
-        ) {
-          api.log("Manovra di fiancheggiamento completata.");
-          api.updateMemory({
-            isExecutingFlank: false, // Reset del flag per la prossima manovra
-          });
-        }
 
         // --- LOGICA DI FUOCO (ogni tick) ---
         // Spara se la mira è buona e la linea di tiro è libera.
@@ -333,8 +311,7 @@ const DefaultAIBase = {
 
         // --- LOGICA DI MOVIMENTO (solo quando il bot è inattivo) ---
         // Se il bot ha finito la sua sequenza di mosse precedente, ne pianifica una nuova.
-        // Aggiungiamo il controllo !this.getMemory.isExecutingFlank per evitare il thrashing.
-        if (api.isQueueEmpty() && !memory.isExecutingFlank) {
+        if (api.isQueueEmpty()) {
           const arena = api.getArenaDimensions();
           const optimalDistance = 250;
           const tooCloseDistance = 150;
@@ -343,8 +320,44 @@ const DefaultAIBase = {
           // Priorità 1: Se la linea di tiro è bloccata, usa moveTo per riposizionarti.
           if (!isLosClear) {
             api.log(
-              "Linea di tiro bloccata. Eseguo manovra di fiancheggiamento."
+              "Linea di tiro bloccata. Inizio manovra di fiancheggiamento."
             );
+            this.setCurrentState("FLANKING", api);
+            api.stop();
+            break;
+          } else {
+            // Priorità 2: Se la linea di tiro è libera, gestisci la distanza (kiting).
+            api.aimAt(enemy.x, enemy.y);
+            if (enemy.distance < tooCloseDistance) {
+              api.move(-80); // Troppo vicino, arretra (kiting).
+            } else if (enemy.distance > optimalDistance + 50) {
+              api.move(80); // Troppo lontano, avvicinati.
+            }
+          }
+          break;
+        }
+        break;
+      case "FLANKING": {
+        // Controlla se il nemico è ancora visibile. Se no, torna a cercare.
+        const enemy = api.scan();
+
+        // Se la manovra è completata, torna a cercare per rivalutare la situazione.
+        if (
+          events.some(
+            (e) =>
+              e.type === "SEQUENCE_COMPLETED" || e.type === "ACTION_STOPPED"
+          )
+        ) {
+          api.log("Manovra di fiancheggiamento completata. Torno a cercare.");
+          this.setCurrentState("SEARCHING", api);
+          break;
+        }
+
+        // Se siamo appena entrati nello stato (coda vuota), calcola e avvia la manovra.
+        if (api.isQueueEmpty()) {
+          if (enemy) {
+            api.log("Calcolo punto di fiancheggiamento...");
+            const arena = api.getArenaDimensions();
             const self = api.getState();
             const dx = enemy.x - self.x;
             const dy = enemy.y - self.y;
@@ -362,23 +375,23 @@ const DefaultAIBase = {
             const clampedX = Math.max(0, Math.min(arena.width, targetX));
             const clampedY = Math.max(0, Math.min(arena.height, targetY));
 
-            api.moveTo(clampedX, clampedY);
-            // Impostiamo il flag per "ricordare" che stiamo eseguendo questa manovra.
-            api.updateMemory({
-              isExecutingFlank: true,
-            });
-          } else {
-            // Priorità 2: Se la linea di tiro è libera, gestisci la distanza (kiting).
-            api.aimAt(enemy.x, enemy.y);
-            if (enemy.distance < tooCloseDistance) {
-              api.move(-80); // Troppo vicino, arretra (kiting).
-            } else if (enemy.distance > optimalDistance + 50) {
-              api.move(80); // Troppo lontano, avvicinati.
+            const moveSuccessful = api.moveTo(clampedX, clampedY);
+
+            // La nuova implementazione di moveTo restituisce false in caso di fallimento.
+            if (!moveSuccessful) {
+              api.log(
+                "Impossibile trovare un percorso di fiancheggiamento. Fallback in evading."
+              );
+              this.setCurrentState("EVADING", api);
             }
+          } else {
+            api.log("Nessun nemico visibile. Fallback in evading");
+            this.setCurrentState("EVADING", api);
           }
-          break;
         }
         break;
+      }
+
       case "EVADING":
         // Priorità 1: Controlla se la manovra di evasione è terminata.
         // Se sì, cambia stato ed esci subito per questo tick.

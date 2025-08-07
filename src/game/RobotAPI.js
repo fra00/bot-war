@@ -64,6 +64,10 @@ class RobotAPI {
     this._setAction("START_MOVE", { distance, speedPercentage });
   };
 
+  /**
+   * Calcola e avvia un percorso verso una destinazione, evitando gli ostacoli.
+   * @returns {boolean} True se un percorso è stato trovato e avviato, altrimenti false.
+   */
   moveTo = (targetX, targetY, speedPercentage = 100) => {
     this.robot.destination = { x: targetX, y: targetY };
     this.robot.path = null;
@@ -123,6 +127,12 @@ class RobotAPI {
         speedPercentage
       );
       this.robot.nextActions.push(...actions, { type: "END_SEQUENCE" });
+      return true;
+    } else {
+      this.log(`Impossibile trovare un percorso valido per (${targetX}, ${targetY}).`);
+      this.robot.destination = null; // Pulisce il marcatore di destinazione in caso di fallimento
+      this.robot.path = null; // Pulisce il percorso visuale in caso di fallimento
+      return false;
     }
   };
 
