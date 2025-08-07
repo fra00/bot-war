@@ -9,45 +9,57 @@ const DefaultAIBase = {
     // =================================================================
     SEARCHING: {
       onEnter: (api, memory) => {
-        api.log("Inizio pattugliamento...");
-      },
-      onExecute: (api, memory, events) => {
-        // Priorità 1: Se un nemico è visibile, passa all'attacco.
-        const potentialTarget = api.scan();
-        if (potentialTarget) {
-          return "ATTACKING"; // Richiesta di transizione di stato
-        }
-
-        // Priorità 2: Se abbiamo un'ultima posizione nota, andiamo a caccia.
+        // All'ingresso, decidiamo subito cosa fare.
+        // Priorità 1: Se abbiamo un'ultima posizione nota, andiamo a caccia.
         if (memory.lastKnownEnemyPosition) {
-          if (api.isQueueEmpty()) {
-            const moveSuccessful = api.moveTo(
-              memory.lastKnownEnemyPosition.x,
-              memory.lastKnownEnemyPosition.y,
-              70 // Usa una velocità ridotta per risparmiare energia
-            );
-            // Se non è possibile raggiungere la posizione, abbandona la caccia.
-            if (!moveSuccessful) {
-              api.updateMemory({ lastKnownEnemyPosition: null });
-            }
-          }
-          // Se arriviamo a destinazione e non troviamo nulla, abbandoniamo la pista.
-          if (events.some((e) => e.type === "MOVE_COMPLETED")) {
+          api.log("Inseguo il nemico all'ultima posizione nota...");
+          const moveSuccessful = api.moveTo(
+            memory.lastKnownEnemyPosition.x,
+            memory.lastKnownEnemyPosition.y,
+            70 // Usa una velocità ridotta per risparmiare energia
+          );
+          // Se non è possibile raggiungere la posizione, abbandona la caccia.
+          if (!moveSuccessful) {
             api.updateMemory({ lastKnownEnemyPosition: null });
           }
-          return; // Rimani in questo stato
-        }
-
-        // Priorità 3: Se siamo inattivi, pattugliamo casualmente.
-        if (api.isQueueEmpty()) {
+        } else {
+          // Priorità 2: Altrimenti, pattugliamo casualmente.
+          api.log("Inizio pattugliamento casuale...");
           const arena = api.getArenaDimensions();
           const randomX = Math.random() * arena.width;
           const randomY = Math.random() * arena.height;
           api.moveTo(randomX, randomY, 70);
         }
       },
+      onExecute: (api, memory, events) => {
+        // Durante l'esecuzione, monitoriamo solo le condizioni di uscita.
+        // Condizione di uscita 1: Nemico avvistato.
+        const potentialTarget = api.scan();
+        if (potentialTarget) {
+          return "ATTACKING"; // Richiesta di transizione di stato
+        }
+
+        // Condizione di uscita 2: Movimento completato.
+        // Se abbiamo finito il nostro pattugliamento, rientriamo in questo stesso
+        // stato per avviare un nuovo percorso tramite onEnter.
+        if (
+          events.some(
+            (e) =>
+              e.type === "SEQUENCE_COMPLETED" ||
+              (e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")
+          )
+        ) {
+          // Se stavamo inseguendo, resettiamo la posizione nota.
+          if (memory.lastKnownEnemyPosition) {
+            api.updateMemory({ lastKnownEnemyPosition: null });
+          }
+          return "SEARCHING";
+        }
+      },
       onExit: (api, memory) => {
-        // Interrompi qualsiasi movimento di pattugliamento prima di cambiare stato.
+        // Questo metodo è intenzionalmente vuoto.
+        // La chiamata a `api.stop()` è ora centralizzata in `setCurrentState`
+        // per garantire una pulizia uniforme durante ogni transizione.
       },
     },
 
@@ -456,11 +468,6 @@ const DefaultAIBase = {
     ) {
       this.setCurrentState("UNSTUCKING", api);
     }
-
-    // if (events.some((e) => e.type === "ENEMY_DETECTED")) {
-    //   this.setCurrentState("ATTACKING", api);
-    //   api.stop(); // Interrompe la ricerca per attaccare
-    // }
 
     // --- Logica della Macchina a Stati ---
     const currentStateName = memory.current;
