@@ -114,9 +114,10 @@ export function useAIScripts() {
     [scripts, activeScript, handleSelectScript, user, addToast]
   );
 
-  const handleCreateNewScript = useCallback(async (newScriptName) => {
+  const handleCreateNewScript = useCallback(async (newScriptName, code) => {
     if (newScriptName && newScriptName.trim() !== "") {
-      const code = `({\n  state: {},\n\n  /**\n   * @param {object} api - L'API del robot per interagire con il gioco.\n   */\n  run: function (api) {\n    // Il tuo codice qui...\n    api.log('Tick!');\n  }\n})`;
+      // Il codice non è più predefinito qui, ma viene passato come argomento.
+      // Questo rende la funzione più flessibile e riutilizzabile.
       const minifiedCode = minifyScript(code);
 
       const newScript = {

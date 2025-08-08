@@ -1,37 +1,48 @@
 import DefaultAIBase from "./DefaultAIBase.js";
 
 /**
+ * Funzione ricorsiva per stringificare un oggetto, gestendo correttamente
+ * funzioni e oggetti annidati.
+ * @param {object} obj - L'oggetto da stringificare.
+ * @param {string} indent - La stringa di indentazione corrente.
+ * @returns {string}
+ */
+function stringifyObjectRecursive(obj, indent) {
+  const parts = [];
+  const nextIndent = indent + "  ";
+
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const value = obj[key];
+      let valueStr;
+
+      if (typeof value === "function") {
+        // Converte la funzione in stringa e la indenta correttamente.
+        valueStr = value.toString().replace(/\n/g, `\n${nextIndent}`);
+      } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+        // Chiamata ricorsiva per oggetti annidati.
+        valueStr = stringifyObjectRecursive(value, nextIndent);
+      } else {
+        // Usa JSON.stringify per tutti gli altri tipi (array, primitivi).
+        valueStr = JSON.stringify(value, null, 2);
+      }
+
+      parts.push(`${nextIndent}${key}: ${valueStr}`);
+    }
+  }
+
+  return `{\n${parts.join(",\n")}\n${indent}}`;
+}
+
+/**
  * Converte un oggetto AI in una stringa di codice sorgente che può essere valutata.
- * Questo assicura che tutti i metodi e le proprietà vengano inclusi.
+ * Gestisce correttamente oggetti annidati e funzioni.
  * @param {object} aiObject - L'oggetto AI da stringificare.
  * @returns {string}
  */
-const stringifyAI = (aiObject) => {
-  const parts = [];
-  for (const key in aiObject) {
-    if (Object.prototype.hasOwnProperty.call(aiObject, key)) {
-      const value = aiObject[key];
-      if (typeof value === "function") {
-        const funcStr = value.toString();
-        // Controlla se è una funzione definita con la sintassi shorthand del metodo (es. `myMethod() {}`)
-        // o una funzione freccia. Le funzioni tradizionali iniziano con "function".
-        if (funcStr.startsWith("function") || funcStr.startsWith("(")) {
-          // Funzione tradizionale o freccia: `key: function() {}` o `key: () => {}`
-          parts.push(`  ${key}: ${funcStr}`);
-        } else {
-          // Metodo Shorthand: `myMethod() {}`. La stringa include già la chiave.
-          parts.push(`  ${funcStr}`);
-        }
-      } else {
-        // Aggiunge altri valori (come oggetti, stringhe, numeri) come JSON.
-        parts.push(`  ${key}: ${JSON.stringify(value, null, 2)}`);
-      }
-    }
-  }
-  // Unisce tutte le parti in una singola stringa di oggetto letterale.
-  // Le parentesi esterne sono cruciali per far sì che `eval` o `new Function`
-  // interpretino `{...}` come un'espressione oggetto e non come un blocco di codice.
-  return `({\n${parts.join(",\n")}\n})`;
+export const stringifyAI = (aiObject) => {
+  // Le parentesi esterne sono cruciali per l'interpretazione come espressione oggetto.
+  return `(${stringifyObjectRecursive(aiObject, "")})`;
 };
 
 // Converte l'oggetto AI di default in una stringa di codice sorgente.

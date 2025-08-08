@@ -6,6 +6,10 @@ import Card from "../ui/Card";
 import CardHeader from "../ui/CardHeader";
 import Input from "../ui/Input";
 import CodeEditor from "./CodeEditor";
+import DefaultAIBase from "../../game/ai/DefaultAIBase.js";
+import initialPlayerCode, {
+  stringifyAI,
+} from "../../game/ai/PlayerAI.js";
 import Spinner from "../ui/Spinner";
 
 /**
@@ -20,14 +24,16 @@ const AIEditorPanel = ({
   activeScript,
   onSelectScript,
   onDeleteScript,
-  onCreateNewScript, // This is now called with/without the name
+  onCreateNewScript,
   isLoading,
 }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [newScriptName, setNewScriptName] = useState("");
+  const [creationMode, setCreationMode] = useState("new");
 
-  const handleInitiateCreate = () => {
+  const handleInitiateCreate = (mode = "new") => {
     setIsCreating(true);
+    setCreationMode(mode);
     // Chiama la prop senza argomenti per segnalare l'inizio della creazione
     // e permettere al tutorial di avanzare.
     onCreateNewScript();
@@ -35,8 +41,13 @@ const AIEditorPanel = ({
 
   const handleConfirmCreate = () => {
     if (newScriptName.trim()) {
-      // Chiama la prop con il nome per confermare la creazione
-      onCreateNewScript(newScriptName.trim());
+      // Ora siamo espliciti: "base" usa DefaultAIBase, "new" usa initialPlayerCode.
+      const code =
+        creationMode === "base"
+          ? stringifyAI(DefaultAIBase)
+          : initialPlayerCode;
+      // Chiama la prop con il nome e il codice per confermare
+      onCreateNewScript(newScriptName.trim(), code);
       setIsCreating(false);
       setNewScriptName("");
     }
@@ -128,13 +139,22 @@ const AIEditorPanel = ({
                 </div>
               </div>
             ) : (
-              <Button
-                data-tutorial-id="new-bot-button"
-                onClick={handleInitiateCreate}
-                className="w-full"
-              >
-                Nuovo Script
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  data-tutorial-id="new-bot-button"
+                  onClick={() => handleInitiateCreate("new")}
+                  className="w-1/2"
+                >
+                  Nuovo Script
+                </Button>
+                <Button
+                  onClick={() => handleInitiateCreate("base")}
+                  className="w-1/2"
+                  variant="secondary"
+                >
+                  Base Script
+                </Button>
+              </div>
             )}
           </div>
         </Card>
@@ -180,6 +200,7 @@ AIEditorPanel.propTypes = {
   compileError: PropTypes.string,
   onSelectScript: PropTypes.func.isRequired,
   onDeleteScript: PropTypes.func.isRequired,
+  // Chiamata senza argomenti per iniziare, poi con (nome, codice) per confermare.
   onCreateNewScript: PropTypes.func.isRequired,
   /** Indica se gli script sono in fase di caricamento. */
   isLoading: PropTypes.bool,
