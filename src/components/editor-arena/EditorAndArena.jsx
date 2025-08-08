@@ -91,12 +91,22 @@ const EditorAndArena = ({ onNavigateBack }) => {
     completeTutorial,
   } = useTutorial();
 
-  // Ref per assicurarsi che le statistiche vengano aggiornate una sola volta per partita
-  const statsUpdatedRef = useRef(false);
+  // Ref per evitare che l'effetto di riavvio del gioco venga eseguito al montaggio iniziale.
+  const isInitialMountRef = useRef(true);
+
+  // Questo effetto risolve la race condition.
+  // Si attiva SOLO quando `playerAI` cambia (dopo un "Applica e Riavvia" andato a buon fine).
+  // In questo modo, siamo sicuri che il GameManager venga ricreato con la NUOVA AI.
   useEffect(() => {
-    // Resetta il flag ogni volta che il gioco viene riavviato (cambia la chiave)
-    statsUpdatedRef.current = false;
-  }, [gameKey]);
+    // Salta il primo render per evitare un riavvio non necessario all'avvio.
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return;
+    }
+
+    // Riavvia il gioco cambiando la chiave del GameManager.
+    setGameKey((k) => k + 1);
+  }, [playerAI]); // La dipendenza è `playerAI`.
 
   // Gestori di eventi "wrappati" per il tutorial
   const handleCreateNewScriptWithTutorial = useCallback(
@@ -120,16 +130,15 @@ const EditorAndArena = ({ onNavigateBack }) => {
     [handleCreateNewScript, isTutorialActive, currentStepIndex, nextStep]
   );
 
-  const handleApplyAIChanges = useCallback(() => {
-    const result = handleUpdateAI();
-    if (result.success) {
-      setGameKey((k) => k + 1);
-    }
+  const handleApplyAIChanges = useCallback(async () => {
+    // Ora questa funzione si occupa solo di aggiornare l'IA.
+    // Il riavvio del gioco è gestito dall'useEffect che osserva `playerAI`.
+    const result = await handleUpdateAI();
     return result;
-  }, [handleUpdateAI, setGameKey]);
+  }, [handleUpdateAI]);
 
-  const handleApplyAIChangesWithTutorial = useCallback(() => {
-    const result = handleApplyAIChanges();
+  const handleApplyAIChangesWithTutorial = useCallback(async () => {
+    const result = await handleApplyAIChanges();
     if (isTutorialActive && currentStepIndex === 8) {
       nextStep();
     }
@@ -178,6 +187,13 @@ const EditorAndArena = ({ onNavigateBack }) => {
     currentStepIndex,
     nextStep,
   ]);
+
+  // Ref per assicurarsi che le statistiche vengano aggiornate una sola volta per partita
+  const statsUpdatedRef = useRef(false);
+  useEffect(() => {
+    // Resetta il flag ogni volta che il gioco viene riavviato (cambia la chiave)
+    statsUpdatedRef.current = false;
+  }, [gameKey]);
 
   const handleRestart = useCallback(() => {
     onGameOverClose();

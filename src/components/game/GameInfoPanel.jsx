@@ -7,6 +7,7 @@ import ProgressBar from "../ui/ProgressBar";
 import Button from "../ui/Button";
 import Textarea from "../ui/Textarea";
 import { Tabs, TabList, Tab, TabPanels, TabPanel } from "../ui/Tabs";
+import { useToast } from "../ui/toast/ToastProvider";
 
 const BotInfo = ({ bot, color, onSelectLog, isLogActive }) => {
   return (
@@ -157,20 +158,22 @@ const GameInfoPanel = ({ gameState }) => {
   const botColors = ["#61dafb", "#e06c75"]; // Player, Enemy
   const bots = gameState?.bots || [];
   const [logSource, setLogSource] = useState(null);
+  const { addToast } = useToast();
 
   // Imposta il log del giocatore come predefinito all'avvio e quando il gioco si riavvia
   useEffect(() => {
     if (bots.length > 0) {
-      // Se logSource non è impostato o non è più valido (es. dopo un reset), reimpostalo.
-      const currentLogSourceIsValid =
-        logSource && bots.some((r) => r.id === logSource.id);
-      if (!currentLogSourceIsValid) {
-        setLogSource(bots[0]);
-      }
+      // Se una fonte di log è già selezionata, trova la sua versione aggiornata
+      // nel nuovo array `bots` per mantenere la selezione tra i tick e dopo un reset.
+      // Se nessuna fonte è selezionata, imposta il primo bot (il giocatore) come predefinito.
+      const targetId = logSource ? logSource.id : bots[0].id;
+      const newLogSource = bots.find((b) => b.id === targetId) || bots[0];
+      setLogSource(newLogSource);
     } else {
+      // Se non ci sono bot (es. prima dell'avvio), pulisci la fonte dei log.
       setLogSource(null);
     }
-  }, [bots, logSource]);
+  }, [bots]); // Rimuoviamo `logSource` dalle dipendenze per correggere il bug del reset.
 
   const handleSelectLog = (bot) => {
     setLogSource(bot);
@@ -185,6 +188,23 @@ const GameInfoPanel = ({ gameState }) => {
     }
     // Crea una copia invertita per mostrare i log più recenti per primi, senza mutare lo stato originale
     return [...logSource.logs].reverse().join("\n");
+  };
+
+  const handleCopyLogs = () => {
+    if (!logSource || !logSource.logs || logSource.logs.length === 0) {
+      addToast("Nessun log da copiare.", "warning");
+      return;
+    }
+    const logText = renderLogContent();
+    navigator.clipboard.writeText(logText).then(
+      () => {
+        addToast("Log copiati negli appunti!", "success");
+      },
+      (err) => {
+        addToast("Impossibile copiare i log.", "danger");
+        console.error("Could not copy text: ", err);
+      }
+    );
   };
 
   if (bots.length === 0) {
@@ -222,15 +242,27 @@ const GameInfoPanel = ({ gameState }) => {
         </TabList>
         <TabPanels>
           <TabPanel>
-            <Textarea
-              id="bot-log-textarea" // Aggiunto id per soddisfare i propTypes
-              readOnly
-              value={renderLogContent()}
-              onChange={() => {}} // Aggiunto onChange vuoto per soddisfare i propTypes
-              rows={8}
-              className="w-full text-xs resize-none bg-gray-800 border-gray-600 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="I log del bot selezionato appariranno qui."
-            />
+            <div className="relative">
+              <Textarea
+                id="bot-log-textarea" // Aggiunto id per soddisfare i propTypes
+                readOnly
+                value={renderLogContent()}
+                onChange={() => {}} // Aggiunto onChange vuoto per soddisfare i propTypes
+                rows={8}
+                className="w-full text-xs resize-none bg-gray-800 border-gray-600 focus:ring-blue-500 focus:border-blue-500 pr-10"
+                placeholder="I log del bot selezionato appariranno qui."
+              />
+              <Button
+                onClick={handleCopyLogs}
+                size="small"
+                variant="ghost"
+                className="absolute top-1 right-1 p-1"
+                aria-label="Copia log"
+                title="Copia log negli appunti"
+              >
+                📋
+              </Button>
+            </div>
           </TabPanel>
         </TabPanels>
       </Tabs>
