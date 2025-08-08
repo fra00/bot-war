@@ -2,16 +2,54 @@
  * IA di default che implementa una macchina a stati con cicli di vita (Enter/Execute/Exit).
  */
 const DefaultAIBase = {
+  // =================================================================
+  // CONFIGURAZIONE IA
+  // =================================================================
+  config: {
+    // Distanze
+    engagementDistance: 250, // Distanza ottimale per attaccare
+    kitingDistance: 150, // Distanza sotto la quale iniziare il kiting
+    flankDistance: 150, // Distanza per la manovra di fiancheggiamento
+    maxCoverDistance: 150, // Distanza massima per cercare copertura
+    coverSeekDistance: 40, // Distanza da un ostacolo per nascondersi
+    unstuckDistance: -60, // Distanza per arretrare quando incastrati
+
+    // Velocità (in percentuale)
+    patrolSpeed: 70,
+    approachSpeed: 80,
+    kitingSpeed: -80, // Negativo per arretrare
+
+    // Angoli e Tolleranze
+    aimTolerance: 5, // Gradi di tolleranza per sparare
+    unstuckAngleRange: 90, // Angolo base per sbloccarsi
+    unstuckAngleRandomness: 30, // Variazione casuale dell'angolo di sblocco
+    evasionAngleBase: 60, // Angolo base per l'evasione
+    evasionAngleRandomness: 40, // Variazione casuale dell'angolo di evasione
+
+    // Comportamento Batteria
+    rechargeEnterThreshold: 30, // Percentuale sotto la quale iniziare a ricaricare
+    rechargeExitThreshold: 70, // Percentuale alla quale smettere di ricaricare
+
+    // Tattica e Temporizzazione
+    engagementBuffer: 50, // Margine oltre la distanza di ingaggio per iniziare ad avvicinarsi
+    kitingBuffer: 20, // Margine oltre la distanza di kiting per smettere di arretrare
+    evasionGracePeriod: 120, // Tick di "invulnerabilità" dopo un'evasione
+    cornerPadding: 50, // Distanza dai bordi per i punti di ricarica
+  },
+
+  // =================================================================
+  // MACCHINA A STATI
+  // =================================================================
   // La mappa degli stati definisce la logica per ogni stato dell'IA.
   states: {
     // =================================================================
     // STATO SEARCHING
     // =================================================================
     SEARCHING: {
-      onEnter: (api, memory) => {
+      onEnter(api, memory) {
         api.log("Inizio pattugliamento...");
       },
-      onExecute: (api, memory, events) => {
+      onExecute(api, memory, events) {
         // Condizione di uscita prioritaria: se vediamo un nemico, attacchiamo.
         const potentialTarget = api.scan();
         if (potentialTarget) {
@@ -38,7 +76,7 @@ const DefaultAIBase = {
             const moveSuccessful = api.moveTo(
               memory.lastKnownEnemyPosition.x,
               memory.lastKnownEnemyPosition.y,
-              70
+              this.config.patrolSpeed
             );
             if (!moveSuccessful) {
               api.updateMemory({ lastKnownEnemyPosition: null });
@@ -49,11 +87,11 @@ const DefaultAIBase = {
             const arena = api.getArenaDimensions();
             const randomX = Math.random() * arena.width;
             const randomY = Math.random() * arena.height;
-            api.moveTo(randomX, randomY, 70);
+            api.moveTo(randomX, randomY, this.config.patrolSpeed);
           }
         }
       },
-      onExit: (api, memory) => {
+      onExit(api, memory) {
         // Questo metodo è intenzionalmente vuoto.
         // La chiamata a `api.stop()` è ora centralizzata in `setCurrentState`
         // per garantire una pulizia uniforme durante ogni transizione.
@@ -64,10 +102,10 @@ const DefaultAIBase = {
     // STATO ATTACKING
     // =================================================================
     ATTACKING: {
-      onEnter: (api, memory) => {
+      onEnter(api, memory) {
         api.log("Nemico ingaggiato! Valuto la situazione...");
       },
-      onExecute: (api, memory, events) => {
+      onExecute(api, memory, events) {
         const enemy = api.scan();
         // Condizione di uscita: Nemico perso di vista.
         if (!enemy) {
@@ -76,15 +114,15 @@ const DefaultAIBase = {
 
         // Azioni continue: Aggiorna la posizione e spara se possibile.
         api.updateMemory({ lastKnownEnemyPosition: { x: enemy.x, y: enemy.y } });
-        if (Math.abs(enemy.angle) < 5 && api.isLineOfSightClear(enemy)) {
+        if (
+          Math.abs(enemy.angle) < this.config.aimTolerance &&
+          api.isLineOfSightClear(enemy)
+        ) {
           api.fire();
         }
 
         // Logica decisionale per il movimento (solo se inattivi).
         if (api.isQueueEmpty()) {
-          const optimalDistance = 250;
-          const tooCloseDistance = 150;
-
           // Mira solo quando decidi una nuova mossa.
           api.aimAt(enemy.x, enemy.y);
 
@@ -93,18 +131,20 @@ const DefaultAIBase = {
             return "FLANKING";
           }
           // Priorità 2: Troppo vicino -> Esegui kiting.
-          if (enemy.distance < tooCloseDistance) {
+          if (enemy.distance < this.config.kitingDistance) {
             return "KITING";
           }
           // Priorità 3: Troppo lontano -> Avvicinati.
-          if (enemy.distance > optimalDistance + 50) {
+          if (
+            enemy.distance > this.config.engagementDistance + this.config.engagementBuffer
+          ) {
             api.log("Nemico troppo lontano, mi avvicino...");
-            api.move(80); // Troppo lontano, avvicinati.
+            api.move(this.config.approachSpeed); // Troppo lontano, avvicinati.
           }
           // Se siamo alla distanza ottimale, non facciamo nulla e continuiamo a sparare.
         }
       },
-      onExit: (api, memory) => {
+      onExit(api, memory) {
         // Questo metodo è intenzionalmente vuoto.
         // La chiamata a `api.stop()` è ora centralizzata in `setCurrentState`
         // per garantire una pulizia uniforme durante ogni transizione.
@@ -115,29 +155,32 @@ const DefaultAIBase = {
     // STATO KITING
     // =================================================================
     KITING: {
-      onEnter: (api, memory) => {
+      onEnter(api, memory) {
         api.log("Nemico troppo vicino! Eseguo kiting...");
-        api.move(-80); // Arretra per creare distanza.
+        api.move(this.config.kitingSpeed); // Arretra per creare distanza.
       },
-      onExecute: (api, memory, events) => {
+      onExecute(api, memory, events) {
         const enemy = api.scan();
-        const tooCloseDistance = 150;
 
         // Condizioni di uscita
         if (!enemy) return "SEARCHING";
         if (!api.isLineOfSightClear(enemy)) return "FLANKING";
-        if (enemy.distance > tooCloseDistance + 20) return "ATTACKING"; // Ristabilita distanza di sicurezza
+        if (
+          enemy.distance >
+          this.config.kitingDistance + this.config.kitingBuffer
+        )
+          return "ATTACKING"; // Ristabilita distanza di sicurezza
 
         // Azioni continue
         api.aimAt(enemy.x, enemy.y);
-        if (Math.abs(enemy.angle) < 5) api.fire();
+        if (Math.abs(enemy.angle) < this.config.aimTolerance) api.fire();
 
         // Se la manovra è finita ma siamo ancora troppo vicini, rientra per muoverti ancora.
         if (events.some(e => e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")) {
           return "KITING";
         }
       },
-      onExit: (api, memory) => {
+      onExit(api, memory) {
         // La pulizia dello stop è gestita centralmente.
       },
     },
@@ -146,10 +189,10 @@ const DefaultAIBase = {
     // STATO FLANKING
     // =================================================================
     FLANKING: {
-      onEnter: (api, memory) => {
+      onEnter(api, memory) {
         api.log("Inizio manovra di fiancheggiamento...");
       },
-      onExecute: (api, memory, events) => {
+      onExecute(api, memory, events) {
         const enemy = api.scan();
         // Condizione di uscita: nemico perso di vista.
         if (!enemy) {
@@ -182,13 +225,12 @@ const DefaultAIBase = {
           const dx = enemy.x - self.x;
           const dy = enemy.y - self.y;
 
-          const flankDistance = 150;
           const randomDirection = Math.random() < 0.5 ? 1 : -1;
           const perp_dx = -dy * randomDirection;
           const perp_dy = dx * randomDirection;
           const len = Math.sqrt(perp_dx * perp_dx + perp_dy * perp_dy) || 1;
-          const targetX = self.x + (perp_dx / len) * flankDistance;
-          const targetY = self.y + (perp_dy / len) * flankDistance;
+          const targetX = self.x + (perp_dx / len) * this.config.flankDistance;
+          const targetY = self.y + (perp_dy / len) * this.config.flankDistance;
 
           const clampedX = Math.max(0, Math.min(arena.width, targetX));
           const clampedY = Math.max(0, Math.min(arena.height, targetY));
@@ -201,20 +243,20 @@ const DefaultAIBase = {
           }
         }
       },
-      onExit: (api, memory) => {},
+      onExit(api, memory) {},
     },
 
     // =================================================================
     // STATO EVADING
     // =================================================================
     EVADING: {
-      onEnter: (api, memory) => {
+      onEnter(api, memory) {
         api.log("Colpito! Inizio manovra evasiva...");
         // La chiamata a stop() è ora gestita da setCurrentState,
         // quindi qui ci concentriamo solo sulla logica specifica dello stato.
-        api.updateMemory({ evasionGraceTicks: 120 });
+        api.updateMemory({ evasionGraceTicks: this.config.evasionGracePeriod });
       },
-      onExecute: (api, memory, events) => {
+      onExecute(api, memory, events) {
         // Condizione di uscita: la manovra è terminata.
         if (
           events.some(
@@ -230,14 +272,13 @@ const DefaultAIBase = {
         if (api.isQueueEmpty()) {
           const obstacles = api.scanObstacles();
           const enemyPos = memory.lastKnownEnemyPosition;
-          const MAX_COVER_DISTANCE = 150;
           let coverFoundAndValid = false;
 
           // Priorità 1: Cerca copertura dietro un ostacolo vicino.
           if (
             obstacles.length > 0 &&
             enemyPos &&
-            obstacles[0].distance < MAX_COVER_DISTANCE
+            obstacles[0].distance < this.config.maxCoverDistance
           ) {
             const cover = obstacles[0];
             const vec = {
@@ -246,10 +287,9 @@ const DefaultAIBase = {
             };
             const len = Math.sqrt(vec.x * vec.x + vec.y * vec.y) || 1;
             const norm = { x: vec.x / len, y: vec.y / len };
-            const hideDistance = 40;
             const hidePos = {
-              x: cover.x + cover.width / 2 + norm.x * hideDistance,
-              y: cover.y + cover.height / 2 + norm.y * hideDistance,
+              x: cover.x + cover.width / 2 + norm.x * this.config.coverSeekDistance,
+              y: cover.y + cover.height / 2 + norm.y * this.config.coverSeekDistance,
             };
 
             if (
@@ -264,8 +304,11 @@ const DefaultAIBase = {
           if (!coverFoundAndValid) {
             for (let i = 0; i < 5; i++) {
               const turnDirection = Math.random() < 0.5 ? 1 : -1;
-              const randomAngle = (60 + Math.random() * 40) * turnDirection;
-              const randomDistance = 80 + Math.random() * 50;
+              const randomAngle =
+                (this.config.evasionAngleBase +
+                  Math.random() * this.config.evasionAngleRandomness) *
+                turnDirection;
+              const randomDistance = this.config.approachSpeed + Math.random() * 50;
               const angleInRad =
                 (api.getState().rotation + randomAngle) * (Math.PI / 180);
               const destX =
@@ -283,7 +326,7 @@ const DefaultAIBase = {
           }
         }
       },
-      onExit: (api, memory) => {
+      onExit(api, memory) {
         api.log("Manovra evasiva terminata.");
         api.updateMemory({ evasionGraceTicks: 0 }); // Resetta il periodo di grazia.
       },
@@ -293,18 +336,20 @@ const DefaultAIBase = {
     // STATO UNSTUCKING
     // =================================================================
     UNSTUCKING: {
-      onEnter: (api, memory) => {
+      onEnter(api, memory) {
         api.log("Collisione rilevata! Eseguo manovra per sbloccarmi.");
 
         // Esegue una manovra per liberarsi: arretra e gira.
         const randomAngle =
-          (Math.random() < 0.5 ? 90 : -90) + (Math.random() * 30 - 15);
+          (Math.random() < 0.5 ? 1 : -1) * this.config.unstuckAngleRange +
+          (Math.random() * this.config.unstuckAngleRandomness -
+            this.config.unstuckAngleRandomness / 2);
         api.sequence([
-          { type: "START_MOVE", payload: { distance: -60 } },
+          { type: "START_MOVE", payload: { distance: this.config.unstuckDistance } },
           { type: "START_ROTATE", payload: { angle: randomAngle } },
         ]);
       },
-      onExecute: (api, memory, events) => {
+      onExecute(api, memory, events) {
         // Condizione di uscita: la manovra è completata.
         if (
           events.some(
@@ -316,7 +361,7 @@ const DefaultAIBase = {
           return "SEARCHING";
         }
       },
-      onExit: (api, memory) => {
+      onExit(api, memory) {
         api.log("Manovra di sblocco completata.");
         // Non è necessario uno stop qui perché la sequenza è finita,
         // ma lo lasciamo per coerenza se lo stato viene interrotto.
@@ -327,14 +372,14 @@ const DefaultAIBase = {
     // STATO RECHARGING
     // =================================================================
     RECHARGING: {
-      onEnter: (api, memory) => {
+      onEnter(api, memory) {
         api.log("Batteria scarica. Inizio procedura di ricarica.");
         // Resetta il flag per forzare la ricerca di un nuovo punto sicuro.
         api.updateMemory({ isMovingToRecharge: false });
       },
-      onExecute: (api, memory, events, context) => {
+      onExecute(api, memory, events, context) {
         // Condizione di uscita: batteria sufficientemente carica.
-        if (context.batteryPercent >= 70) {
+        if (context.batteryPercent >= this.config.rechargeExitThreshold) {
           return "SEARCHING";
         }
 
@@ -367,11 +412,12 @@ const DefaultAIBase = {
           api.log("Cerco un posto sicuro per ricaricare...");
           const enemyPos = memory.lastKnownEnemyPosition;
           const arena = api.getArenaDimensions();
+          const padding = this.config.cornerPadding;
           const corners = [
-            { x: 50, y: 50 },
-            { x: arena.width - 50, y: 50 },
-            { x: 50, y: arena.height - 50 },
-            { x: arena.width - 50, y: arena.height - 50 },
+            { x: padding, y: padding },
+            { x: arena.width - padding, y: padding },
+            { x: padding, y: arena.height - padding },
+            { x: arena.width - padding, y: arena.height - padding },
           ];
 
           const walkableCorners = corners.filter((c) => api.isPositionValid(c));
@@ -406,7 +452,7 @@ const DefaultAIBase = {
           api.updateMemory({ isMovingToRecharge: true });
         }
       },
-      onExit: (api, memory) => {
+      onExit(api, memory) {
         api.log("Fine procedura di ricarica.");
         // Pulisci lo stato specifico della ricarica.
         api.updateMemory({ isMovingToRecharge: false });
@@ -426,7 +472,7 @@ const DefaultAIBase = {
     if (oldState !== newState) {
       // Chiama onExit del vecchio stato, se esiste nel nuovo pattern
       if (oldState && this.states[oldState]?.onExit) {
-        this.states[oldState].onExit(api, memory);
+        this.states[oldState].onExit.call(this, api, memory);
       }
 
       // Centralizziamo lo stop qui. Ogni transizione di stato interrompe l'azione precedente.
@@ -437,7 +483,7 @@ const DefaultAIBase = {
 
       // Chiama onEnter del nuovo stato, se esiste nel nuovo pattern
       if (this.states[newState]?.onEnter) {
-        this.states[newState].onEnter(api, memory);
+        this.states[newState].onEnter.call(this, api, memory);
       }
     }
   },
@@ -472,7 +518,10 @@ const DefaultAIBase = {
     const batteryPercent = (battery.energy / battery.maxEnergy) * 100;
 
     // Se la batteria è scarica, entra in modalità ricarica (a meno che non lo sia già)
-    if (batteryPercent < 30 && memory.current !== "RECHARGING") {
+    if (
+      batteryPercent < this.config.rechargeEnterThreshold &&
+      memory.current !== "RECHARGING"
+    ) {
       this.setCurrentState("RECHARGING", api);
       return; // Interrompi il tick, la logica di RECHARGING inizierà dal prossimo.
     }
@@ -501,8 +550,9 @@ const DefaultAIBase = {
     // Se lo stato corrente è gestito dal nuovo pattern Enter/Execute/Exit
     if (currentState) {
       // Passiamo un contesto con dati calcolati una sola volta per tick.
-      const context = { batteryPercent };
-      const nextStateName = currentState.onExecute?.(
+      const context = { batteryPercent, config: this.config };
+      const nextStateName = currentState.onExecute?.call(
+        this,
         api,
         memory,
         events,
