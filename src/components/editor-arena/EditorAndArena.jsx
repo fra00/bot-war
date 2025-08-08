@@ -80,6 +80,7 @@ const EditorAndArena = ({ onNavigateBack }) => {
     handleSaveOnly,
     handleUpdateBotSettings,
   } = useAIScripts();
+  const { isLoading } = useAIScripts();
 
   const {
     isTutorialActive,
@@ -237,175 +238,205 @@ const EditorAndArena = ({ onNavigateBack }) => {
       {/* Overlay scuro per migliorare la leggibilità */}
       <div className="absolute inset-0 -z-10 bg-black/50" />
 
-      <GameManager
-        key={gameKey}
-        playerAI={playerAI || DefaultAI}
-        defaultAI={opponentAI}
-      >
-        {({ gameState, controls }) => {
-          // Gli Hook devono essere chiamati incondizionatamente.
-          // La logica che dipende da gameState viene eseguita solo quando non è null.
+      {isLoading && (
+        <div className="flex items-center justify-center h-full text-lg text-white">
+          <svg
+            className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+          <span>Caricamento script...</span>
+        </div>
+      )}
+      {!isLoading && (
+        <GameManager
+          key={gameKey}
+          playerAI={playerAI || DefaultAI}
+          defaultAI={opponentAI}
+        >
+          {({ gameState, controls }) => {
+            // Gli Hook devono essere chiamati incondizionatamente.
+            // La logica che dipende da gameState viene eseguita solo quando non è null.
 
-          // Effetto per aggiornare le statistiche a fine partita
-          useEffect(() => {
-            // Esegui solo se la partita è finita, l'utente è loggato e le stats non sono già state aggiornate
-            if (
-              gameState &&
-              gameState.status === "finished" &&
-              user &&
-              !statsUpdatedRef.current
-            ) {
-              statsUpdatedRef.current = true; // Impedisce aggiornamenti multipli
+            // Effetto per aggiornare le statistiche a fine partita
+            useEffect(() => {
+              // Esegui solo se la partita è finita, l'utente è loggato e le stats non sono già state aggiornate
+              if (
+                gameState &&
+                gameState.status === "finished" &&
+                user &&
+                !statsUpdatedRef.current
+              ) {
+                statsUpdatedRef.current = true; // Impedisce aggiornamenti multipli
 
-              const playerBotId = activeScript?.id;
-              const opponentBotId = opponentScriptId;
-              const winnerId = gameState.winner; // 'player', 'opponent', o null
-              const matchType = "offline"; // Per ora, tutte le partite sono offline
+                const playerBotId = activeScript?.id;
+                const opponentBotId = opponentScriptId;
+                const winnerId = gameState.winner; // 'player', 'opponent', o null
+                const matchType = "offline"; // Per ora, tutte le partite sono offline
 
-              if (!playerBotId) return;
+                if (!playerBotId) return;
 
-              let playerResult;
-              let opponentResult;
+                let playerResult;
+                let opponentResult;
 
-              if (winnerId === "player") {
-                playerResult = "win";
-                opponentResult = "loss";
-              } else if (winnerId === "opponent") {
-                playerResult = "loss";
-                opponentResult = "win";
-              } else {
-                playerResult = "draw";
-                opponentResult = "draw";
-              }
+                if (winnerId === "player") {
+                  playerResult = "win";
+                  opponentResult = "loss";
+                } else if (winnerId === "opponent") {
+                  playerResult = "loss";
+                  opponentResult = "win";
+                } else {
+                  playerResult = "draw";
+                  opponentResult = "draw";
+                }
 
-              // Aggiorna le statistiche per il bot del giocatore
-              FirestoreService.updateBotStats(
-                playerBotId,
-                playerResult,
-                matchType
-              ).catch((err) =>
-                console.error("Failed to update player stats:", err)
-              );
-
-              // Aggiorna le statistiche per l'avversario, se è un bot custom
-              if (opponentBotId) {
+                // Aggiorna le statistiche per il bot del giocatore
                 FirestoreService.updateBotStats(
-                  opponentBotId,
-                  opponentResult,
+                  playerBotId,
+                  playerResult,
                   matchType
                 ).catch((err) =>
-                  console.error("Failed to update opponent stats:", err)
+                  console.error("Failed to update player stats:", err)
                 );
-              }
-            }
-          }, [gameState, user, activeScript?.id, opponentScriptId]);
 
-          // Se gameState non è ancora pronto, mostra un placeholder.
-          // Questo risolve l'errore degli Hook, perché gli Hook sopra
-          // vengono chiamati incondizionatamente ad ogni render.
-          if (!gameState) {
-            return (
-              <div className="grid grid-cols-12 gap-4">
-                <div className="col-span-8">
-                  <Arena gameState={null} />
-                </div>
-                <div className="col-span-4">
-                  <GameInfoPanel gameState={{}} />
-                </div>
-              </div>
-            );
-          }
-          // Il GameManager non conosce il nome dello script AI del giocatore,
-          // quindi lo aggiungiamo qui prima di passarlo alla UI.
-          // Questo risolve il bug nella modale di fine partita e assicura
-          // che i nomi siano corretti in tutta l'interfaccia.
-          const enrichedGameState = { ...gameState };
-
-          const opponentScriptName =
-            scripts.find((s) => s.id === opponentScriptId)?.name || "Opponent";
-
-          // Il GameManager produce un array `robots`. Lo trasformiamo in `bots`
-          // per la UI, arricchendolo con i nomi corretti. Questo risolve il bug
-          // per cui le statistiche non si aggiornavano.
-          if (gameState.robots) {
-            enrichedGameState.bots = gameState.robots.map((bot) => ({
-              ...bot,
-              name:
-                bot.id === "player"
-                  ? activeScript?.name || "Player Bot"
-                  : opponentScriptName,
-              isCustomAI: bot.id === "opponent" && !!opponentScriptId,
-            }));
-          }
-
-          // Se la partita è finita, determiniamo il vincitore in modo robusto
-          // basandoci sulla salute dei bot, poiché l'oggetto `gameState.winner`
-          // originale potrebbe non contenere tutte le informazioni necessarie (come il nome).
-          if (gameState.status === "finished" && enrichedGameState.bots) {
-            // Il vincitore è l'unico bot rimasto con salute > 0.
-            // Se nessuno ha salute, è un pareggio (winner rimane null).
-            const winningBot = enrichedGameState.bots.find(
-              (bot) => bot.hullHp > 0
-            );
-            enrichedGameState.winner = winningBot || null;
-          }
-
-          return (
-            <GameUI
-              gameState={enrichedGameState}
-              controls={controls}
-              onEditorOpen={() => {
-                onEditorOpen();
-                if (isTutorialActive && currentStepIndex === 1) {
-                  nextStep();
+                // Aggiorna le statistiche per l'avversario, se è un bot custom
+                if (opponentBotId) {
+                  FirestoreService.updateBotStats(
+                    opponentBotId,
+                    opponentResult,
+                    matchType
+                  ).catch((err) =>
+                    console.error("Failed to update opponent stats:", err)
+                  );
                 }
-              }}
-              isEditorOpen={isEditorOpen}
-              onEditorClose={onEditorClose}
-              playerCode={playerCode}
-              onCodeChange={setPlayerCode}
-              onUpdate={handleApplyAIChangesWithTutorial}
-              compileError={compileError}
-              isLogOpen={isLogOpen}
-              onLogOpen={onLogOpen}
-              onLogClose={onLogClose}
-              isGameOver={isGameOver}
-              onGameOver={onGameOverOpen}
-              onGameOverClose={onGameOverClose}
-              onRestart={handleRestart}
-              onApiDocsOpen={onApiDocsOpen}
-              scripts={scripts}
-              activeScript={activeScript}
-              onSelectScript={handleSelectScript}
-              onDeleteScript={handleDeleteScript}
-              onCreateNewScript={handleCreateNewScriptWithTutorial}
-              onSaveOnly={handleSaveOnly}
-              onUpdateSettings={handleUpdateBotSettingsWithTutorial}
-              // Props per la nuova modale di selezione avversario
-              isOpponentModalOpen={isOpponentModalOpen}
-              onOpponentModalOpen={handleOpponentModalOpen}
-              onOpponentModalClose={onOpponentModalClose}
-              onConfirmOpponentSelection={handleConfirmOpponentSelection}
-              // Passa l'ID temporaneo e la funzione per aggiornarlo alla modale
-              opponentScriptId={tempOpponentScriptId}
-              onSelectOpponentScript={setTempOpponentScriptId}
-              opponentCompileError={opponentCompileError}
-              onClearOpponentCompileError={() => setOpponentCompileError(null)}
-              user={user}
-              onLogout={handleLogout}
-              isLogoutModalOpen={isLogoutModalOpen}
-              onLogoutModalOpen={onLogoutModalOpen}
-              onLogoutModalClose={onLogoutModalClose}
-              isSettingsModalOpen={isSettingsModalOpen}
-              onSettingsModalOpen={handleSettingsModalOpenWithTutorial}
-              onSettingsModalClose={onSettingsModalClose}
-              onTutorialModalOpen={onTutorialModalOpen}
-              onBotSettingsOpen={handleBotSettingsOpenWithTutorial}
-              onNavigateBack={onNavigateBack}
-            />
-          );
-        }}
-      </GameManager>
+              }
+            }, [gameState, user, activeScript?.id, opponentScriptId]);
+
+            // Se gameState non è ancora pronto, mostra un placeholder.
+            // Questo risolve l'errore degli Hook, perché gli Hook sopra
+            // vengono chiamati incondizionatamente ad ogni render.
+            if (!gameState) {
+              return (
+                <div className="grid grid-cols-12 gap-4">
+                  <div className="col-span-8">
+                    <Arena gameState={null} />
+                  </div>
+                  <div className="col-span-4">
+                    <GameInfoPanel gameState={{}} />
+                  </div>
+                </div>
+              );
+            }
+            // Il GameManager non conosce il nome dello script AI del giocatore,
+            // quindi lo aggiungiamo qui prima di passarlo alla UI.
+            // Questo risolve il bug nella modale di fine partita e assicura
+            // che i nomi siano corretti in tutta l'interfaccia.
+            const enrichedGameState = { ...gameState };
+
+            const opponentScriptName =
+              scripts.find((s) => s.id === opponentScriptId)?.name ||
+              "Opponent";
+
+            // Il GameManager produce un array `robots`. Lo trasformiamo in `bots`
+            // per la UI, arricchendolo con i nomi corretti. Questo risolve il bug
+            // per cui le statistiche non si aggiornavano.
+            if (gameState.robots) {
+              enrichedGameState.bots = gameState.robots.map((bot) => ({
+                ...bot,
+                name:
+                  bot.id === "player"
+                    ? activeScript?.name || "Player Bot"
+                    : opponentScriptName,
+                isCustomAI: bot.id === "opponent" && !!opponentScriptId,
+              }));
+            }
+
+            // Se la partita è finita, determiniamo il vincitore in modo robusto
+            // basandoci sulla salute dei bot, poiché l'oggetto `gameState.winner`
+            // originale potrebbe non contenere tutte le informazioni necessarie (come il nome).
+            if (gameState.status === "finished" && enrichedGameState.bots) {
+              // Il vincitore è l'unico bot rimasto con salute > 0.
+              // Se nessuno ha salute, è un pareggio (winner rimane null).
+              const winningBot = enrichedGameState.bots.find(
+                (bot) => bot.hullHp > 0
+              );
+              enrichedGameState.winner = winningBot || null;
+            }
+
+            return (
+              <GameUI
+                gameState={enrichedGameState}
+                controls={controls}
+                onEditorOpen={() => {
+                  onEditorOpen();
+                  if (isTutorialActive && currentStepIndex === 1) {
+                    nextStep();
+                  }
+                }}
+                isEditorOpen={isEditorOpen}
+                onEditorClose={onEditorClose}
+                playerCode={playerCode}
+                onCodeChange={setPlayerCode}
+                onUpdate={handleApplyAIChangesWithTutorial}
+                compileError={compileError}
+                isLogOpen={isLogOpen}
+                onLogOpen={onLogOpen}
+                onLogClose={onLogClose}
+                isGameOver={isGameOver}
+                onGameOver={onGameOverOpen}
+                onGameOverClose={onGameOverClose}
+                onRestart={handleRestart}
+                onApiDocsOpen={onApiDocsOpen}
+                scripts={scripts}
+                activeScript={activeScript}
+                onSelectScript={handleSelectScript}
+                onDeleteScript={handleDeleteScript}
+                onCreateNewScript={handleCreateNewScriptWithTutorial}
+                onSaveOnly={handleSaveOnly}
+                onUpdateSettings={handleUpdateBotSettingsWithTutorial}
+                // Props per la nuova modale di selezione avversario
+                isOpponentModalOpen={isOpponentModalOpen}
+                onOpponentModalOpen={handleOpponentModalOpen}
+                onOpponentModalClose={onOpponentModalClose}
+                onConfirmOpponentSelection={handleConfirmOpponentSelection}
+                // Passa l'ID temporaneo e la funzione per aggiornarlo alla modale
+                opponentScriptId={tempOpponentScriptId}
+                onSelectOpponentScript={setTempOpponentScriptId}
+                opponentCompileError={opponentCompileError}
+                onClearOpponentCompileError={() =>
+                  setOpponentCompileError(null)
+                }
+                user={user}
+                onLogout={handleLogout}
+                isLogoutModalOpen={isLogoutModalOpen}
+                onLogoutModalOpen={onLogoutModalOpen}
+                onLogoutModalClose={onLogoutModalClose}
+                isSettingsModalOpen={isSettingsModalOpen}
+                onSettingsModalOpen={handleSettingsModalOpenWithTutorial}
+                onSettingsModalClose={onSettingsModalClose}
+                onTutorialModalOpen={onTutorialModalOpen}
+                onBotSettingsOpen={handleBotSettingsOpenWithTutorial}
+                onNavigateBack={onNavigateBack}
+              />
+            );
+          }}
+        </GameManager>
+      )}
       <ApiDocsModal isOpen={isApiDocsOpen} onClose={onApiDocsClose} />
       <TutorialModal
         isOpen={isTutorialModalOpen}
