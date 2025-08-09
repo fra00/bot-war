@@ -1,6 +1,21 @@
 import Robot from "../Robot.js";
 
 /**
+ * Controlla se due comandi sono funzionalmente equivalenti.
+ * Utile per evitare di riavviare un'azione già in corso (es. una rotazione).
+ * @param {Object} cmd1
+ * @param {Object} cmd2
+ * @returns {boolean}
+ */
+export function isCommandEquivalent(cmd1, cmd2) {
+  if (!cmd1 || !cmd2 || cmd1.type !== cmd2.type) {
+    return false;
+  }
+  // Per ora, confrontiamo solo i comandi di rotazione basandoci sulla velocità.
+  return cmd1.type === "ROTATE" && cmd1.rotationSpeed === cmd2.rotationSpeed;
+}
+
+/**
  * Processa i comandi asincroni attivi per ogni robot (movimento, rotazione).
  * Questo sistema aggiorna la posizione/rotazione del robot ad ogni tick e
  * genera eventi quando un comando è completato o interrotto.

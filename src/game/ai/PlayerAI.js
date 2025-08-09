@@ -17,17 +17,24 @@ function stringifyObjectRecursive(obj, indent) {
       let valueStr;
 
       if (typeof value === "function") {
-        // Converte la funzione in stringa e la indenta correttamente.
-        valueStr = value.toString().replace(/\n/g, `\n${nextIndent}`);
+        const funcStr = value.toString().replace(/\n/g, `\n${nextIndent}`);
+        // I metodi con sintassi abbreviata (es. `myMethod() {}`) includono già il nome.
+        // Le funzioni anonime (`function() {}`) e le arrow functions (`() => {}`) no.
+        if (funcStr.startsWith("function") || funcStr.startsWith("(")) {
+          parts.push(`${nextIndent}${key}: ${funcStr}`);
+        } else {
+          // È un metodo con sintassi abbreviata, il nome è già incluso.
+          parts.push(`${nextIndent}${funcStr}`);
+        }
       } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
         // Chiamata ricorsiva per oggetti annidati.
-        valueStr = stringifyObjectRecursive(value, nextIndent);
+        const nestedStr = stringifyObjectRecursive(value, nextIndent);
+        parts.push(`${nextIndent}${key}: ${nestedStr}`);
       } else {
         // Usa JSON.stringify per tutti gli altri tipi (array, primitivi).
-        valueStr = JSON.stringify(value, null, 2);
+        const primitiveStr = JSON.stringify(value, null, 2);
+        parts.push(`${nextIndent}${key}: ${primitiveStr}`);
       }
-
-      parts.push(`${nextIndent}${key}: ${valueStr}`);
     }
   }
 

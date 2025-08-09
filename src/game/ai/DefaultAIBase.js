@@ -121,27 +121,21 @@ const DefaultAIBase = {
           api.fire();
         }
 
-        // Logica decisionale per il movimento (solo se inattivi).
-        if (api.isQueueEmpty()) {
-          // Mira solo quando decidi una nuova mossa.
-          api.aimAt(enemy.x, enemy.y);
+        // Con la nuova logica di `aimAt`, possiamo semplicemente chiamarlo ad ogni tick.
+        // Il sistema si occuperà di correggere la mira in modo efficiente.
+        api.aimAt(enemy.x, enemy.y);
 
+        // La logica di movimento viene eseguita solo se non siamo già impegnati in un'azione.
+        if (api.isQueueEmpty()) {
           // Priorità 1: Linea di tiro bloccata -> Fiancheggia.
-          if (!api.isLineOfSightClear(enemy)) {
-            return "FLANKING";
-          }
+          if (!api.isLineOfSightClear(enemy)) return "FLANKING";
           // Priorità 2: Troppo vicino -> Esegui kiting.
-          if (enemy.distance < this.config.kitingDistance) {
-            return "KITING";
-          }
+          if (enemy.distance < this.config.kitingDistance) return "KITING";
           // Priorità 3: Troppo lontano -> Avvicinati.
-          if (
-            enemy.distance > this.config.engagementDistance + this.config.engagementBuffer
-          ) {
+          if (enemy.distance > this.config.engagementDistance + this.config.engagementBuffer) {
             api.log("Nemico troppo lontano, mi avvicino...");
-            api.move(this.config.approachSpeed); // Troppo lontano, avvicinati.
+            api.move(this.config.approachSpeed);
           }
-          // Se siamo alla distanza ottimale, non facciamo nulla e continuiamo a sparare.
         }
       },
       onExit(api, memory) {

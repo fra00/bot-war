@@ -146,16 +146,26 @@ class RobotAPI {
     this.robot.nextActions = [{ type: "STOP_ACTION", payload: { source } }];
   };
 
+  /**
+   * Un comando "continuo" per mirare a una destinazione. Se chiamato ripetutamente,
+   * il bot continuerà a correggere la sua mira verso il bersaglio.
+   * Interrompe altre azioni di movimento/rotazione per dare priorità alla mira.
+   */
   aimAt = (targetX, targetY, speedPercentage = 100) => {
-    const command = generateAimCommand(
+    const aimCommand = generateAimCommand(
       { x: this.robot.x, y: this.robot.y },
       this.robot.rotation,
       { x: targetX, y: targetY },
       speedPercentage
     );
-    if (command) {
-      this._setAction(command.type, command.payload);
-    }
+
+    // Se non c'è bisogno di ruotare, non fare nulla.
+    if (!aimCommand) return;
+
+    // Rende il comando idempotente. Se il bot non sta già eseguendo questa esatta rotazione,
+    // la avvia, interrompendo qualsiasi altra azione di movimento/rotazione.
+    // Questo semplifica enormemente la logica dell'IA.
+    this._setAction("AIM_AT_CONTINUOUS", aimCommand.payload);
   };
 
   sequence = (actions) => {

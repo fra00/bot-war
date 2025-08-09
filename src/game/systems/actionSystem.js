@@ -6,9 +6,14 @@ import Projectile from "../Projectile.js";
  * l'esecuzione di azioni sincrone (fire).
  * @param {Array<import('../Robot.js').default>} robots
  * @param {number} projectileCounter
+ * @param {function(import('../Robot.js').default, Object): {handled: boolean}} [customActionHandler] - Un gestore opzionale per azioni custom.
  * @returns {{newProjectiles: Array<Projectile>, newEvents: Array<Object>, updatedProjectileCounter: number}}
  */
-export function executeNextActions(robots, projectileCounter) {
+export function executeNextActions(
+  robots,
+  projectileCounter,
+  customActionHandler
+) {
   const newProjectiles = [];
   const newEvents = [];
   let updatedProjectileCounter = projectileCounter;
@@ -18,6 +23,13 @@ export function executeNextActions(robots, projectileCounter) {
     if (!actions || actions.length === 0) return;
 
     actions.forEach((action) => {
+      // Prova prima il gestore custom, se esiste.
+      if (customActionHandler) {
+        const result = customActionHandler(robot, action);
+        if (result && result.handled) {
+          return; // L'azione è stata gestita, salta la logica di default.
+        }
+      }
       switch (action.type) {
         case "START_MOVE": {
           const { distance, speedPercentage } = action.payload;

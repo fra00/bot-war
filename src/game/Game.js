@@ -2,7 +2,10 @@ import Arena from "./Arena.js";
 import Robot from "./Robot.js";
 import Projectile from "./Projectile.js";
 import { updateProjectiles } from "./systems/projectileSystem.js";
-import { processActiveCommands } from "./systems/commandSystem.js";
+import {
+  processActiveCommands,
+  isCommandEquivalent,
+} from "./systems/commandSystem.js";
 import { executeNextActions } from "./systems/actionSystem.js";
 import { updateRobotStates } from "./systems/robotStateSystem.js";
 import { setupGame } from "./gameSetup.js";
@@ -151,7 +154,38 @@ class Game {
       newProjectiles,
       newEvents: actionEvents,
       updatedProjectileCounter,
-    } = executeNextActions(this.robots, this.projectileCounter);
+    } = executeNextActions(
+      this.robots,
+      this.projectileCounter,
+      (robot, action) => {
+        // Logica custom per il nuovo comando AIM_AT_CONTINUOUS
+        if (action.type === "AIM_AT_CONTINUOUS") {
+          // Converte l'azione 'AIM_AT_CONTINUOUS' in un comando 'ROTATE' completo,
+          // replicando la logica che si trova in actionSystem.js per START_ROTATE.
+          const { angle, speedPercentage } = action.payload;
+          const clampedPercentage = Math.max(-100, Math.min(speedPercentage, 100));
+          const rotationSpeed =
+            robot.motor.maxRotationSpeed *
+            (clampedPercentage / 100) *
+            Math.sign(angle);
+
+          const newCommand = {
+            type: "ROTATE",
+            rotationSpeed: rotationSpeed,
+            remainingAngle: Math.abs(angle),
+          };
+
+          const activeCommand = robot.commandQueue[0];
+
+          // Se il comando attivo non è già la stessa rotazione, interrompi e avvia la nuova.
+          if (!activeCommand || !isCommandEquivalent(activeCommand, newCommand)) {
+            robot.commandQueue = [newCommand];
+          }
+          return { handled: true }; // Indica che l'azione è stata gestita qui.
+        }
+        return { handled: false }; // Lascia che la gestione di default proceda.
+      }
+    );
 
     // Traccia i colpi sparati
     newProjectiles.forEach(p => {

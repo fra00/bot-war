@@ -39,11 +39,8 @@ const api = {
   moveTo: (targetX, targetY, speedPercentage = 100) => {
     /* Muove il bot verso una coordinata, evitando ostacoli. Restituisce `true` se un percorso è stato trovato, `false` altrimenti. */
   },
-  rotate: (angle, speedPercentage = 100) => {
-    /* Ruota il bot di un certo numero di gradi (positivo per orario, negativo per antiorario). */
-  },
   aimAt: (targetX, targetY, speedPercentage = 100) => {
-    /* Ruota il bot per puntare a una coordinata specifica. */
+    /* Comando "continuo" per mirare a una destinazione. Se chiamato ad ogni tick, il bot correggerà la sua mira verso il bersaglio. Interrompe altre azioni per dare priorità alla mira. */
   },
   stop: (source = "AI_REQUEST") => {
     /* Interrompe immediatamente qualsiasi azione in corso (movimento/rotazione). */
@@ -169,20 +166,20 @@ const DefaultAIBase = {
         api.updateMemory({
           lastKnownEnemyPosition: { x: enemy.x, y: enemy.y },
         });
+
         if (Math.abs(enemy.angle) < 5 && api.isLineOfSightClear(enemy)) {
           api.fire();
         }
+
+        // Con la nuova logica, chiamiamo `aimAt` ad ogni tick per correggere
+        // continuamente la mira verso il nemico.
+        api.aimAt(enemy.x, enemy.y);
+
+        // La logica di movimento viene eseguita solo se non siamo già impegnati in un'azione.
         if (api.isQueueEmpty()) {
-          const optimalDistance = 250;
-          const tooCloseDistance = 150;
-          api.aimAt(enemy.x, enemy.y);
-          if (!api.isLineOfSightClear(enemy)) {
-            return "FLANKING";
-          }
-          if (enemy.distance < tooCloseDistance) {
-            return "KITING";
-          }
-          if (enemy.distance > optimalDistance + 50) {
+          if (!api.isLineOfSightClear(enemy)) return "FLANKING";
+          if (enemy.distance < 150) return "KITING";
+          if (enemy.distance > 300) {
             api.log("Nemico troppo lontano, mi avvicino...");
             api.move(80);
           }

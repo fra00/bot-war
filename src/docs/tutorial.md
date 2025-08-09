@@ -119,7 +119,7 @@ SEARCHING: {
 Quando siamo in `ATTACKING`, la nostra logica è:
 1.  **`onExecute`**: Controlla se il nemico è ancora visibile. Se no, torna a `SEARCHING`.
 2.  **`onExecute`**: Spara continuamente se la mira è buona e la linea di tiro è libera.
-3.  **`onExecute`**: Se il bot è inattivo, mira al nemico.
+3.  **`onExecute`**: Ad ogni tick, dichiara l'intento di mirare al nemico. Il motore di gioco si occuperà di avviare o correggere la rotazione.
 
 Aggiungi questo oggetto all'interno di `states`:
 
@@ -139,10 +139,9 @@ ATTACKING: {
       api.fire();
     }
 
-    // Azione di setup: se siamo inattivi, miriamo.
-    if (api.isQueueEmpty()) {
-      api.aimAt(enemy.x, enemy.y);
-    }
+    // Azione continua: dichiariamo il nostro intento di mirare al nemico.
+    // Il motore di gioco si occuperà di correggere la mira in modo efficiente.
+    api.aimAt(enemy.x, enemy.y);
   },
 },
 ```
@@ -217,9 +216,7 @@ Il codice completo dovrebbe assomigliare a questo. Puoi usarlo come riferimento 
         if (Math.abs(enemy.angle) < 5 && api.isLineOfSightClear(enemy)) {
           api.fire();
         }
-        if (api.isQueueEmpty()) {
-          api.aimAt(enemy.x, enemy.y);
-        }
+        api.aimAt(enemy.x, enemy.y);
       },
     },
     EVADING: {

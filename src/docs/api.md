@@ -226,11 +226,11 @@ api.log(...args)
 
 ## Comandi di Combattimento e Mira
 
-Questi comandi interagiscono con la coda di comandi o vengono eseguiti istantaneamente.
+Questi comandi gestiscono le capacità offensive del bot. `fire` è un'azione istantanea, mentre `aimAt` avvia e mantiene un'azione di mira che richiede tempo per essere completata.
 
 api.aimAt(x, y, speedPercentage)
 
-    Accoda un'azione di rotazione per puntare verso coordinate specifiche.
+    Comando "continuo" per mirare a una destinazione. Se chiamato ad ogni tick, il bot correggerà la sua mira verso il bersaglio.
 
     Parametri:
     - `x` (number): La coordinata X del bersaglio.
@@ -238,23 +238,21 @@ api.aimAt(x, y, speedPercentage)
     - `speedPercentage` (number, opzionale, default: 100): La velocità di rotazione.
 
     Comportamento:
-    - Calcola l'angolo di rotazione più breve per puntare verso il punto (x, y).
-    - Accoda un singolo comando `rotate` per eseguire quella rotazione.
-    - Al termine, genera un evento `ROTATION_COMPLETED`.
+    - Questo comando è **dichiarativo**. Ad ogni tick, l'IA dovrebbe semplicemente dichiarare "voglio puntare qui".
+    - Il motore di gioco si occupa di avviare, continuare o correggere la rotazione in modo efficiente.
+    - Questo elimina la necessità di controllare `isQueueEmpty` prima di mirare e di attendere l'evento `ROTATION_COMPLETED`.
 
     Esempio di utilizzo corretto:
-    // L'obiettivo è mirare e sparare solo DOPO che la mira è completata.
-    // La logica deve attendere l'evento di completamento.
+    // Nello stato ATTACKING, ad ogni tick:
     const target = api.scan();
     if (target) {
+      // 1. Dichiara l'intento di mirare. Il motore gestisce la rotazione.
       api.aimAt(target.x, target.y);
-    }
-
-    // In un tick successivo, dopo che la rotazione è iniziata:
-    const events = api.getEvents();
-    if (events.some(e => e.type === 'ROTATION_COMPLETED')) {
-      // Ora la mira è completa. Possiamo sparare.
-      api.fire();
+      // 2. Controlla se la mira è già allineata e spara.
+      // Questo può accadere anche mentre la rotazione è in corso.
+      if (Math.abs(target.angle) < 5) {
+        api.fire();
+      }
     }
 
 api.fire()
