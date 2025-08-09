@@ -225,7 +225,7 @@ const EditorAndArena = ({ onNavigateBack }) => {
       if (script) {
         try {
           // La funzione compileAI restituisce l'oggetto AI o lancia un'eccezione.
-          const compiledAI = compileAI(script.code);
+          const compiledAI = compileAI(script.script || script.code);
           setOpponentAI(() => compiledAI);
         } catch (error) {
           const errorMessage = `Errore di compilazione per l'IA "${script.name}": ${error.message}`;

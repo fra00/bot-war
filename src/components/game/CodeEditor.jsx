@@ -22,7 +22,7 @@ const CodeEditor = ({ value, onChange, height = "100%" }) => {
         minimap: { enabled: false },
         fontSize: 14,
         wordWrap: "on",
-        scrollBeyondLastLine: false,
+        scrollBeyondLastLine: true,
         automaticLayout: true,
       }}
     />
