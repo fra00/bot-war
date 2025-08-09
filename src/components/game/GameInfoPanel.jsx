@@ -15,7 +15,7 @@ const BotInfo = ({ bot, color, onSelectLog, isLogActive }) => {
       className="flex flex-1 flex-col" // flex-1 per occupare lo spazio, rimosso mb-4
       style={{ minHeight: "260px" }}
     >
-      <CardHeader className="flex justify-between items-center flex-shrink-0">
+      <CardHeader className="flex-shrink-0">
         <div className="flex items-center">
           <span style={{ color }} className="font-bold">
             {bot.name || bot.id}
@@ -29,13 +29,15 @@ const BotInfo = ({ bot, color, onSelectLog, isLogActive }) => {
             </span>
           )}
         </div>
-        <Button
-          onClick={() => onSelectLog(bot)}
-          size="small"
-          variant={isLogActive ? "primary" : "ghost"}
-        >
-          Log
-        </Button>
+        <div className="mt-1">
+          <Button
+            onClick={() => onSelectLog(bot)}
+            size="small"
+            variant={isLogActive ? "primary" : "ghost"}
+          >
+            Log
+          </Button>
+        </div>
       </CardHeader>
       <div className="p-3 text-xs space-y-2">
         <div>
