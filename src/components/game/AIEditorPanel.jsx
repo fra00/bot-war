@@ -7,9 +7,7 @@ import CardHeader from "../ui/CardHeader";
 import Input from "../ui/Input";
 import CodeEditor from "./CodeEditor";
 import DefaultAIBase from "../../game/ai/DefaultAIBase.js";
-import initialPlayerCode, {
-  stringifyAI,
-} from "../../game/ai/PlayerAI.js";
+import initialPlayerCode, { stringifyAI } from "../../game/ai/PlayerAI.js";
 import Spinner from "../ui/Spinner";
 
 /**
@@ -69,12 +67,12 @@ const AIEditorPanel = ({
   return (
     // Il contenitore principale è ora gestito dal componente Modal.
     // Rimuoviamo la Toolbar e il div contenitore esterno.
-    <div className="grid grid-cols-12 gap-4 h-full">
+    <div className="grid grid-cols-12 gap-4 h-full overflow-hidden">
       {/* Colonna Sinistra: Lista Script */}
       <div className="col-span-3 flex flex-col gap-4">
-        <Card className="flex-grow flex flex-col">
+        <Card className="flex flex-col">
           <CardHeader>I tuoi Script</CardHeader>
-          <div className="flex-grow overflow-y-auto p-2">
+          <div className="overflow-y-auto p-2" style={{ height: "300px" }}>
             <ul>
               {scripts.map((script) => (
                 <li key={script.id} className="mb-2">
@@ -130,7 +128,11 @@ const AIEditorPanel = ({
                   data-tutorial-id="script-name-input"
                 />
                 <div className="flex gap-2">
-                  <Button onClick={handleCancelCreate} variant="secondary" className="w-full">
+                  <Button
+                    onClick={handleCancelCreate}
+                    variant="secondary"
+                    className="w-full"
+                  >
                     Annulla
                   </Button>
                   <Button onClick={handleConfirmCreate} className="w-full">
