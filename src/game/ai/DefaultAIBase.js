@@ -13,11 +13,11 @@ const DefaultAIBase = {
     maxCoverDistance: 150, // Distanza massima per cercare copertura
     coverSeekDistance: 40, // Distanza da un ostacolo per nascondersi
     unstuckDistance: -60, // Distanza per arretrare quando incastrati
+    approachDistance: 80, // Distanza per la manovra di avvicinamento
+    kitingMoveDistance: -80, // Distanza per la manovra di kiting
 
     // Velocità (in percentuale)
     patrolSpeed: 70,
-    approachSpeed: 80,
-    kitingSpeed: -80, // Negativo per arretrare
 
     // Angoli e Tolleranze
     aimTolerance: 5, // Gradi di tolleranza per sparare
@@ -134,7 +134,7 @@ const DefaultAIBase = {
           // Priorità 3: Troppo lontano -> Avvicinati.
           if (enemy.distance > this.config.engagementDistance + this.config.engagementBuffer) {
             api.log("Nemico troppo lontano, mi avvicino...");
-            api.move(this.config.approachSpeed);
+            api.move(this.config.approachDistance);
           }
         }
       },
@@ -151,7 +151,7 @@ const DefaultAIBase = {
     KITING: {
       onEnter(api, memory) {
         api.log("Nemico troppo vicino! Eseguo kiting...");
-        api.move(this.config.kitingSpeed); // Arretra per creare distanza.
+        api.move(this.config.kitingMoveDistance); // Arretra per creare distanza.
       },
       onExecute(api, memory, events) {
         const enemy = api.scan();
