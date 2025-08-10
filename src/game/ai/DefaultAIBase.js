@@ -113,7 +113,9 @@ const DefaultAIBase = {
         }
 
         // Azioni continue: Aggiorna la posizione e spara se possibile.
-        api.updateMemory({ lastKnownEnemyPosition: { x: enemy.x, y: enemy.y } });
+        api.updateMemory({
+          lastKnownEnemyPosition: { x: enemy.x, y: enemy.y },
+        });
         if (
           Math.abs(enemy.angle) < this.config.aimTolerance &&
           api.isLineOfSightClear(enemy)
@@ -132,7 +134,10 @@ const DefaultAIBase = {
           // Priorità 2: Troppo vicino -> Esegui kiting.
           if (enemy.distance < this.config.kitingDistance) return "KITING";
           // Priorità 3: Troppo lontano -> Avvicinati.
-          if (enemy.distance > this.config.engagementDistance + this.config.engagementBuffer) {
+          if (
+            enemy.distance >
+            this.config.engagementDistance + this.config.engagementBuffer
+          ) {
             api.log("Nemico troppo lontano, mi avvicino...");
             api.move(this.config.approachDistance);
           }
@@ -170,7 +175,12 @@ const DefaultAIBase = {
         if (Math.abs(enemy.angle) < this.config.aimTolerance) api.fire();
 
         // Se la manovra è finita ma siamo ancora troppo vicini, rientra per muoverti ancora.
-        if (events.some(e => e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")) {
+        if (
+          events.some(
+            (e) =>
+              e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION"
+          )
+        ) {
           return "KITING";
         }
       },
@@ -282,8 +292,14 @@ const DefaultAIBase = {
             const len = Math.sqrt(vec.x * vec.x + vec.y * vec.y) || 1;
             const norm = { x: vec.x / len, y: vec.y / len };
             const hidePos = {
-              x: cover.x + cover.width / 2 + norm.x * this.config.coverSeekDistance,
-              y: cover.y + cover.height / 2 + norm.y * this.config.coverSeekDistance,
+              x:
+                cover.x +
+                cover.width / 2 +
+                norm.x * this.config.coverSeekDistance,
+              y:
+                cover.y +
+                cover.height / 2 +
+                norm.y * this.config.coverSeekDistance,
             };
 
             if (
@@ -302,7 +318,8 @@ const DefaultAIBase = {
                 (this.config.evasionAngleBase +
                   Math.random() * this.config.evasionAngleRandomness) *
                 turnDirection;
-              const randomDistance = this.config.approachSpeed + Math.random() * 50;
+              const randomDistance =
+                this.config.approachDistance + Math.random() * 50;
               const angleInRad =
                 (api.getState().rotation + randomAngle) * (Math.PI / 180);
               const destX =
@@ -339,7 +356,10 @@ const DefaultAIBase = {
           (Math.random() * this.config.unstuckAngleRandomness -
             this.config.unstuckAngleRandomness / 2);
         api.sequence([
-          { type: "START_MOVE", payload: { distance: this.config.unstuckDistance } },
+          {
+            type: "START_MOVE",
+            payload: { distance: this.config.unstuckDistance },
+          },
           { type: "START_ROTATE", payload: { angle: randomAngle } },
         ]);
       },
