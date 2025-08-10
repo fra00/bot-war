@@ -69,6 +69,8 @@ const GameUI = ({
     }
   }, [gameState.status, onGameOver]);
 
+  const isMultiplayer = !!opponentScriptId;
+
   const formatTime = (ms) => {
     if (typeof ms !== "number" || ms < 0) {
       return "00:00";
@@ -146,7 +148,7 @@ const GameUI = ({
         </div>
         {/* Colonna destra: Info Bots (occupa 1 colonna) */}
         <div className="col-span-4">
-          <GameInfoPanel gameState={gameState} />
+          <GameInfoPanel gameState={gameState} isMultiplayer={isMultiplayer} />
         </div>
       </div>
 

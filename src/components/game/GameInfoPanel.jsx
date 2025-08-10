@@ -9,7 +9,13 @@ import Textarea from "../ui/Textarea";
 import { Tabs, TabList, Tab, TabPanels, TabPanel } from "../ui/Tabs";
 import { useToast } from "../ui/toast/ToastProvider";
 
-const BotInfo = ({ bot, color, onSelectLog, isLogActive }) => {
+const BotInfo = ({
+  bot,
+  color,
+  onSelectLog,
+  isLogActive,
+  isMultiplayer,
+}) => {
   return (
     <Card
       className="flex flex-1 flex-col" // flex-1 per occupare lo spazio, rimosso mb-4
@@ -34,6 +40,12 @@ const BotInfo = ({ bot, color, onSelectLog, isLogActive }) => {
             onClick={() => onSelectLog(bot)}
             size="small"
             variant={isLogActive ? "primary" : "ghost"}
+            disabled={isMultiplayer && bot.id !== "player"}
+            title={
+              isMultiplayer && bot.id !== "player"
+                ? "Non puoi visualizzare i log dell'avversario in modalità multiplayer."
+                : "Visualizza i log"
+            }
           >
             Log
           </Button>
@@ -113,6 +125,7 @@ BotInfo.propTypes = {
   color: PropTypes.string.isRequired,
   onSelectLog: PropTypes.func.isRequired,
   isLogActive: PropTypes.bool.isRequired,
+  isMultiplayer: PropTypes.bool,
 };
 
 const BotInfoPlaceholder = ({ name, color }) => (
@@ -156,29 +169,38 @@ BotInfoPlaceholder.propTypes = {
   color: PropTypes.string.isRequired,
 };
 
-const GameInfoPanel = ({ gameState }) => {
+const GameInfoPanel = ({ gameState, isMultiplayer }) => {
   const botColors = ["#61dafb", "#e06c75"]; // Player, Enemy
   const bots = gameState?.bots || [];
-  const [logSource, setLogSource] = useState(null);
+  const [selectedLogBotId, setSelectedLogBotId] = useState(null);
+  const [isLogPanelVisible, setIsLogPanelVisible] = useState(false);
   const { addToast } = useToast();
 
-  // Imposta il log del giocatore come predefinito all'avvio e quando il gioco si riavvia
+  // Trova il bot selezionato per i log dall'array `bots` più recente.
+  const logSource = bots.find((b) => b.id === selectedLogBotId);
+
   useEffect(() => {
-    if (bots.length > 0) {
-      // Se una fonte di log è già selezionata, trova la sua versione aggiornata
-      // nel nuovo array `bots` per mantenere la selezione tra i tick e dopo un reset.
-      // Se nessuna fonte è selezionata, imposta il primo bot (il giocatore) come predefinito.
-      const targetId = logSource ? logSource.id : bots[0].id;
-      const newLogSource = bots.find((b) => b.id === targetId) || bots[0];
-      setLogSource(newLogSource);
-    } else {
-      // Se non ci sono bot (es. prima dell'avvio), pulisci la fonte dei log.
-      setLogSource(null);
+    // Questo effetto gestisce il caso in cui il bot selezionato per i log
+    // non esista più (es. dopo un reset del gioco), nascondendo il pannello.
+    if (selectedLogBotId && !logSource) {
+      setSelectedLogBotId(null);
+      setIsLogPanelVisible(false);
     }
-  }, [bots]); // Rimuoviamo `logSource` dalle dipendenze per correggere il bug del reset.
+  }, [bots, selectedLogBotId, logSource]);
 
   const handleSelectLog = (bot) => {
-    setLogSource(bot);
+    // Se il pannello è già visibile e si clicca sullo stesso bot, lo nasconde.
+    // Altrimenti, mostra i log per il bot cliccato.
+    if (isLogPanelVisible && selectedLogBotId === bot.id) {
+      setIsLogPanelVisible(false);
+    } else {
+      setSelectedLogBotId(bot.id);
+      setIsLogPanelVisible(true);
+    }
+  };
+
+  const handleCloseLogPanel = () => {
+    setIsLogPanelVisible(false);
   };
 
   const renderLogContent = () => {
@@ -232,42 +254,57 @@ const GameInfoPanel = ({ gameState }) => {
             bot={bot}
             color={botColors[index]}
             onSelectLog={handleSelectLog}
-            isLogActive={logSource?.id === bot.id}
+            isLogActive={isLogPanelVisible && selectedLogBotId === bot.id}
+            isMultiplayer={isMultiplayer}
           />
         ))}
       </Box>
-      <Tabs defaultIndex={0}>
-        <TabList>
-          <Tab>
-            Logs {logSource ? `(${logSource.name || logSource.id})` : ""}
-          </Tab>
-        </TabList>
-        <TabPanels>
-          <TabPanel>
-            <div className="relative">
-              <Textarea
-                id="bot-log-textarea" // Aggiunto id per soddisfare i propTypes
-                readOnly
-                value={renderLogContent()}
-                onChange={() => {}} // Aggiunto onChange vuoto per soddisfare i propTypes
-                rows={8}
-                className="w-full text-xs resize-none bg-gray-800 border-gray-600 focus:ring-blue-500 focus:border-blue-500 pr-10"
-                placeholder="I log del bot selezionato appariranno qui."
-              />
+      {isLogPanelVisible && logSource && (
+        <Tabs defaultIndex={0}>
+          <TabList>
+            <Tab>Logs ({logSource.name || logSource.id})</Tab>
+            <div className="ml-auto flex items-center">
               <Button
-                onClick={handleCopyLogs}
+                onClick={handleCloseLogPanel}
                 size="small"
                 variant="ghost"
-                className="absolute top-1 right-1 p-1"
-                aria-label="Copia log"
-                title="Copia log negli appunti"
+                className="p-1"
+                aria-label="Chiudi pannello log"
+                title="Chiudi pannello log"
               >
-                📋
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </Button>
             </div>
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
+          </TabList>
+          <TabPanels>
+            <TabPanel>
+              <div className="relative">
+                <Textarea
+                  id="bot-log-textarea"
+                  readOnly
+                  value={renderLogContent()}
+                  onChange={() => {}}
+                  rows={8}
+                  className="w-full text-xs resize-none bg-gray-800 border-gray-600 focus:ring-blue-500 focus:border-blue-500 pr-10"
+                  placeholder="I log del bot selezionato appariranno qui."
+                />
+                <Button
+                  onClick={handleCopyLogs}
+                  size="small"
+                  variant="ghost"
+                  className="absolute top-1 right-1 p-1"
+                  aria-label="Copia log"
+                  title="Copia log negli appunti"
+                >
+                  📋
+                </Button>
+              </div>
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
+      )}
     </div>
   );
 };
@@ -288,6 +325,11 @@ GameInfoPanel.propTypes = {
       })
     ),
   }).isRequired,
+  isMultiplayer: PropTypes.bool,
+};
+
+GameInfoPanel.defaultProps = {
+  isMultiplayer: false,
 };
 
 export default GameInfoPanel;

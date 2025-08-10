@@ -204,7 +204,7 @@ const MultiplayerArena = ({ matchData, onNavigate }) => {
                     <Arena gameState={enrichedGameState} />
                   </div>
                   <div className="col-span-4">
-                    <GameInfoPanel gameState={enrichedGameState} />
+                    <GameInfoPanel gameState={enrichedGameState} isMultiplayer={true} />
                   </div>
                 </div>
                 <GameOverModal
