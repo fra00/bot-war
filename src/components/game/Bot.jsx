@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import PropTypes from 'prop-types';
 
 /**
@@ -297,4 +297,21 @@ Bot.defaultProps = {
   onDeathAnimationEnd: () => {},
 };
 
-export default Bot;
+/**
+ * Funzione di confronto personalizzata per React.memo.
+ * Impedisce il re-rendering del componente Bot se le sue proprietà visive non sono cambiate.
+ * Questo è cruciale per le performance, dato che il componente viene aggiornato ad ogni frame.
+ * @param {object} prevProps
+ * @param {object} nextProps
+ * @returns {boolean}
+ */
+const areBotsEqual = (prevProps, nextProps) => {
+  const p = prevProps.botData;
+  const n = nextProps.botData;
+
+  // Confronta solo le proprietà che influenzano la resa grafica.
+  // Se nessuna di queste cambia, il componente non verrà ri-renderizzato.
+  return p.x === n.x && p.y === n.y && p.angle === n.angle && p.hullHp === n.hullHp && p.armorHp === n.armorHp && p.energy === n.energy && prevProps.isPlayer === nextProps.isPlayer;
+};
+
+export default memo(Bot, areBotsEqual);

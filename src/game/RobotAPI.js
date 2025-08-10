@@ -3,8 +3,7 @@ import {
   checkLineOfSight,
   isPositionWalkable,
   checkForObstacleAhead,
-} from "./systems/perceptionSystem.js";
-import { createNavigationGrid } from "./systems/navigationGrid.js";
+} from "./systems/perceptionSystem.js"; 
 import { findPath } from "./systems/pathfindingSystem.js";
 import {
   generateCommandsForPath,
@@ -73,8 +72,8 @@ class RobotAPI {
     this.robot.path = null;
 
     const cellSize = Robot.RADIUS * 2;
-    const grid = createNavigationGrid(this.gameState.arena, Robot.RADIUS);
-
+    const grid = this.gameState.arena.navigationGrid;
+    
     const startCoords = {
       x: Math.floor(this.robot.x / cellSize),
       y: Math.floor(this.robot.y / cellSize),

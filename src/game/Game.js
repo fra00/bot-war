@@ -9,6 +9,7 @@ import {
 import { executeNextActions } from "./systems/actionSystem.js";
 import { updateRobotStates } from "./systems/robotStateSystem.js";
 import { setupGame } from "./gameSetup.js";
+import { createNavigationGrid } from "./systems/navigationGrid.js";
 import StatsTracker from "./StatsTracker.js";
 import { scanForEnemy, scanForObstacles } from "./systems/perceptionSystem.js";
 
@@ -85,6 +86,9 @@ class Game {
     this.arena = arena;
     /** @type {Array<Robot>} */
     this.robots = robots;
+
+    /** @type {Array<Array<import('./systems/navigationGrid.js').GridNode>>} */
+    this.navigationGrid = createNavigationGrid(this.arena, Robot.RADIUS);
 
     /** @type {Array<Projectile>} */
     this.projectiles = [];
@@ -278,6 +282,7 @@ class Game {
         width: this.arena.width,
         height: this.arena.height,
         obstacles: this.arena.obstacles,
+        navigationGrid: this.navigationGrid,
       },
       robots: this.robots.map((robot) => robot.getState()),
       projectiles: this.projectiles.map((p) => p.getState()),
