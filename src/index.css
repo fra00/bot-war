@@ -73,3 +73,38 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Animazione per la scia del propulsore del bot */
+@keyframes thruster-flicker {
+  0%,
+  100% {
+    transform: scaleX(1) scaleY(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scaleX(1.3) scaleY(0.8);
+    opacity: 0.8;
+  }
+}
+
+.bot-thruster {
+  animation: thruster-flicker 100ms ease-in-out infinite;
+}
+
+/* Animazione per l'esplosione del bot */
+@keyframes bot-explosion {
+  from {
+    transform: scale(0);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+.bot-explosion-circle {
+  fill: none;
+  transform-origin: center;
+  animation: bot-explosion 500ms ease-out forwards;
+}
