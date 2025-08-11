@@ -49,10 +49,10 @@ const DefaultAIBase = {
       onEnter(api, memory) {
         api.log("Inizio pattugliamento...");
       },
-      onExecute(api, memory, events) {
+      onExecute(api, memory, events, context) {
         // Condizione di uscita prioritaria: se vediamo un nemico, attacchiamo.
-        const potentialTarget = api.scan();
-        if (potentialTarget) {
+        const { enemy } = context;
+        if (enemy) {
           return "ATTACKING"; // Richiesta di transizione di stato
         }
 
@@ -105,8 +105,8 @@ const DefaultAIBase = {
       onEnter(api, memory) {
         api.log("Nemico ingaggiato! Valuto la situazione...");
       },
-      onExecute(api, memory, events) {
-        const enemy = api.scan();
+      onExecute(api, memory, events, context) {
+        const { enemy } = context;
         // Condizione di uscita: Nemico perso di vista.
         if (!enemy) {
           return "SEARCHING";
@@ -131,8 +131,6 @@ const DefaultAIBase = {
         if (api.isQueueEmpty()) {
           // Priorità 1: Linea di tiro bloccata -> Fiancheggia.
           if (!api.isLineOfSightClear(enemy)) return "FLANKING";
-          // Priorità 2: Troppo vicino -> Esegui kiting.
-          if (enemy.distance < this.config.kitingDistance) return "KITING";
           // Priorità 3: Troppo lontano -> Avvicinati.
           if (
             enemy.distance >
@@ -158,12 +156,10 @@ const DefaultAIBase = {
         api.log("Nemico troppo vicino! Eseguo kiting...");
         api.move(this.config.kitingMoveDistance); // Arretra per creare distanza.
       },
-      onExecute(api, memory, events) {
-        const enemy = api.scan();
-
-        // Condizioni di uscita
+      onExecute(api, memory, events, context) {
+        const { enemy } = context;
         if (!enemy) return "SEARCHING";
-        if (!api.isLineOfSightClear(enemy)) return "FLANKING";
+        //if (!api.isLineOfSightClear(enemy)) return "FLANKING";
         if (
           enemy.distance >
           this.config.kitingDistance + this.config.kitingBuffer
@@ -196,8 +192,8 @@ const DefaultAIBase = {
       onEnter(api, memory) {
         api.log("Inizio manovra di fiancheggiamento...");
       },
-      onExecute(api, memory, events) {
-        const enemy = api.scan();
+      onExecute(api, memory, events, context) {
+        const { enemy } = context;
         // Condizione di uscita: nemico perso di vista.
         if (!enemy) {
           api.log(
@@ -401,7 +397,7 @@ const DefaultAIBase = {
         if (events.some((e) => e.type === "SEQUENCE_COMPLETED")) {
           api.log("Arrivato al punto di ricarica. Controllo sicurezza...");
           // Se, appena arrivati, vediamo un nemico, il posto non è sicuro.
-          if (api.scan()) {
+          if (context.enemy) {
             api.log("Il posto non è sicuro! Cerco un altro punto.");
             api.updateMemory({ isMovingToRecharge: false });
           } else {
@@ -527,44 +523,58 @@ const DefaultAIBase = {
 
     const events = api.getEvents();
 
-    // --- Gestione Transizioni ad Alta Priorità ---
+    // --- Gestione Transizioni ad Alta Priorità (controllate ad ogni tick) ---
+    const enemy = api.scan();
     const battery = api.getBatteryState();
     const batteryPercent = (battery.energy / battery.maxEnergy) * 100;
 
-    // Se la batteria è scarica, entra in modalità ricarica (a meno che non lo sia già)
-    if (
-      batteryPercent < this.config.rechargeEnterThreshold &&
-      memory.current !== "RECHARGING"
-    ) {
-      this.setCurrentState("RECHARGING", api);
-      return; // Interrompi il tick, la logica di RECHARGING inizierà dal prossimo.
-    }
-
-    // --- Gestione delle Transizioni di Stato ---
-    // Se veniamo colpiti E non siamo nel periodo di grazia, iniziamo una nuova evasione.
-    if (
-      events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
-      memory.evasionGraceTicks <= 0
-    ) {
-      this.setCurrentState("EVADING", api);
-    }
-    // Se il bot si scontra con un muro, deve sbloccarsi.
+    // 1. Collisione con un muro: priorità assoluta per sbloccarsi.
     if (
       events.some(
         (e) => e.type === "ACTION_STOPPED" && e.reason === "COLLISION"
       )
     ) {
       this.setCurrentState("UNSTUCKING", api);
+      return;
     }
 
-    // --- Logica della Macchina a Stati ---
+    // 2. Colpiti da un proiettile: priorità alla sopravvivenza.
+    if (
+      events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
+      memory.evasionGraceTicks <= 0
+    ) {
+      this.setCurrentState("EVADING", api);
+      return;
+    }
+
+    // 3. Kiting: se un nemico è troppo vicino, mantieni le distanze.
+    // Questa è una transizione globale che può interrompere altri stati.
+    if (
+      enemy &&
+      enemy.distance < this.config.kitingDistance &&
+      !["KITING", "UNSTUCKING"].includes(memory.current)
+    ) {
+      this.setCurrentState("KITING", api);
+      return;
+    }
+
+    // 4. Ricarica: se la batteria è scarica, cerca un posto sicuro.
+    if (
+      batteryPercent < this.config.rechargeEnterThreshold &&
+      memory.current !== "RECHARGING"
+    ) {
+      this.setCurrentState("RECHARGING", api);
+      return;
+    }
+
+    // ---
     const currentStateName = memory.current;
     const currentState = this.states[currentStateName];
 
     // Se lo stato corrente è gestito dal nuovo pattern Enter/Execute/Exit
     if (currentState) {
       // Passiamo un contesto con dati calcolati una sola volta per tick.
-      const context = { batteryPercent, config: this.config };
+      const context = { enemy, batteryPercent, config: this.config };
       const nextStateName = currentState.onExecute?.call(
         this,
         api,
