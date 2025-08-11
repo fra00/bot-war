@@ -69,10 +69,12 @@ export function scanForObstacles(self, obstacles) {
  * Una posizione è calpestabile se un robot centrato lì non collide con muri o ostacoli.
  * @param {{x: number, y: number}} position - La posizione del mondo da controllare.
  * @param {number} robotRadius - Il raggio del robot.
- * @param {import('../Arena.js').Obstacle} arenaData - I dati dell'arena {width, height, obstacles}.
+ * @param {Object} arenaData - I dati dell'arena {width, height, obstacles}.
+ * @param {Array<import('../Robot.js').RobotState>} [allRobots=[]] - Lo stato di tutti i robot.
+ * @param {string} [selfId=null] - L'ID del robot che sta controllando la posizione.
  * @returns {boolean}
  */
-export function isPositionWalkable(position, robotRadius, arenaData) {
+export function isPositionWalkable(position, robotRadius, arenaData, allRobots = [], selfId = null) {
   const { width, height, obstacles } = arenaData;
   const { x, y } = position;
 
@@ -90,6 +92,18 @@ export function isPositionWalkable(position, robotRadius, arenaData) {
   const objectAsCircle = { x, y, radius: robotRadius };
   for (const obstacle of obstacles) {
     if (circleIntersectsRectangle(objectAsCircle, obstacle)) {
+      return false;
+    }
+  }
+
+  // Controlla le collisioni con altri robot
+  for (const otherRobot of allRobots) {
+    if (otherRobot.id === selfId) continue;
+
+    const dx = otherRobot.x - x;
+    const dy = otherRobot.y - y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance < robotRadius + Robot.RADIUS) {
       return false;
     }
   }

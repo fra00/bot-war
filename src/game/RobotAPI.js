@@ -213,8 +213,13 @@ class RobotAPI {
       this.gameState.arena.obstacles
     );
 
-  isPositionValid = (position) =>
-    isPositionWalkable(position, Robot.RADIUS, this.gameState.arena);
+  isPositionValid = (position) => {
+    // Ora passiamo anche lo stato di tutti i robot e l'ID del nostro bot
+    // per un controllo delle collisioni completo.
+    const allRobotStates = this.gameState.robots;
+    const selfId = this.robot.id;
+    return isPositionWalkable(position, Robot.RADIUS, this.gameState.arena, allRobotStates, selfId);
+  }
 
   // --- Memoria Persistente ---
 

@@ -71,7 +71,7 @@ export function processActiveCommands(robots, arena) {
         const newX = robot.x + signedDistanceToMove * Math.cos(angleRad);
         const newY = robot.y + signedDistanceToMove * Math.sin(angleRad);
 
-        if (arena.isPositionValid({ x: newX, y: newY }, Robot.RADIUS)) {
+        if (arena.isPositionValid({ x: newX, y: newY }, Robot.RADIUS, robots, robot.id)) {
           robot.x = newX;
           robot.y = newY;
           // 6. Aggiorna la distanza rimanente
