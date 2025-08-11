@@ -32,7 +32,7 @@ export function executeNextActions(
       }
       switch (action.type) {
         case "START_MOVE": {
-          const { distance, speedPercentage } = action.payload;
+          const { distance, speedPercentage = 100 } = action.payload;
           const clampedPercentage = Math.max(
             -100,
             Math.min(speedPercentage, 100)
@@ -50,7 +50,7 @@ export function executeNextActions(
           break;
         }
         case "START_ROTATE": {
-          const { angle, speedPercentage } = action.payload;
+          const { angle, speedPercentage = 100 } = action.payload;
           const clampedPercentage = Math.max(
             -100,
             Math.min(speedPercentage, 100)
