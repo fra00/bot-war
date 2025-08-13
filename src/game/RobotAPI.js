@@ -253,11 +253,17 @@ class RobotAPI {
   getEvents = () => {
     return this.gameState.events.filter((e) => {
       switch (e.type) {
+        // Eventi per il robot che viene colpito
         case "HIT_BY_PROJECTILE":
+          return e.robotId === this.robot.id;
+
+        // Eventi per il robot che ha sparato
         case "ENEMY_HIT":
         case "PROJECTILE_HIT_WALL":
         case "PROJECTILE_HIT_OBSTACLE":
           return e.ownerId === this.robot.id;
+
+        // Eventi generici per il robot
         case "ACTION_STOPPED":
         case "ENEMY_DETECTED":
         case "SEQUENCE_COMPLETED":
