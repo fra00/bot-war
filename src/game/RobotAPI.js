@@ -60,14 +60,14 @@ class RobotAPI {
       { x: this.robot.x, y: this.robot.y },
       { x: destX, y: destY },
     ];
-    this._setAction("START_MOVE", { distance, speedPercentage });
+    this.sequence([{ type: "START_MOVE", payload: { distance, speedPercentage } }]);
   };
 
   /**
    * Calcola e avvia un percorso verso una destinazione, evitando gli ostacoli.
    * @returns {boolean} True se un percorso è stato trovato e avviato, altrimenti false.
    */
-  moveTo = (targetX, targetY, speedPercentage = 100) => {
+  moveTo = (targetX, targetY, speedPercentage = 100) => {    
     this.robot.destination = { x: targetX, y: targetY };
     this.robot.path = null;
 
@@ -135,8 +135,9 @@ class RobotAPI {
     }
   };
 
-  rotate = (angle, speedPercentage = 100) =>
-    this._setAction("START_ROTATE", { angle, speedPercentage });
+  rotate = (angle, speedPercentage = 100) => {
+    this.sequence([{ type: "START_ROTATE", payload: { angle, speedPercentage } }]);
+  }
 
   stop = (source = "AI_REQUEST") => {
     this.robot.destination = null;
@@ -253,13 +254,10 @@ class RobotAPI {
     return this.gameState.events.filter((e) => {
       switch (e.type) {
         case "HIT_BY_PROJECTILE":
-          return e.robotId === this.robot.id;
         case "ENEMY_HIT":
         case "PROJECTILE_HIT_WALL":
         case "PROJECTILE_HIT_OBSTACLE":
           return e.ownerId === this.robot.id;
-        case "MOVE_COMPLETED":
-        case "ROTATION_COMPLETED":
         case "ACTION_STOPPED":
         case "ENEMY_DETECTED":
         case "SEQUENCE_COMPLETED":

@@ -89,8 +89,13 @@ export function processActiveCommands(robots, arena) {
         }
 
         if (command.remainingDistance < 0.1) {
-          robot.commandQueue.shift(); // Rimuovi il comando completato
-          newEvents.push({ type: "MOVE_COMPLETED", robotId: robot.id });
+          robot.commandQueue.shift(); // Rimuovi il comando MOVE completato
+          // Se il prossimo comando è la fine della sequenza, emetti l'evento qui.
+          const nextCommand = robot.commandQueue[0];
+          if (nextCommand && nextCommand.type === "END_SEQUENCE") {
+            newEvents.push({ type: "SEQUENCE_COMPLETED", robotId: robot.id, payload: { lastCommandType: 'MOVE' } });
+            robot.commandQueue.shift(); // Rimuovi anche il comando END_SEQUENCE
+          }
         }
         break;
       }
@@ -130,13 +135,20 @@ export function processActiveCommands(robots, arena) {
         command.remainingAngle -= angleToRotate;
 
         if (command.remainingAngle < 0.1) {
-          robot.commandQueue.shift(); // Rimuovi il comando completato
-          newEvents.push({ type: "ROTATION_COMPLETED", robotId: robot.id });
+          robot.commandQueue.shift(); // Rimuovi il comando ROTATE completato
+          // Se il prossimo comando è la fine della sequenza, emetti l'evento qui.
+          const nextCommand = robot.commandQueue[0];
+          if (nextCommand && nextCommand.type === "END_SEQUENCE") {
+            newEvents.push({ type: "SEQUENCE_COMPLETED", robotId: robot.id, payload: { lastCommandType: 'ROTATE' } });
+            robot.commandQueue.shift(); // Rimuovi anche il comando END_SEQUENCE
+          }
         }
         break;
       }
       case "END_SEQUENCE": {
-        newEvents.push({ type: "SEQUENCE_COMPLETED", robotId: robot.id });
+        // Questo caso si verifica se una sequenza è vuota o se è l'ultimo comando rimasto.
+        // Lo gestiamo come un completamento di sequenza "vuota".
+        newEvents.push({ type: "SEQUENCE_COMPLETED", robotId: robot.id, payload: { lastCommandType: 'EMPTY' } });
         robot.commandQueue.shift(); // Rimuovi il comando completato
         break;
       }

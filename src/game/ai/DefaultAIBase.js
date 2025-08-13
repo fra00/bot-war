@@ -38,6 +38,49 @@ const DefaultAIBase = {
   },
 
   // =================================================================
+  // TRANSIZIONI GLOBALI (Massima Priorità)
+  // =================================================================
+  globalTransitions: [
+    {
+      target: "UNSTUCKING",
+      condition: (api, memory, context, events) =>
+        events.some(
+          (e) => e.type === "ACTION_STOPPED" && e.reason === "COLLISION"
+        ),
+      description: "Collisione con un muro, sbloccarsi è la priorità assoluta.",
+    },
+    {
+      target: "EVADING",
+      condition: (api, memory, context, events) =>
+        events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
+        memory.evasionGraceTicks <= 0,
+      description: "Colpiti da un proiettile, evasione ha la priorità.",
+    },
+    {
+      target: "KITING",
+      condition: function (api, memory, context) {
+        return (
+          context.enemy &&
+          context.enemy.distance < this.config.kitingDistance &&
+          !["KITING", "UNSTUCKING", "EVADING", "FLANKING"].includes(
+            memory.current
+          )
+        );
+      },
+      description: "Nemico troppo vicino, iniziare il kiting.",
+    },
+    {
+      target: "RECHARGING",
+      condition: function (api, memory, context) {
+        return (
+          context.batteryPercent < this.config.rechargeEnterThreshold &&
+          memory.current !== "RECHARGING"
+        );
+      },
+      description: "Batteria scarica, cercare una stazione di ricarica.",
+    },
+  ],
+  // =================================================================
   // MACCHINA A STATI
   // =================================================================
   // La mappa degli stati definisce la logica per ogni stato dell'IA.
@@ -50,13 +93,10 @@ const DefaultAIBase = {
         api.log("Inizio pattugliamento...");
       },
       onExecute(api, memory, events, context) {
-        // Condizione di uscita prioritaria: se vediamo un nemico, attacchiamo.
-        const { enemy } = context;
-        if (enemy) {
-          return "ATTACKING"; // Richiesta di transizione di stato
-        }
+        // La logica di transizione è stata spostata.
+        // Questa funzione ora gestisce solo le azioni continue o di "mantenimento".
 
-        // Se un movimento è terminato, e stavamo inseguendo, puliamo la memoria.
+        // Se un movimento è terminato e stavamo inseguendo, puliamo la memoria.
         if (
           memory.lastKnownEnemyPosition &&
           events.some(
@@ -96,6 +136,13 @@ const DefaultAIBase = {
         // La chiamata a `api.stop()` è ora centralizzata in `setCurrentState`
         // per garantire una pulizia uniforme durante ogni transizione.
       },
+      transitions: [
+        {
+          target: "ATTACKING",
+          condition: (api, memory, context) => context.enemy,
+          description: "Passa ad attaccare se un nemico è visibile.",
+        },
+      ],
     },
 
     // =================================================================
@@ -106,16 +153,20 @@ const DefaultAIBase = {
         api.log("Nemico ingaggiato! Valuto la situazione...");
       },
       onExecute(api, memory, events, context) {
+        // La logica di transizione è stata spostata.
+        // Questa funzione ora gestisce solo le azioni continue dello stato.
         const { enemy } = context;
-        // Condizione di uscita: Nemico perso di vista.
-        if (!enemy) {
-          return "SEARCHING";
-        }
+        if (!enemy) return; // Guardia di sicurezza se il nemico scompare tra i tick
 
         // Azioni continue: Aggiorna la posizione e spara se possibile.
         api.updateMemory({
           lastKnownEnemyPosition: { x: enemy.x, y: enemy.y },
         });
+
+        // Mira sempre al nemico
+        api.aimAt(enemy.x, enemy.y);
+
+        // Spara se la mira è buona e la linea di tiro è libera
         if (
           Math.abs(enemy.angle) < this.config.aimTolerance &&
           api.isLineOfSightClear(enemy)
@@ -123,15 +174,8 @@ const DefaultAIBase = {
           api.fire();
         }
 
-        // Con la nuova logica di `aimAt`, possiamo semplicemente chiamarlo ad ogni tick.
-        // Il sistema si occuperà di correggere la mira in modo efficiente.
-        api.aimAt(enemy.x, enemy.y);
-
-        // La logica di movimento viene eseguita solo se non siamo già impegnati in un'azione.
+        // Logica di azione (non di transizione): se il nemico è troppo lontano, avvicinati.
         if (api.isQueueEmpty()) {
-          // Priorità 1: Linea di tiro bloccata -> Fiancheggia.
-          if (!api.isLineOfSightClear(enemy)) return "FLANKING";
-          // Priorità 3: Troppo lontano -> Avvicinati.
           if (
             enemy.distance >
             this.config.engagementDistance + this.config.engagementBuffer
@@ -141,11 +185,23 @@ const DefaultAIBase = {
           }
         }
       },
-      onExit(api, memory) {
-        // Questo metodo è intenzionalmente vuoto.
-        // La chiamata a `api.stop()` è ora centralizzata in `setCurrentState`
-        // per garantire una pulizia uniforme durante ogni transizione.
-      },
+      onExit(api, memory) {},
+      transitions: [
+        {
+          target: "SEARCHING",
+          condition: (api, memory, context) => !context.enemy,
+          description: "Passa a cercare se il nemico non è più visibile.",
+        },
+        {
+          target: "FLANKING",
+          condition: (api, memory, context) =>
+            context.enemy &&
+            api.isQueueEmpty() &&
+            !api.isLineOfSightClear(context.enemy),
+          description:
+            "Passa a fiancheggiare se la linea di tiro è bloccata e non si sta già muovendo.",
+        },
+      ],
     },
 
     // =================================================================
@@ -153,36 +209,71 @@ const DefaultAIBase = {
     // =================================================================
     KITING: {
       onEnter(api, memory) {
-        api.log("Nemico troppo vicino! Eseguo kiting...");
-        api.move(this.config.kitingMoveDistance); // Arretra per creare distanza.
+        api.log("Nemico troppo vicino! Valuto manovra di kiting...");
+
+        // Controlla se c'è un ostacolo molto vicino dietro
+        if (api.isObstacleAhead(this.config.kitingMoveDistance)) {
+          // Se c'è un ostacolo, non possiamo arretrare. Eseguiamo una manovra evasiva casuale.
+          api.log("Spazio per kiting bloccato, cerco una nuova posizione.");
+          const arena = api.getArenaDimensions();
+          const randomX = Math.random() * arena.width;
+          const randomY = Math.random() * arena.height;
+          api.moveTo(randomX, randomY);
+        } else {
+          // Altrimenti, esegui il kiting standard (arretra)
+          api.log("Eseguo kiting...");
+          api.move(this.config.kitingMoveDistance);
+        }
       },
       onExecute(api, memory, events, context) {
+        // La logica di transizione è stata spostata.
+        // Questa funzione ora gestisce solo le azioni continue dello stato.
         const { enemy } = context;
-        if (!enemy) return "SEARCHING";
-        //if (!api.isLineOfSightClear(enemy)) return "FLANKING";
-        if (
-          enemy.distance >
-          this.config.kitingDistance + this.config.kitingBuffer
-        )
-          return "ATTACKING"; // Ristabilita distanza di sicurezza
+        if (!enemy) return; // Guardia di sicurezza
 
-        // Azioni continue
+        // Azioni continue: mira e spara se possibile
         api.aimAt(enemy.x, enemy.y);
-        if (Math.abs(enemy.angle) < this.config.aimTolerance) api.fire();
-
-        // Se la manovra è finita ma siamo ancora troppo vicini, rientra per muoverti ancora.
         if (
-          events.some(
-            (e) =>
-              e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION"
-          )
+          Math.abs(enemy.angle) < this.config.aimTolerance &&
+          api.isLineOfSightClear(enemy)
         ) {
-          return "KITING";
+          api.fire();
         }
       },
       onExit(api, memory) {
         // La pulizia dello stop è gestita centralmente.
       },
+      transitions: [
+        {
+          target: "ATTACKING",
+          condition: function (api, memory, context) {
+            return (
+              context.enemy &&
+              context.enemy.distance >
+                this.config.kitingDistance + this.config.kitingBuffer
+            );
+          },
+          description:
+            "Torna ad attaccare se la distanza di sicurezza è stata ripristinata.",
+        },
+        {
+          target: "SEARCHING",
+          condition: (api, memory, context) => !context.enemy,
+          description: "Passa a cercare se il nemico non è più visibile.",
+        },
+        {
+          target: "KITING",
+          condition: (api, memory, context, events) =>
+            events.some(
+              (e) =>
+                (e.type === "ACTION_STOPPED" &&
+                  e.source !== "STATE_TRANSITION") ||
+                e.type === "SEQUENCE_COMPLETED"
+            ),
+          description:
+            "Riavvia la manovra di kiting se l'azione è finita ma il nemico è ancora troppo vicino.",
+        },
+      ],
     },
 
     // =================================================================
@@ -193,57 +284,58 @@ const DefaultAIBase = {
         api.log("Inizio manovra di fiancheggiamento...");
       },
       onExecute(api, memory, events, context) {
-        const { enemy } = context;
-        // Condizione di uscita: nemico perso di vista.
-        if (!enemy) {
-          api.log(
-            "Nemico perso durante il fiancheggiamento. Eseguo manovra evasiva."
-          );
-          return "EVADING";
-        }
-
-        // Condizione di uscita: manovra completata.
-        if (
-          events.some((e) => {
-            // La manovra è completata se la sequenza finisce,
-            // o se viene interrotta per una ragione esterna (es. collisione),
-            // ma NON se lo stop è stato causato da una normale transizione di stato.
-            return (
-              e.type === "SEQUENCE_COMPLETED" ||
-              (e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")
-            );
-          })
-        ) {
-          api.log("Manovra di fiancheggiamento completata. Torno a cercare.");
-          return "SEARCHING";
-        }
-
         // Esecuzione: se inattivi, calcola e avvia la manovra.
         if (api.isQueueEmpty()) {
+          const { enemy } = context;
+          if (!enemy) return; // Guardia di sicurezza, la transizione gestirà il cambio stato.
+
           const arena = api.getArenaDimensions();
-          const self = api.getState();
+          const self = api.getState(); // N.B: api.getState() è un metodo dell'API
           const dx = enemy.x - self.x;
           const dy = enemy.y - self.y;
 
           const randomDirection = Math.random() < 0.5 ? 1 : -1;
           const perp_dx = -dy * randomDirection;
           const perp_dy = dx * randomDirection;
-          const len = Math.sqrt(perp_dx * perp_dx + perp_dy * perp_dy) || 1;
-          const targetX = self.x + (perp_dx / len) * this.config.flankDistance;
-          const targetY = self.y + (perp_dy / len) * this.config.flankDistance;
+          const len = Math.sqrt(perp_dx ** 2 + perp_dy ** 2) || 1;
+          // Calcola un punto sul fianco del nemico (orbita) invece che un punto
+          // laterale rispetto alla posizione corrente del bot (strafe).
+          // Questo è più efficace per aggirare gli ostacoli.
+          const targetX = enemy.x + (perp_dx / len) * this.config.flankDistance;
+          const targetY = enemy.y + (perp_dy / len) * this.config.flankDistance;
 
           const clampedX = Math.max(0, Math.min(arena.width, targetX));
           const clampedY = Math.max(0, Math.min(arena.height, targetY));
 
+          // Transizione guidata dall'azione: se moveTo fallisce, cambia stato.
           if (!api.moveTo(clampedX, clampedY)) {
             api.log(
               "Impossibile trovare un percorso di fiancheggiamento. Fallback in evading."
             );
-            return "EVADING";
+            return "EVADING"; // Ritorna il nuovo stato
           }
         }
       },
       onExit(api, memory) {},
+      transitions: [
+        {
+          target: "EVADING",
+          condition: (api, memory, context) => !context.enemy,
+          description:
+            "Nemico perso durante il fiancheggiamento, passa a evasione.",
+        },
+        {
+          target: "SEARCHING",
+          condition: (api, memory, context, events) =>
+            events.some(
+              (e) =>
+                e.type === "SEQUENCE_COMPLETED" ||
+                (e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")
+            ),
+          description:
+            "Manovra di fiancheggiamento completata, torna a cercare.",
+        },
+      ],
     },
 
     // =================================================================
@@ -256,20 +348,10 @@ const DefaultAIBase = {
         // quindi qui ci concentriamo solo sulla logica specifica dello stato.
         api.updateMemory({ evasionGraceTicks: this.config.evasionGracePeriod });
       },
-      onExecute(api, memory, events) {
-        // Condizione di uscita: la manovra è terminata.
-        if (
-          events.some(
-            (e) =>
-              e.type === "SEQUENCE_COMPLETED" ||
-              (e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")
-          )
-        ) {
-          return "SEARCHING"; // Torna a cercare dopo l'evasione.
-        }
-
+      onExecute(api, memory, events, context) {
         // Esecuzione: se inattivi, inizia una nuova manovra.
         if (api.isQueueEmpty()) {
+          // La logica di transizione è stata spostata.
           const obstacles = api.scanObstacles();
           const enemyPos = memory.lastKnownEnemyPosition;
           let coverFoundAndValid = false;
@@ -337,6 +419,18 @@ const DefaultAIBase = {
         api.log("Manovra evasiva terminata.");
         api.updateMemory({ evasionGraceTicks: 0 }); // Resetta il periodo di grazia.
       },
+      transitions: [
+        {
+          target: "SEARCHING",
+          condition: (api, memory, context, events) =>
+            events.some(
+              (e) =>
+                e.type === "SEQUENCE_COMPLETED" ||
+                (e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")
+            ),
+          description: "Manovra evasiva completata, torna a cercare.",
+        },
+      ],
     },
 
     // =================================================================
@@ -359,23 +453,24 @@ const DefaultAIBase = {
           { type: "START_ROTATE", payload: { angle: randomAngle } },
         ]);
       },
-      onExecute(api, memory, events) {
-        // Condizione di uscita: la manovra è completata.
-        if (
-          events.some(
-            (e) =>
-              e.type === "SEQUENCE_COMPLETED" ||
-              (e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")
-          )
-        ) {
-          return "SEARCHING";
-        }
+      onExecute(api, memory, events, context) {
+        // La logica è tutta in onEnter e nelle transizioni.
       },
       onExit(api, memory) {
         api.log("Manovra di sblocco completata.");
-        // Non è necessario uno stop qui perché la sequenza è finita,
-        // ma lo lasciamo per coerenza se lo stato viene interrotto.
       },
+      transitions: [
+        {
+          target: "SEARCHING",
+          condition: (api, memory, context, events) =>
+            events.some(
+              (e) =>
+                e.type === "SEQUENCE_COMPLETED" ||
+                (e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")
+            ),
+          description: "Manovra di sblocco completata, torna a cercare.",
+        },
+      ],
     },
 
     // =================================================================
@@ -388,11 +483,6 @@ const DefaultAIBase = {
         api.updateMemory({ isMovingToRecharge: false });
       },
       onExecute(api, memory, events, context) {
-        // Condizione di uscita: batteria sufficientemente carica.
-        if (context.batteryPercent >= this.config.rechargeExitThreshold) {
-          return "SEARCHING";
-        }
-
         // Se abbiamo completato un movimento, siamo arrivati a destinazione.
         if (events.some((e) => e.type === "SEQUENCE_COMPLETED")) {
           api.log("Arrivato al punto di ricarica. Controllo sicurezza...");
@@ -467,6 +557,15 @@ const DefaultAIBase = {
         // Pulisci lo stato specifico della ricarica.
         api.updateMemory({ isMovingToRecharge: false });
       },
+      transitions: [
+        {
+          target: "SEARCHING",
+          condition: function (api, memory, context) {
+            return context.batteryPercent >= this.config.rechargeExitThreshold;
+          },
+          description: "Batteria carica, torna a cercare.",
+        },
+      ],
     },
   },
 
@@ -528,63 +627,44 @@ const DefaultAIBase = {
     const battery = api.getBatteryState();
     const batteryPercent = (battery.energy / battery.maxEnergy) * 100;
 
-    // 1. Collisione con un muro: priorità assoluta per sbloccarsi.
-    if (
-      events.some(
-        (e) => e.type === "ACTION_STOPPED" && e.reason === "COLLISION"
-      )
-    ) {
-      this.setCurrentState("UNSTUCKING", api);
-      return;
-    }
+    // --- NUOVO FLUSSO DI CONTROLLO ---
+    const context = { enemy, batteryPercent, config: this.config };
 
-    // 2. Colpiti da un proiettile: priorità alla sopravvivenza.
-    if (
-      events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
-      memory.evasionGraceTicks <= 0
-    ) {
-      this.setCurrentState("EVADING", api);
-      return;
-    }
-
-    // 3. Kiting: se un nemico è troppo vicino, mantieni le distanze.
-    // Questa è una transizione globale che può interrompere altri stati.
-    if (
-      enemy &&
-      enemy.distance < this.config.kitingDistance &&
-      !["KITING", "UNSTUCKING"].includes(memory.current)
-    ) {
-      this.setCurrentState("KITING", api);
-      return;
-    }
-
-    // 4. Ricarica: se la batteria è scarica, cerca un posto sicuro.
-    if (
-      batteryPercent < this.config.rechargeEnterThreshold &&
-      memory.current !== "RECHARGING"
-    ) {
-      this.setCurrentState("RECHARGING", api);
-      return;
+    // 1. Controlla le transizioni GLOBALI in ordine di priorità
+    for (const transition of this.globalTransitions) {
+      if (transition.condition.call(this, api, memory, context, events)) {
+        this.setCurrentState(transition.target, api);
+        return; // Transizione avvenuta, fine del tick.
+      }
     }
 
     // ---
     const currentStateName = memory.current;
     const currentState = this.states[currentStateName];
 
-    // Se lo stato corrente è gestito dal nuovo pattern Enter/Execute/Exit
-    if (currentState) {
-      // Passiamo un contesto con dati calcolati una sola volta per tick.
-      const context = { enemy, batteryPercent, config: this.config };
-      const nextStateName = currentState.onExecute?.call(
+    // 2. Se nessuna transizione globale è scattata, controlla le transizioni LOCALI dello stato corrente
+    if (currentState && currentState.transitions) {
+      for (const transition of currentState.transitions) {
+        if (transition.condition.call(this, api, memory, context, events)) {
+          this.setCurrentState(transition.target, api);
+          return; // Transizione avvenuta, fine del tick.
+        }
+      }
+    }
+
+    // 3. Se NESSUNA transizione è scattata, esegui la logica `onExecute` dello stato corrente
+    if (currentState && currentState.onExecute) {
+      // Reintroduciamo la possibilità per onExecute di ritornare uno stato per gestire transizioni guidate da azioni.
+      const nextStateName = currentState.onExecute.call(
         this,
         api,
         memory,
         events,
         context
       );
-
       if (nextStateName && nextStateName !== currentStateName) {
         this.setCurrentState(nextStateName, api);
+        return; // Transizione avvenuta, fine del tick.
       }
     }
   },
