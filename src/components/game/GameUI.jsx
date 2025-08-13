@@ -60,6 +60,7 @@ const GameUI = ({
   onSettingsModalOpen,
   onSettingsModalClose,
   onTutorialModalOpen,
+  onLLMGuideOpen,
   onBotSettingsOpen,
 }) => {
   // Effetto per aprire il modale di fine partita
@@ -243,6 +244,16 @@ const GameUI = ({
           >
             Tutorial
           </Button>
+          <Button
+            onClick={() => {
+              onLLMGuideOpen();
+              onSettingsModalClose();
+            }}
+            className="w-full"
+            size="large"
+          >
+            Guida LLM
+          </Button>
         </div>
         <CardFooter>
           <Button onClick={onSettingsModalClose} variant="secondary" className="w-full">
@@ -317,6 +328,8 @@ GameUI.propTypes = {
   onSettingsModalClose: PropTypes.func.isRequired,
   /** Funzione per aprire la modale del tutorial. */
   onTutorialModalOpen: PropTypes.func.isRequired,
+  /** Funzione per aprire la modale della guida LLM. */
+  onLLMGuideOpen: PropTypes.func.isRequired,
   onBotSettingsOpen: PropTypes.func,
 };
 

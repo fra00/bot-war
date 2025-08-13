@@ -5,6 +5,7 @@ import DefaultAI from "../../game/ai/DefaultAIBase";
 import useDisclosure from "../ui/useDisclosure";
 import ApiDocsModal from "../docs/ApiDocsModal";
 import TutorialModal from "../docs/TutorialModal";
+import LLMGuideModal from "../docs/LLMGuideModal";
 import { compileAI } from "../../game/ai/compiler";
 import { useAIScripts } from "../../hooks/useAIScripts";
 import { useTutorial } from "../../hooks/useTutorial";
@@ -46,6 +47,11 @@ const EditorAndArena = ({ onNavigateBack }) => {
     isOpen: isSettingsModalOpen,
     onOpen: onSettingsModalOpen,
     onClose: onSettingsModalClose,
+  } = useDisclosure();
+  const {
+    isOpen: isLLMGuideOpen,
+    onOpen: onLLMGuideOpen,
+    onClose: onLLMGuideClose,
   } = useDisclosure();
   const {
     isOpen: isLogoutModalOpen,
@@ -446,6 +452,7 @@ const EditorAndArena = ({ onNavigateBack }) => {
                 onSettingsModalOpen={handleSettingsModalOpenWithTutorial}
                 onSettingsModalClose={onSettingsModalClose}
                 onTutorialModalOpen={onTutorialModalOpen}
+                onLLMGuideOpen={onLLMGuideOpen}
                 onBotSettingsOpen={handleBotSettingsOpenWithTutorial}
                 onNavigateBack={onNavigateBack}
               />
@@ -458,6 +465,7 @@ const EditorAndArena = ({ onNavigateBack }) => {
         isOpen={isTutorialModalOpen}
         onClose={onTutorialModalClose}
       />
+      <LLMGuideModal isOpen={isLLMGuideOpen} onClose={onLLMGuideClose} />
       {isTutorialActive && (
         <InteractiveTutorial
           step={currentStep}

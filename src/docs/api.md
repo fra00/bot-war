@@ -1,10 +1,10 @@
-API di Controllo del Bot (v3)
+API di Controllo del Bot (v4)
 
 Questa documentazione descrive l'API aggiornata per programmare il tuo robot. Il sistema di controllo è asincrono, basato su eventi e ora include una coda di comandi per semplificare la programmazione di sequenze di azioni.
 
 ---
 
-## Concetti Fondamentali
+## Concetti Fondamentali: La Coda di Comandi
 
 Coda di Comandi (Command Queue)
 
@@ -27,61 +27,507 @@ Nonostante la coda di comandi semplifichi le sequenze, la logica reattiva è anc
 
 ---
 
-## Architettura dell'IA: La Macchina a Stati
+## Architettura dell'IA: Macchina a Stati Dichiarativa (Consigliata)
 
 Per creare un'IA robusta, il nostro `DefaultAIBase.js` implementa una **Macchina a Stati** con un ciclo di vita definito per ogni stato. Questo pattern è il modo consigliato per strutturare la tua logica.
 
-### Il Pattern `Enter/Execute/Exit`
+### Il Flusso Decisionale
 
-Ogni stato è un oggetto con tre metodi opzionali che ne definiscono il comportamento:
+Ad ogni tick, il motore dell'IA segue una gerarchia di priorità per decidere cosa fare:
 
-- **`onEnter(api, memory)`**: Viene eseguito **una sola volta** quando si entra nello stato. È il posto ideale per le azioni di setup, come avviare un movimento o resettare un valore in memoria.
-- **`onExecute(api, memory, events)`**: Viene eseguito ad **ogni tick** in cui lo stato è attivo. Il suo scopo è monitorare la situazione (es. `api.scan()`) e decidere se è necessario passare a un altro stato. Per richiedere una transizione, deve **restituire una stringa** con il nome del nuovo stato (es. `return "ATTACKING";`).
-- **`onExit(api, memory)`**: Viene eseguito **una sola volta** quando si sta per lasciare lo stato. È usato per azioni di pulizia, come resettare flag specifici dello stato in memoria.
+1.  **Transizioni Globali**: Vengono controllate per prime. Sono condizioni di emergenza o ad alta priorità (es. collisione, batteria scarica) che possono interrompere qualsiasi stato.
+2.  **Transizioni Locali**: Se nessuna transizione globale è valida, vengono controllate le transizioni specifiche dello stato corrente. Queste definiscono le regole per uscire da quello stato (es. da `ATTACKING` a `SEARCHING` se il nemico sparisce).
+3.  **Azione di Stato (`onExecute`)**: Se nessuna transizione (globale o locale) è valida, il bot rimane nello stato corrente ed esegue la logica definita in `onExecute`, che si occupa delle azioni continue (es. mirare, sparare, muoversi).
 
-### Il Motore della Macchina a Stati
+### Struttura di uno Stato
 
-Il cuore del sistema è la funzione `run`, che agisce come un "motore", e la funzione `setCurrentState`, che gestisce le transizioni.
+Ogni stato è un oggetto che può contenere:
 
-1.  **`run`**: Ad ogni tick, esegue i controlli globali (es. batteria scarica, collisioni) e poi chiama `onExecute` dello stato corrente. Se `onExecute` restituisce un nuovo nome di stato, `run` chiama `setCurrentState`.
-2.  **`setCurrentState(newState, api)`**: Questa funzione è il centro di controllo delle transizioni:
-    - Chiama `onExit()` del vecchio stato.
-    - Chiama `api.stop("STATE_TRANSITION")` per interrompere qualsiasi azione in corso e pulire la coda di comandi.
-    - Aggiorna lo stato in memoria (`memory.current = newState`).
-    - Chiama `onEnter()` del nuovo stato.
+- **`onEnter(api, memory, context)`**: Eseguito **una sola volta** all'ingresso. Ideale per avviare un'azione (es. `api.move()`).
+- **`onExecute(api, memory, events, context)`**: Eseguito **ad ogni tick**. Contiene le azioni continue dello stato (es. `api.aimAt()`).
+- **`onExit(api, memory)`**: Eseguito **una sola volta** all'uscita. Utile per la pulizia.
+- **`transitions` (Array)**: Un array di oggetti che definisce le possibili uscite dallo stato, ordinate per priorità. Ogni oggetto ha la forma:
+  ```javascript
+  {
+    target: 'NOME_STATO_DESTINAZIONE',
+    condition: (api, memory, context, events) => { /* ... logica ... */ return true; },
+    description: 'Descrizione testuale della transizione'
+  }
+  ```
 
-### Gestire le Transizioni e gli Eventi: Il Caso `ACTION_STOPPED`
-
-Un punto cruciale è la gestione dell'evento `ACTION_STOPPED`. Poiché `setCurrentState` chiama `api.stop()` ad ogni transizione, viene generato un evento `{ type: "ACTION_STOPPED", source: "STATE_TRANSITION" }`.
-
-Nel tick successivo, il nuovo stato leggerà questo evento. Se non viene gestito correttamente, potrebbe pensare che una *sua* azione sia terminata e uscire prematuramente.
-
-**La soluzione corretta** è filtrare questa `source` specifica:
+### Esempio Pratico: `SEARCHING` con la Nuova Architettura
 
 ```javascript
-// Esempio di condizione di uscita corretta in onExecute
-if (events.some(e => e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")) {
-  // Un'azione è stata interrotta per una ragione esterna (es. collisione)
-  // o si è completata. È sicuro procedere.
-  return "SEARCHING";
-}
+// all'interno di states: { ... }
+SEARCHING: {
+  onEnter: (api, memory) => {
+    api.log("Inizio pattugliamento...");
+  },
+  onExecute: (api, memory, events, context) => {
+    // Se un movimento è terminato e stavamo inseguendo, puliamo la memoria.
+    if (
+      memory.lastKnownEnemyPosition &&
+      events.some(
+        (e) =>
+          e.type === "SEQUENCE_COMPLETED" ||
+          (e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")
+      )
+    ) {
+      api.updateMemory({ lastKnownEnemyPosition: null });
+    }
+
+    // Se il bot è inattivo, decide la prossima mossa.
+    if (api.isQueueEmpty()) {
+      if (memory.lastKnownEnemyPosition) {
+        api.moveTo(memory.lastKnownEnemyPosition.x, memory.lastKnownEnemyPosition.y);
+      } else {
+        const arena = api.getArenaDimensions();
+        api.moveTo(Math.random() * arena.width, Math.random() * arena.height);
+      }
+    }
+  },
+  transitions: [
+    {
+      target: 'ATTACKING',
+      condition: (api, memory, context) => context.enemy,
+      description: "Passa ad attaccare se un nemico è visibile."
+    }
+  ]
+},
 ```
 
-### Esempio Pratico: `SEARCHING`
+In questo esempio:
+- La transizione a `ATTACKING` è definita in modo chiaro e separato.
+- `onExecute` si occupa solo della logica di pattugliamento quando il bot è inattivo.
 
-Nello stato `SEARCHING`, la logica di decidere dove andare è in `onExecute`, perché deve essere rivalutata ogni volta che il bot è inattivo. L'esempio seguente è più robusto di quello base.
+---
+
+## Comandi di Movimento e Navigazione
+
+Questi comandi vengono aggiunti alla coda di comandi del robot.
+
+api.move(distance, speedPercentage)
+
+    Accoda un'azione di movimento per una distanza specifica.
+
+    Parametri:
+    - `distance` (number): La distanza in pixel da percorrere. Un valore negativo indica un movimento all'indietro.
+    - `speedPercentage` (number, opzionale, default: 100): La percentuale della velocità massima da usare (da -100 a 100).
+
+    Comportamento:
+    - L'azione viene aggiunta alla coda. Al termine del movimento, viene generato un evento `SEQUENCE_COMPLETED`.
+    - Può essere interrotta da `api.stop()`, collisioni o mancanza di energia, generando un evento `ACTION_STOPPED`.
+
+    Esempio:
+    // Accoda un movimento in avanti di 200 pixel, poi uno indietro di 50.
+    api.sequence([
+      { type: 'START_MOVE', payload: { distance: 200, speedPercentage: 75 } },
+      { type: 'START_MOVE', payload: { distance: -50, speedPercentage: 100 } }
+    ]);
+
+api.rotate(angle, speedPercentage)
+
+    Accoda un'azione di rotazione di un angolo specifico.
+
+    Parametri:
+    - `angle` (number): L'angolo in gradi di cui ruotare. Positivo per senso orario (destra), negativo per antiorario (sinistra).
+    - `speedPercentage` (number, opzionale, default: 100): La percentuale della velocità di rotazione massima.
+
+    Comportamento:
+    - L'azione viene aggiunta alla coda. Al termine, genera un evento `SEQUENCE_COMPLETED`.
+
+    Esempio:
+    // Accoda una rotazione a sinistra di 90 gradi.
+    api.rotate(-90);
+
+api.moveTo(x, y, speedPercentage)
+
+    Comando di alto livello che calcola un percorso per raggiungere le coordinate specificate e accoda i comandi necessari.
+
+    Parametri:
+    - `x` (number): La coordinata X di destinazione.
+    - `y` (number): La coordinata Y di destinazione.
+    - `speedPercentage` (number, opzionale, default: 100): La velocità da usare per i movimenti.
+
+    Comportamento:
+    - Utilizza un algoritmo di pathfinding (A*) per trovare il percorso più breve fino al punto (x, y), aggirando gli ostacoli.
+    - Se un percorso viene trovato, il comando accoda automaticamente una sequenza di comandi `rotate` e `move` per seguirlo.
+
+    Esempio:
+    // Calcola un percorso per il centro dell'arena e accoda i movimenti.
+    const arena = api.getArenaDimensions();
+    api.moveTo(arena.width / 2, arena.height / 2);
+
+api.stop()
+
+    Interrompe immediatamente il comando in esecuzione e svuota l'intera coda di comandi. Questa è un'azione istantanea.
+
+    Comportamento:
+    - Se un comando era attivo, viene interrotto e viene generato un evento `ACTION_STOPPED` con una `source` specifica.
+    - Tutta la `commandQueue` viene cancellata. Qualsiasi azione pianificata viene annullata.
+    - È il comando principale per implementare una logica reattiva.
+
+    **Nota:** La chiamata a `stop()` accetta un parametro opzionale `source` (stringa) per identificare chi ha richiesto lo stop. Il motore della macchina a stati usa `"STATE_TRANSITION"`.
+
+    Esempio:
+    // Se vieni colpito mentre ti muovi, annulla tutto e fermati.
+    const events = api.getEvents();
+    if (events.some(e => e.type === 'HIT_BY_PROJECTILE')) {
+      api.stop();
+      // Ora la coda è vuota, puoi pianificare una manovra evasiva.
+    }
+
+api.sequence(actions)
+
+    Accoda una serie di comandi personalizzati che verranno eseguiti in sequenza.
+    Questo è un comando avanzato per creare catene di azioni complesse.
+
+    Parametri:
+    - `actions` (Array<Object>): Un array di oggetti azione, dove ogni oggetto ha la forma `{ type: string, payload: any }`. I tipi e i payload devono corrispondere a quelli usati internamente (es. `{ type: 'START_MOVE', payload: { distance: 100 } }`).
+
+    Comportamento:
+    - Le azioni vengono aggiunte alla coda di comandi.
+    - Al termine dell'intera sequenza, viene generato un evento `SEQUENCE_COMPLETED`.
+
+    Esempio:
+    // Accoda una sequenza per muoversi a zig-zag
+    const zigZag = [
+      { type: 'START_ROTATE', payload: { angle: 45 } },
+      { type: 'START_MOVE', payload: { distance: 100 } },
+      { type: 'START_ROTATE', payload: { angle: -90 } },
+      { type: 'START_MOVE', payload: { distance: 100 } },
+    ];
+    api.sequence(zigZag);
+
+---
+
+## Azioni di Debug
+
+api.log(...args)
+
+    Registra un messaggio o un oggetto nel pannello di log del bot per il debug. Questa è un'azione istantanea.
+
+    Parametri:
+    - `...args` (any): Una serie di argomenti (stringhe, numeri, oggetti) da registrare. Gli oggetti verranno convertiti in stringhe JSON.
+
+    Esempio:
+    api.log("Stato attuale:", api.getMemory().current);
+    const enemy = api.scan();
+    if (enemy) {
+      api.log("Nemico trovato a distanza:", enemy.distance);
+    }
+
+---
+
+## Comandi di Combattimento e Mira
+
+Questi comandi gestiscono le capacità offensive del bot. `fire` è un'azione istantanea, mentre `aimAt` avvia e mantiene un'azione di mira che richiede tempo per essere completata.
+
+api.aimAt(x, y, speedPercentage)
+
+    Comando "continuo" per mirare a una destinazione. Se chiamato ad ogni tick, il bot correggerà la sua mira verso il bersaglio.
+
+    Parametri:
+    - `x` (number): La coordinata X del bersaglio.
+    - `y` (number): La coordinata Y del bersaglio.
+    - `speedPercentage` (number, opzionale, default: 100): La velocità di rotazione.
+
+    Comportamento:
+    - Questo comando è **dichiarativo**. Ad ogni tick, l'IA dovrebbe semplicemente dichiarare "voglio puntare qui".
+    - Il motore di gioco si occupa di avviare, continuare o correggere la rotazione in modo efficiente.
+    - Questo elimina la necessità di controllare `isQueueEmpty` prima di mirare e di attendere l'evento di completamento.
+
+    Esempio di utilizzo corretto:
+    // Nello stato ATTACKING, ad ogni tick:
+    const target = api.scan();
+    if (target) {
+      // 1. Dichiara l'intento di mirare. Il motore gestisce la rotazione.
+      api.aimAt(target.x, target.y);
+      // 2. Controlla se la mira è già allineata e spara.
+      if (Math.abs(target.angle) < 5) {
+        api.fire();
+      }
+    }
+
+api.fire()
+
+    Spara un proiettile nella direzione attuale. Questa è un'azione istantanea.
+
+    Comportamento:
+    - Viene eseguita immediatamente nel tick in cui viene chiamata.
+    - Non viene aggiunta alla coda di comandi e non interrompe l'azione in corso (es. un movimento).
+    - Ha un costo in energia e un tempo di ricarica (cooldown). Se non hai abbastanza energia o il cannone è in ricarica, l'azione fallisce silenziosamente.
+
+    Esempio:
+    // Spara mentre ti stai muovendo lateralmente.
+    // La coda di comandi potrebbe contenere un'azione 'move'.
+    // Se la linea di tiro è libera, spara.
+    if (api.isLineOfSightClear(enemyPosition)) {
+      api.fire();
+    }
+
+---
+
+## Percezione e Stato
+
+Queste funzioni forniscono informazioni immediate sullo stato del robot e dell'ambiente. Non interagiscono con la coda di comandi e restituiscono sempre lo stato del tick corrente.
+
+api.scan()
+
+    Restituisce il risultato dell'ultima scansione radar eseguita dal motore di gioco. Questa è un'azione istantanea e non consuma energia.
+
+    Valore di ritorno:
+    - Un oggetto `{ distance, angle, x, y }` se il nemico è nel raggio del radar.
+      - `distance` (number): Distanza in linea d'aria dal nemico.
+      - `angle` (number): Angolo relativo al nemico in gradi (da -180 a 180). `0` è la direzione in cui il tuo robot sta puntando. Un valore negativo è a sinistra, uno positivo a destra.
+      - `x` (number): Coordinata X stimata del nemico.
+      - `y` (number): Coordinata Y stimata del nemico.
+    - `null` se il nemico non viene rilevato.
+
+api.scanObstacles()
+
+    Restituisce una lista di ostacoli all'interno del raggio del radar. Questa è un'azione istantanea.
+
+    Valore di ritorno:
+    - Un array di oggetti, dove ogni oggetto rappresenta un ostacolo rilevato. Gli ostacoli sono ordinati dal più vicino al più lontano.
+      - `id` (string): ID univoco dell'ostacolo.
+      - `x`, `y`, `width`, `height` (number): Posizione e dimensioni dell'ostacolo.
+      - `distance` (number): Distanza dal centro del tuo robot al centro dell'ostacolo.
+      - `angle` (number): Angolo relativo al centro dell'ostacolo (0-360).
+    - Un array vuoto `[]` se non vengono rilevati ostacoli.
+
+api.getState()
+
+    Restituisce lo stato attuale e istantaneo del tuo robot.
+
+    Valore di ritorno: Un oggetto con le seguenti proprietà:
+    - `x` (number): Coordinata X.
+    - `y` (number): Coordinata Y.
+    - `rotation` (number): Angolo di rotazione attuale (0-360).
+    - `hp` (number): Punti vita totali (scafo + armatura).
+    - `energy` (number): Energia rimanente.
+
+api.getHullState()
+
+    Restituisce lo stato attuale dello scafo del robot.
+
+    Valore di ritorno: Un oggetto `{ hp: number, maxHp: number }`.
+
+api.getArmorState()
+
+    Restituisce lo stato attuale dell'armatura del robot.
+
+    Valore di ritorno: Un oggetto `{ hp: number, maxHp: number }`.
+
+api.getBatteryState()
+
+    Restituisce lo stato attuale della batteria del robot.
+
+    Valore di ritorno: Un oggetto `{ energy: number, maxEnergy: number }`.
+
+    **Nota sulla Ricarica:** L'energia si ricarica passivamente ad ogni tick del gioco. La quantità di ricarica è definita dalla proprietà `rechargeRate` del componente batteria equipaggiato. Se il consumo di energia dovuto alle azioni (movimento, fuoco, etc.) è inferiore alla ricarica passiva, l'energia totale del bot aumenterà.
+
+api.getArenaDimensions()
+
+    Restituisce le dimensioni e gli ostacoli dell'arena.
+
+api.isObstacleAhead(probeDistance)
+
+    Controlla la presenza di un ostacolo (muro o oggetto) molto vicino nella direzione di movimento attuale.
+
+    Parametri:
+    - `probeDistance` (number, opzionale, default: 30): La distanza in pixel davanti al robot da controllare.
+
+api.isLineOfSightClear(targetPosition)
+
+    Verifica se c'è una linea di tiro libera da ostacoli tra il tuo robot e una posizione.
+
+api.isPositionValid(position)
+
+    Controlla se una data coordinata del mondo è una posizione valida per il centro del tuo robot (cioè, non dentro un muro o un ostacolo).
+
+    Parametri:
+    - `position` (Object): Un oggetto con coordinate `{ x, y }`.
+
+api.isQueueEmpty()
+
+    Controlla se la coda di comandi del robot è vuota.
+
+    Valore di ritorno:
+    - `true` se non ci sono comandi in coda o in esecuzione.
+    - `false` se c'è almeno un comando in attesa o in esecuzione.
+
+    Comportamento:
+    - Questa funzione è il modo preferito per verificare se il robot è "occupato" con una sequenza di azioni. Sostituisce la necessità di gestire manualmente un flag di stato come `isQueueBusy`.
+
+    Esempio:
+    if (api.isQueueEmpty()) {
+      // La coda è libera, posso pianificare una nuova sequenza di azioni.
+      api.moveTo(100, 100);
+    }
+
+---
+
+## Sistema di Eventi
+
+La logica reattiva si basa sul controllo degli eventi generati ad ogni tick.
+
+api.getEvents()
+
+    Restituisce un array di eventi accaduti nell'ultimo tick che riguardano il tuo robot.
+
+    Tipi di Evento Principali:
+    - `SEQUENCE_COMPLETED`: Una sequenza di azioni (da `moveTo`, `move`, `rotate` o `sequence`) è terminata con successo. Contiene un `payload` per identificare l'ultimo tipo di comando: `{ payload: { lastCommandType: 'MOVE' | 'ROTATE' | 'EMPTY' } }`.
+    - `ACTION_STOPPED`: Un comando nella coda è stato interrotto. Motivi: `USER_COMMAND`, `COLLISION`, `NO_ENERGY`. Contiene una `source` per identificare la causa (`"STATE_TRANSITION"`, `"AI_REQUEST"`, `"ENGINE"`).
+    - `HIT_BY_PROJECTILE`: Il tuo robot è stato colpito da un proiettile nemico.
+    - `ENEMY_HIT`: Un tuo proiettile ha colpito il bersaglio nemico.
+    - `PROJECTILE_HIT_WALL`: Un tuo proiettile ha colpito un muro dell'arena.
+    - `PROJECTILE_HIT_OBSTACLE`: Un tuo proiettile ha colpito un ostacolo.
+    - `ENEMY_DETECTED`: Il radar ha rilevato un nemico che non era visibile nel tick precedente. Contiene i dati del bersaglio.
+
+## La Struttura di Base
+
+Ogni IA è un oggetto JavaScript che deve esportare una funzione `run(api)`. Il modo consigliato per strutturare la tua IA è usare il pattern a stati dichiarativo descritto sopra.
+
+Ecco uno scheletro di partenza che puoi copiare nell'editor:
 
 ```javascript
-// In states.SEARCHING
-onExecute: (api, memory, events) => {
-  // Condizione di uscita prioritaria: se vediamo un nemico, attacchiamo.
-  const potentialTarget = api.scan();
-  if (potentialTarget) {
-    return "ATTACKING";
-  }
+({
+  // =================================================================
+  // CONFIGURAZIONE IA
+  // =================================================================
+  config: {
+    // Inserisci qui i tuoi parametri di configurazione
+    engagementDistance: 250,
+    kitingDistance: 150,
+    rechargeEnterThreshold: 30,
+    evasionGracePeriod: 120,
+  },
 
-  // Se un movimento è terminato (perché siamo arrivati o per una collisione),
-  // e stavamo inseguendo il nemico, puliamo la memoria per non rimanere bloccati.
+  // =================================================================
+  // TRANSIZIONI GLOBALI (Massima Priorità)
+  // =================================================================
+  globalTransitions: [
+    {
+      target: 'EVADING',
+      condition: (api, memory, context, events) =>
+        events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
+        memory.evasionGraceTicks <= 0,
+      description: "Colpiti da un proiettile, evasione ha la priorità.",
+    },
+    // Aggiungi qui altre transizioni globali (es. per collisioni, batteria, etc.)
+  ],
+
+  // =================================================================
+  // MACCHINA A STATI
+  // =================================================================
+  states: {
+    SEARCHING: {
+      onEnter: (api, memory) => {
+        api.log("Inizio pattugliamento...");
+      },
+      onExecute: (api, memory, events, context) => {
+        if (
+          memory.lastKnownEnemyPosition &&
+          events.some(
+            (e) =>
+              e.type === "SEQUENCE_COMPLETED" ||
+              (e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")
+          )
+        ) {
+          api.updateMemory({ lastKnownEnemyPosition: null });
+        }
+        if (api.isQueueEmpty()) {
+          if (memory.lastKnownEnemyPosition) {
+            api.moveTo(
+              memory.lastKnownEnemyPosition.x,
+              memory.lastKnownEnemyPosition.y
+            );
+          } else {
+            const arena = api.getArenaDimensions();
+            api.moveTo(
+              Math.random() * arena.width,
+              Math.random() * arena.height
+            );
+          }
+        }
+      },
+      transitions: [
+        {
+          target: "ATTACKING",
+          condition: (api, memory, context) => context.enemy,
+          description: "Passa ad attaccare se un nemico è visibile.",
+        },
+      ],
+    },
+    // Aggiungi qui altri stati...
+  },
+
+  setCurrentState: function (newState, api, context = {}) {
+    const memory = api.getMemory();
+    const oldState = memory.current;
+    if (oldState !== newState) {
+      if (oldState && this.states[oldState]?.onExit) {
+        this.states[oldState].onExit.call(this, api, memory);
+      }
+      api.stop("STATE_TRANSITION");
+      api.log(`Stato: ${oldState || "undefined"} -> ${newState}`);
+      api.updateMemory({ current: newState });
+      if (this.states[newState]?.onEnter) {
+        this.states[newState].onEnter.call(this, api, memory, context);
+      }
+    }
+  },
+
+  run: function (api) {
+    const memory = api.getMemory();
+    if (typeof memory.current === "undefined") {
+      api.updateMemory({
+        lastKnownEnemyPosition: null,
+        isMovingToRecharge: false,
+        evasionGraceTicks: 0,
+      });
+      this.setCurrentState("SEARCHING", api);
+      return;
+    }
+
+    if (memory.evasionGraceTicks > 0) {
+      api.updateMemory({ evasionGraceTicks: memory.evasionGraceTicks - 1 });
+    }
+
+    const events = api.getEvents();
+    const enemy = api.scan();
+    const battery = api.getBatteryState();
+    const batteryPercent = (battery.energy / battery.maxEnergy) * 100;
+    const context = { enemy, batteryPercent, config: this.config };
+
+    for (const transition of this.globalTransitions) {
+      if (transition.condition.call(this, api, memory, context, events)) {
+        this.setCurrentState(transition.target, api, context);
+        return;
+      }
+    }
+
+    const currentState = this.states[memory.current];
+    if (currentState?.transitions) {
+      for (const transition of currentState.transitions) {
+        if (transition.condition.call(this, api, memory, context, events)) {
+          this.setCurrentState(transition.target, api, context);
+          return;
+        }
+      }
+    }
+
+    if (currentState?.onExecute) {
+      const nextStateName = currentState.onExecute.call(this, api, memory, events, context);
+      if (nextStateName && nextStateName !== memory.current) {
+        this.setCurrentState(nextStateName, api, context);
+        return;
+      }
+    }
+  },
+});
+```
   if (
     memory.lastKnownEnemyPosition &&
     events.some(
@@ -336,27 +782,6 @@ api.getBatteryState()
 api.getArenaDimensions()
 
     Restituisce le dimensioni e gli ostacoli dell'arena.
-
-api.isObstacleAhead(probeDistance)
-
-    Controlla la presenza di un ostacolo (muro o oggetto) molto vicino nella direzione di movimento attuale.
-
-    Parametri:
-    - `probeDistance` (number, opzionale, default: 30): La distanza in pixel davanti al robot da controllare.
-
-api.isObstacleAhead(probeDistance)
-
-    Controlla la presenza di un ostacolo (muro o oggetto) molto vicino nella direzione di movimento attuale.
-
-    Parametri:
-    - `probeDistance` (number, opzionale, default: 30): La distanza in pixel davanti al robot da controllare.
-
-api.isObstacleAhead(probeDistance)
-
-    Controlla la presenza di un ostacolo (muro o oggetto) molto vicino nella direzione di movimento attuale.
-
-    Parametri:
-    - `probeDistance` (number, opzionale, default: 30): La distanza in pixel davanti al robot da controllare.
 
 api.isObstacleAhead(probeDistance)
 

@@ -1,20 +1,50 @@
-# Tutorial: Creare il Tuo Primo Bot
+----
+## Tutorial: Creare il Tuo Primo Bot
 
-Benvenuto! Questo tutorial ti guiderà passo dopo passo nella creazione di un'intelligenza artificiale (IA) per il tuo primo robot. Imparerai a implementare una logica di base che permette al tuo bot di cercare il nemico, attaccarlo quando lo trova e tentare di schivare i colpi.
+Benvenuto! Questo tutorial ti guiderà passo dopo passo nella creazione di un'intelligenza artificiale (IA) per il tuo primo robot. Imparerai a implementare una logica di base che permette al tuo bot di cercare il nemico, attaccarlo quando lo trova e schivare i colpi.
 
-Utilizzeremo i concetti fondamentali dell'API, come la **coda di comandi**, gli **eventi** e l'architettura a **macchina a stati** basata sul pattern `Enter/Execute/Exit`.
+Utilizzeremo i concetti fondamentali dell'API, come la **coda di comandi**, gli **eventi** e l'architettura a **macchina a stati dichiarativa**.
 
 ---
 
 ## Passo 1: La Struttura di Base (Il "Motore" dell'IA)
 
-Ogni IA è un oggetto JavaScript che deve avere una funzione `run(api)`. Il modo migliore per organizzare la logica è usare una mappa di stati.
+Ogni IA è un oggetto JavaScript che deve avere una funzione `run(api)`. Il modo migliore per organizzare la logica è usare una macchina a stati.
 
-Copia questo scheletro nell'editor. Definisce la struttura base con una mappa `states` e una funzione `run` che agisce come motore della nostra macchina a stati. Contiene anche la funzione `setCurrentState`, che non dovrai modificare.
+Copia questo scheletro nell'editor. Definisce la struttura base con una mappa `states`, una lista di `globalTransitions` per le emergenze, e una funzione `run` che agisce come motore della nostra macchina a stati. Contiene anche la funzione `setCurrentState`, che non dovrai modificare.
 
 ```javascript
 ({
-  // La mappa degli stati definisce la logica per ogni stato dell'IA.
+  // =================================================================
+  // CONFIGURAZIONE (opzionale)
+  // =================================================================
+  config: {
+    // Qui puoi definire costanti per il tuo bot
+    patrolSpeed: 70,
+    aimTolerance: 5,
+    evasionGracePeriod: 120, // Tick di "invulnerabilità" dopo un'evasione
+  },
+
+  // =================================================================
+  // TRANSIZIONI GLOBALI (Massima Priorità)
+  // =================================================================
+  globalTransitions: [
+    {
+      target: "EVADING",
+      condition: function (api, memory, context, events) {
+        // Se veniamo colpiti e non siamo già in un periodo di grazia, evadiamo.
+        return (
+          events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
+          memory.evasionGraceTicks <= 0
+        );
+      },
+      description: "Colpiti da un proiettile, evasione ha la priorità.",
+    },
+  ],
+
+  // =================================================================
+  // MACCHINA A STATI
+  // =================================================================
   states: {
     // Qui definiremo i nostri stati: SEARCHING, ATTACKING, EVADING
   },
@@ -27,29 +57,51 @@ Copia questo scheletro nell'editor. Definisce la struttura base con una mappa `s
     // Inizializzazione al primo tick.
     const memory = api.getMemory();
     if (typeof memory.current === "undefined") {
-      api.updateMemory({
-        // Inizializza qui le variabili di memoria.
-        lastKnownEnemyPosition: null,
-      });
+      api.updateMemory({ evasionGraceTicks: 0 });
       this.setCurrentState("SEARCHING", api);
       return; // Esce per questo tick, la logica inizierà dal prossimo.
     }
 
+    // Decrementa il contatore del periodo di grazia per l'evasione ad ogni tick.
+    if (memory.evasionGraceTicks > 0) {
+      api.updateMemory({ evasionGraceTicks: memory.evasionGraceTicks - 1 });
+    }
+
     const events = api.getEvents();
+    const enemy = api.scan();
+    const context = { enemy, config: this.config }; // Passiamo dati utili agli stati
 
     // --- Gestione Transizioni ad Alta Priorità ---
-    // Se veniamo colpiti, passiamo sempre allo stato di evasione.
-    if (events.some((e) => e.type === "HIT_BY_PROJECTILE")) {
-      this.setCurrentState("EVADING", api);
-      return; // Interrompi il tick per dare priorità alla nuova azione evasiva.
+    for (const transition of this.globalTransitions) {
+      if (transition.condition.call(this, api, memory, context, events)) {
+        this.setCurrentState(transition.target, api, context);
+        return;
+      }
     }
 
     // --- Esecuzione dello Stato Corrente ---
     const currentStateName = memory.current;
     const currentState = this.states[currentStateName];
 
-    if (currentState && currentState.onExecute) {
-      const nextStateName = currentState.onExecute(api, memory, events);
+    // 1. Controlla le transizioni locali dello stato
+    if (currentState?.transitions) {
+      for (const transition of currentState.transitions) {
+        if (transition.condition.call(this, api, memory, context, events)) {
+          this.setCurrentState(transition.target, api, context);
+          return;
+        }
+      }
+    }
+
+    // 2. Se nessuna transizione è scattata, esegui la logica dello stato
+    if (currentState?.onExecute) {
+      const nextStateName = currentState.onExecute.call(
+        this,
+        api,
+        memory,
+        events,
+        context
+      );
       if (nextStateName && nextStateName !== currentStateName) {
         this.setCurrentState(nextStateName, api);
       }
@@ -57,22 +109,21 @@ Copia questo scheletro nell'editor. Definisce la struttura base con una mappa `s
   },
 
   // --- Motore della Macchina a Stati (non modificare) ---
-  setCurrentState: function (newState, api) {
+  setCurrentState: function (newState, api, context = {}) {
     const memory = api.getMemory();
     const oldState = memory.current;
 
     if (oldState !== newState) {
       if (oldState && this.states[oldState]?.onExit) {
-        this.states[oldState].onExit(api, memory);
+        this.states[oldState].onExit.call(this, api, memory);
       }
 
       api.stop("STATE_TRANSITION");
-
       api.log(`Stato: ${oldState || "undefined"} -> ${newState}`);
       api.updateMemory({ current: newState });
 
       if (this.states[newState]?.onEnter) {
-        this.states[newState].onEnter(api, memory);
+        this.states[newState].onEnter.call(this, api, memory, context);
       }
     }
   },
@@ -84,31 +135,34 @@ Copia questo scheletro nell'editor. Definisce la struttura base con una mappa `s
 ## Passo 2: Implementare lo Stato `SEARCHING`
 
 Nello stato `SEARCHING`, il nostro bot deve pattugliare l'arena. La sua logica è:
-1.  **`onExecute`**: Controlla se il nemico è visibile. Se sì, richiede di passare allo stato `ATTACKING`.
+1.  **`transitions`**: Definiamo una regola di transizione per passare allo stato `ATTACKING` quando `api.scan()` rileva un nemico.
 2.  **`onExecute`**: Se il bot è inattivo (`api.isQueueEmpty()`), avvia un pattugliamento verso un punto casuale.
 
 Aggiungi questo oggetto all'interno della mappa `states` del tuo codice:
 
 ```javascript
-// Aggiungi questo oggetto all'interno di `states: { ... }`
 SEARCHING: {
   onEnter: (api, memory) => {
     api.log("Inizio pattugliamento...");
   },
-  onExecute: (api, memory, events) => {
-    // Condizione di uscita: se vediamo un nemico, attacchiamo.
-    if (api.scan()) {
-      return "ATTACKING";
-    }
-
+  onExecute: function (api, memory, events) {
     // Se il bot è inattivo, decide la prossima mossa di pattugliamento.
     if (api.isQueueEmpty()) {
       const arena = api.getArenaDimensions();
       const randomX = Math.random() * arena.width;
       const randomY = Math.random() * arena.height;
-      api.moveTo(randomX, randomY, 70); // Pattuglia a velocità ridotta
+      api.moveTo(randomX, randomY, this.config.patrolSpeed); // Pattuglia a velocità ridotta
     }
   },
+  transitions: [
+    {
+      target: 'ATTACKING',
+      // La condizione per la transizione è che `context.enemy` non sia nullo.
+      // Il `context` viene preparato per noi nella funzione `run`.
+      condition: (api, memory, context) => context.enemy,
+      description: "Passa ad attaccare se un nemico è visibile."
+    }
+  ]
 },
 ```
 
@@ -117,25 +171,19 @@ SEARCHING: {
 ## Passo 3: Implementare lo Stato `ATTACKING`
 
 Quando siamo in `ATTACKING`, la nostra logica è:
-1.  **`onExecute`**: Controlla se il nemico è ancora visibile. Se no, torna a `SEARCHING`.
-2.  **`onExecute`**: Spara continuamente se la mira è buona e la linea di tiro è libera.
-3.  **`onExecute`**: Ad ogni tick, dichiara l'intento di mirare al nemico. Il motore di gioco si occuperà di avviare o correggere la rotazione.
+1.  **`transitions`**: Definiamo una regola per tornare a `SEARCHING` se `api.scan()` restituisce `null`.
+2.  **`onExecute`**: Ad ogni tick, dichiara l'intento di mirare al nemico e spara se la mira è buona.
 
 Aggiungi questo oggetto all'interno di `states`:
 
 ```javascript
-// Aggiungi questo oggetto all'interno di `states: { ... }`
 ATTACKING: {
-  onExecute: (api, memory, events) => {
-    const enemy = api.scan();
-
-    // Condizione di uscita: se perdiamo il bersaglio, torniamo a cercare.
-    if (!enemy) {
-      return "SEARCHING";
-    }
+  onExecute: function (api, memory, events, context) {
+    const { enemy } = context;
+    if (!enemy) return; // Guardia di sicurezza
 
     // Azione continua: spara se la mira è buona.
-    if (Math.abs(enemy.angle) < 5 && api.isLineOfSightClear(enemy)) {
+    if (Math.abs(enemy.angle) < this.config.aimTolerance && api.isLineOfSightClear(enemy)) {
       api.fire();
     }
 
@@ -143,6 +191,13 @@ ATTACKING: {
     // Il motore di gioco si occuperà di correggere la mira in modo efficiente.
     api.aimAt(enemy.x, enemy.y);
   },
+  transitions: [
+    {
+      target: 'SEARCHING',
+      condition: (api, memory, context) => !context.enemy,
+      description: "Passa a cercare se il nemico non è più visibile."
+    }
+  ]
 },
 ```
 
@@ -150,140 +205,18 @@ ATTACKING: {
 
 ## Passo 4: Implementare lo Stato `EVADING`
 
-La transizione a `EVADING` avviene automaticamente quando veniamo colpiti, grazie alla logica che abbiamo inserito in `run`. Il nostro compito è definire cosa fare una volta entrati in questo stato.
-1.  **`onEnter`**: Avvia una manovra evasiva (gira e muoviti).
-2.  **`onExecute`**: Controlla se la manovra è finita. Se sì, torna a `SEARCHING`.
+La transizione a `EVADING` avviene automaticamente quando veniamo colpiti, grazie alla regola che abbiamo definito in `globalTransitions`. Il nostro compito è definire cosa fare una volta entrati in questo stato.
+1.  **`onEnter`**: Avvia una manovra evasiva (gira e muoviti) e imposta un "periodo di grazia" per non essere interrotti subito da un altro colpo.
+2.  **`transitions`**: Definiamo una regola per tornare a `SEARCHING` quando la manovra è finita.
 
 Aggiungi questo oggetto all'interno di `states`:
 
 ```javascript
-// Aggiungi questo oggetto all'interno di `states: { ... }`
 EVADING: {
-  onEnter: (api, memory) => {
+  onEnter: function (api, memory) {
     api.log("Eseguo manovra evasiva...");
+    // Imposta un periodo di grazia per non entrare in questo stato ad ogni colpo.
+    api.updateMemory({ evasionGraceTicks: this.config.evasionGracePeriod });
     // Gira di un angolo casuale e scatta in avanti.
-    const randomAngle = (Math.random() < 0.5 ? 90 : -90) + (Math.random() * 30 - 15);
-    api.sequence([
-      { type: "START_ROTATE", payload: { angle: randomAngle } },
-      { type: "START_MOVE", payload: { distance: 100 } },
-    ]);
-  },
-  onExecute: (api, memory, events) => {
-    // Condizione di uscita: la manovra è completata.
-    // Filtriamo lo stop causato dalla transizione di stato.
-    if (events.some(e => e.type === "SEQUENCE_COMPLETED" || (e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION"))) {
-      return "SEARCHING";
-    }
-  },
-},
+    
 ```
-
----
-
-## Passo 5: Codice Completo e Prossimi Passi
-
-Congratulazioni! Hai creato la tua prima IA funzionante. Ora puoi premere "Compile" e "Start" per vederla in azione.
-
-Il codice completo dovrebbe assomigliare a questo. Puoi usarlo come riferimento o per fare copia-incolla se qualcosa non funziona.
-
-```javascript
-({
-  states: {
-    SEARCHING: {
-      onEnter: (api, memory) => {
-        api.log("Inizio pattugliamento...");
-      },
-      onExecute: (api, memory, events) => {
-        if (api.scan()) {
-          return "ATTACKING";
-        }
-        if (api.isQueueEmpty()) {
-          const arena = api.getArenaDimensions();
-          api.moveTo(
-            Math.random() * arena.width,
-            Math.random() * arena.height,
-            70
-          );
-        }
-      },
-    },
-    ATTACKING: {
-      onExecute: (api, memory, events) => {
-        const enemy = api.scan();
-        if (!enemy) {
-          return "SEARCHING";
-        }
-        if (Math.abs(enemy.angle) < 5 && api.isLineOfSightClear(enemy)) {
-          api.fire();
-        }
-        api.aimAt(enemy.x, enemy.y);
-      },
-    },
-    EVADING: {
-      onEnter: (api, memory) => {
-        api.log("Eseguo manovra evasiva...");
-        const randomAngle =
-          (Math.random() < 0.5 ? 90 : -90) + (Math.random() * 30 - 15);
-        api.sequence([
-          { type: "START_ROTATE", payload: { angle: randomAngle } },
-          { type: "START_MOVE", payload: { distance: 100 } },
-        ]);
-      },
-      onExecute: (api, memory, events) => {
-        if (
-          events.some(
-            (e) =>
-              e.type === "SEQUENCE_COMPLETED" ||
-              (e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")
-          )
-        ) {
-          return "SEARCHING";
-        }
-      },
-    },
-  },
-  run: function (api) {
-    const memory = api.getMemory();
-    if (typeof memory.current === "undefined") {
-      api.updateMemory({ lastKnownEnemyPosition: null });
-      this.setCurrentState("SEARCHING", api);
-      return;
-    }
-    const events = api.getEvents();
-    if (events.some((e) => e.type === "HIT_BY_PROJECTILE")) {
-      this.setCurrentState("EVADING", api);
-      return;
-    }
-    const currentStateName = memory.current;
-    const currentState = this.states[currentStateName];
-    if (currentState && currentState.onExecute) {
-      const nextStateName = currentState.onExecute(api, memory, events);
-      if (nextStateName && nextStateName !== currentStateName) {
-        this.setCurrentState(nextStateName, api);
-      }
-    }
-  },
-  setCurrentState: function (newState, api) {
-    const memory = api.getMemory();
-    const oldState = memory.current;
-    if (oldState !== newState) {
-      if (oldState && this.states[oldState]?.onExit) {
-        this.states[oldState].onExit(api, memory);
-      }
-      api.stop("STATE_TRANSITION");
-      api.log(`Stato: ${oldState || "undefined"} -> ${newState}`);
-      api.updateMemory({ current: newState });
-      if (this.states[newState]?.onEnter) {
-        this.states[newState].onEnter(api, memory);
-      }
-    }
-  },
-});
-```
-
-Ora che hai una base solida, prova a sperimentare! Ecco alcune idee:
-- Migliora lo stato `ATTACKING` per far muovere il bot mentre spara (kiting).
-- Nello stato `SEARCHING`, se perdi di vista il nemico, vai alla sua ultima posizione nota (`memory.lastKnownEnemyPosition`).
-- Crea nuovi stati, come `FLEEING` (scappare se la vita è bassa) o `FLANKING` (aggirare gli ostacoli).
-
-Buon divertimento!
