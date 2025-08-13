@@ -208,22 +208,8 @@ const DefaultAIBase = {
     // STATO KITING
     // =================================================================
     KITING: {
-      onEnter(api, memory) {
+      onEnter(api, memory, context) {
         api.log("Nemico troppo vicino! Valuto manovra di kiting...");
-
-        // Controlla se c'è un ostacolo molto vicino dietro
-        if (api.isObstacleAhead(this.config.kitingMoveDistance)) {
-          // Se c'è un ostacolo, non possiamo arretrare. Eseguiamo una manovra evasiva casuale.
-          api.log("Spazio per kiting bloccato, cerco una nuova posizione.");
-          const arena = api.getArenaDimensions();
-          const randomX = Math.random() * arena.width;
-          const randomY = Math.random() * arena.height;
-          api.moveTo(randomX, randomY);
-        } else {
-          // Altrimenti, esegui il kiting standard (arretra)
-          api.log("Eseguo kiting...");
-          api.move(this.config.kitingMoveDistance);
-        }
       },
       onExecute(api, memory, events, context) {
         // La logica di transizione è stata spostata.
@@ -231,13 +217,40 @@ const DefaultAIBase = {
         const { enemy } = context;
         if (!enemy) return; // Guardia di sicurezza
 
-        // Azioni continue: mira e spara se possibile
-        api.aimAt(enemy.x, enemy.y);
-        if (
-          Math.abs(enemy.angle) < this.config.aimTolerance &&
-          api.isLineOfSightClear(enemy)
-        ) {
-          api.fire();
+        api.fire();
+
+        if (api.isQueueEmpty()) {
+          // Se il nemico è alle nostre spalle, avanziamo per allontanarci.
+          if (Math.abs(enemy.angle) > 90) {
+            api.log("Nemico alle spalle, avanzo per allontanarmi.");
+            const moveDistance = Math.abs(this.config.kitingMoveDistance);
+            if (api.isObstacleAhead(moveDistance)) {
+              api.log(
+                "Spazio per avanzare bloccato, cerco una nuova posizione."
+              );
+              const arena = api.getArenaDimensions();
+              const randomX = Math.random() * arena.width;
+              const randomY = Math.random() * arena.height;
+              api.moveTo(randomX, randomY);
+            } else {
+              api.move(moveDistance);
+            }
+          } else {
+            // Il nemico è di fronte, eseguiamo il kiting standard (arretriamo).
+            api.log("Nemico di fronte, arretro (kiting).");
+            const moveDistance = this.config.kitingMoveDistance; // Valore negativo
+            if (api.isObstacleAhead(moveDistance)) {
+              api.log(
+                "Spazio per arretrare bloccato, cerco una nuova posizione."
+              );
+              const arena = api.getArenaDimensions();
+              const randomX = Math.random() * arena.width;
+              const randomY = Math.random() * arena.height;
+              api.moveTo(randomX, randomY);
+            } else {
+              api.move(moveDistance);
+            }
+          }
         }
       },
       onExit(api, memory) {
@@ -318,12 +331,12 @@ const DefaultAIBase = {
       },
       onExit(api, memory) {},
       transitions: [
-        {
-          target: "EVADING",
-          condition: (api, memory, context) => !context.enemy,
-          description:
-            "Nemico perso durante il fiancheggiamento, passa a evasione.",
-        },
+        // {
+        //   target: "EVADING",
+        //   condition: (api, memory, context) => !context.enemy,
+        //   description:
+        //     "Nemico perso durante il fiancheggiamento, passa a evasione.",
+        // },
         {
           target: "SEARCHING",
           condition: (api, memory, context, events) =>
@@ -574,7 +587,7 @@ const DefaultAIBase = {
    * @param {string} newState - Il nuovo stato da impostare.
    * @param {Object} api - L'API del robot per il logging.
    */
-  setCurrentState: function (newState, api) {
+  setCurrentState: function (newState, api, context = {}) {
     const memory = api.getMemory();
     const oldState = memory.current;
 
@@ -592,7 +605,7 @@ const DefaultAIBase = {
 
       // Chiama onEnter del nuovo stato, se esiste nel nuovo pattern
       if (this.states[newState]?.onEnter) {
-        this.states[newState].onEnter.call(this, api, memory);
+        this.states[newState].onEnter.call(this, api, memory, context);
       }
     }
   },
