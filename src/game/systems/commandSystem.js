@@ -52,7 +52,8 @@ export function processActiveCommands(robots, arena) {
           potentialTickSpeed > 0 ? distanceToMove : -distanceToMove;
 
         // 4. Calcola il costo energetico
-        const energyCost = distanceToMove * robot.motor.energyCostPerMove;
+        const energyCost =
+          Math.abs(distanceToMove) * robot.motor.energyCostPerMove;
         if (!robot.consumeEnergy(energyCost)) {
           newEvents.push({
             type: "ACTION_STOPPED",
@@ -70,7 +71,7 @@ export function processActiveCommands(robots, arena) {
         const newX = robot.x + signedDistanceToMove * Math.cos(angleRad);
         const newY = robot.y + signedDistanceToMove * Math.sin(angleRad);
 
-        if (arena.isPositionValid({ x: newX, y: newY }, Robot.RADIUS)) {
+        if (arena.isPositionValid({ x: newX, y: newY }, Robot.RADIUS, robots, robot.id)) {
           robot.x = newX;
           robot.y = newY;
           // 6. Aggiorna la distanza rimanente
@@ -110,7 +111,8 @@ export function processActiveCommands(robots, arena) {
           potentialRotationSpeed > 0 ? angleToRotate : -angleToRotate;
 
         // 4. Calcola il costo energetico in base alla rotazione effettiva
-        const energyCost = angleToRotate * robot.motor.energyCostPerRotation;
+        const energyCost =
+          Math.abs(angleToRotate) * robot.motor.energyCostPerRotation;
         if (!robot.consumeEnergy(energyCost)) {
           newEvents.push({
             type: "ACTION_STOPPED",

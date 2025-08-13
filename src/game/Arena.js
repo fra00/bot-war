@@ -84,9 +84,11 @@ class Arena {
    * Controlla se una data posizione è all'interno dei confini dell'arena.
    * @param {{x: number, y: number}} position - La posizione da controllare.
    * @param {number} [radius=0] - Il raggio dell'oggetto da controllare, per collisioni più accurate.
+   * @param {Array<import('./Robot.js').default>} [allRobots=[]] - Un array di tutti i robot per il controllo delle collisioni.
+   * @param {string} [selfId=null] - L'ID del robot che si sta muovendo, da escludere dal controllo.
    * @returns {boolean} True se la posizione è valida, altrimenti false.
    */
-  isPositionValid({ x, y }, radius = 0) {
+  isPositionValid({ x, y }, radius = 0, allRobots = [], selfId = null) {
     // Controlla i confini dell'arena
     if (x - radius < 0 || x + radius > this.width || y - radius < 0 || y + radius > this.height) {
       return false;
@@ -97,6 +99,17 @@ class Arena {
     for (const obstacle of this.obstacles) {
       if (circleIntersectsRectangle(objectAsCircle, obstacle)) {
         return false;
+      }
+    }
+
+    // Controlla la collisione con altri robot
+    for (const otherRobot of allRobots) {
+      if (otherRobot.id === selfId) continue; // Non controllare la collisione con se stesso
+      const dx = otherRobot.x - x;
+      const dy = otherRobot.y - y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < radius + otherRobot.constructor.RADIUS) {
+        return false; // Collisione con un altro robot
       }
     }
 
