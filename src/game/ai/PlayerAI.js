@@ -2,39 +2,51 @@ import DefaultAIBase from "./DefaultAIBase.js";
 
 /**
  * Funzione ricorsiva per stringificare un oggetto, gestendo correttamente
- * funzioni e oggetti annidati.
- * @param {object} obj - L'oggetto da stringificare.
+ * oggetti, array, funzioni e primitivi in una stringa di codice formattata.
+ * @param {*} value - Il valore da stringificare.
  * @param {string} indent - La stringa di indentazione corrente.
  * @returns {string}
  */
-function stringifyObjectRecursive(obj, indent) {
-  const parts = [];
+function stringifyRecursive(value, indent) {
   const nextIndent = indent + "  ";
 
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      const value = obj[key];
-      let valueStr;
+  // Gestione dei tipi primitivi e delle funzioni non in oggetti
+  if (value === null) return "null";
+  if (typeof value !== "object") {
+    if (typeof value === "function") {
+      return value.toString().replace(/\n/g, `\n${indent}`);
+    }
+    return JSON.stringify(value);
+  }
 
-      if (typeof value === "function") {
-        const funcStr = value.toString().replace(/\n/g, `\n${nextIndent}`);
-        // I metodi con sintassi abbreviata (es. `myMethod() {}`) includono già il nome.
-        // Le funzioni anonime (`function() {}`) e le arrow functions (`() => {}`) no.
-        if (funcStr.startsWith("function") || funcStr.startsWith("(")) {
-          parts.push(`${nextIndent}${key}: ${funcStr}`);
-        } else {
-          // È un metodo con sintassi abbreviata, il nome è già incluso.
-          parts.push(`${nextIndent}${funcStr}`);
-        }
-      } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-        // Chiamata ricorsiva per oggetti annidati.
-        const nestedStr = stringifyObjectRecursive(value, nextIndent);
-        parts.push(`${nextIndent}${key}: ${nestedStr}`);
+  // Gestione degli Array
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+    const arrayParts = value.map((item) =>
+      `${nextIndent}${stringifyRecursive(item, nextIndent)}`
+    );
+    return `[\n${arrayParts.join(",\n")}\n${indent}]`;
+  }
+
+  // Gestione degli Oggetti
+  const keys = Object.keys(value);
+  if (keys.length === 0) return "{}";
+
+  const parts = [];
+  for (const key of keys) {
+    const propValue = value[key];
+
+    if (typeof propValue === "function") {
+      const funcStr = propValue.toString().replace(/\n/g, `\n${nextIndent}`);
+      // Gestisce la differenza tra `myMethod() {}` e `myFunc: function() {}`
+      if (funcStr.startsWith("function") || funcStr.startsWith("(")) {
+        parts.push(`${nextIndent}${key}: ${funcStr}`);
       } else {
-        // Usa JSON.stringify per tutti gli altri tipi (array, primitivi).
-        const primitiveStr = JSON.stringify(value, null, 2);
-        parts.push(`${nextIndent}${key}: ${primitiveStr}`);
+        parts.push(`${nextIndent}${funcStr}`);
       }
+    } else {
+      const valueStr = stringifyRecursive(propValue, nextIndent);
+      parts.push(`${nextIndent}${key}: ${valueStr}`);
     }
   }
 
@@ -49,7 +61,7 @@ function stringifyObjectRecursive(obj, indent) {
  */
 export const stringifyAI = (aiObject) => {
   // Le parentesi esterne sono cruciali per l'interpretazione come espressione oggetto.
-  return `(${stringifyObjectRecursive(aiObject, "")})`;
+  return `(${stringifyRecursive(aiObject, "")})`;
 };
 
 // Converte l'oggetto AI di default in una stringa di codice sorgente.
