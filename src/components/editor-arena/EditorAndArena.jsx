@@ -5,6 +5,7 @@ import DefaultAI from "../../game/ai/DefaultAIBase";
 import useDisclosure from "../ui/useDisclosure";
 import ApiDocsModal from "../docs/ApiDocsModal";
 import TutorialModal from "../docs/TutorialModal";
+import VisualEditorGuideModal from "../docs/VisualEditorGuideModal";
 import LLMGuideModal from "../docs/LLMGuideModal";
 import { compileAI } from "../../game/ai/compiler";
 import { useAIScripts } from "../../hooks/useAIScripts";
@@ -52,6 +53,11 @@ const EditorAndArena = ({ onNavigateBack }) => {
     isOpen: isLLMGuideOpen,
     onOpen: onLLMGuideOpen,
     onClose: onLLMGuideClose,
+  } = useDisclosure();
+  const {
+    isOpen: isVisualEditorGuideOpen,
+    onOpen: onVisualEditorGuideOpen,
+    onClose: onVisualEditorGuideClose,
   } = useDisclosure();
   const {
     isOpen: isLogoutModalOpen,
@@ -458,6 +464,8 @@ const EditorAndArena = ({ onNavigateBack }) => {
                 onSettingsModalClose={onSettingsModalClose}
                 onTutorialModalOpen={onTutorialModalOpen}
                 onLLMGuideOpen={onLLMGuideOpen}
+                // Guida Editor Visuale
+                onVisualEditorGuideOpen={onVisualEditorGuideOpen}
                 onBotSettingsOpen={handleBotSettingsOpenWithTutorial}
                 onNavigateBack={onNavigateBack}
               />
@@ -471,6 +479,10 @@ const EditorAndArena = ({ onNavigateBack }) => {
         onClose={onTutorialModalClose}
       />
       <LLMGuideModal isOpen={isLLMGuideOpen} onClose={onLLMGuideClose} />
+      <VisualEditorGuideModal
+        isOpen={isVisualEditorGuideOpen}
+        onClose={onVisualEditorGuideClose}
+      />
       {isTutorialActive && (
         <InteractiveTutorial
           step={currentStep}

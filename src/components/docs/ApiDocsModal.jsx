@@ -1,31 +1,24 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import PropTypes from "prop-types";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import CardFooter from "../ui/CardFooter";
-import Article from "../ui/Article";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import apiDocsContent from "../../docs/api.md?raw";
 
 /**
  * Un modal che carica, converte e visualizza la documentazione dall'api.md.
  */
 const ApiDocsModal = ({ isOpen, onClose }) => {
-  const [copyStatus, setCopyStatus] = useState('Copy');
-  // Converte il markdown in HTML in modo sicuro solo quando il modal si apre.
-  const htmlContent = useMemo(() => {
-    if (!isOpen) return "";
-    const rawHtml = marked.parse(apiDocsContent, { gfm: true, breaks: true });
-    return DOMPurify.sanitize(rawHtml);
-  }, [isOpen]);
+  const [copyStatus, setCopyStatus] = useState('Copia');
 
   // Gestisce la copia del contenuto markdown negli appunti.
   const handleCopy = () => {
     navigator.clipboard.writeText(apiDocsContent).then(
       () => {
-        setCopyStatus('Copied!');
-        setTimeout(() => setCopyStatus('Copy'), 2000); // Resetta dopo 2 secondi
+        setCopyStatus('Copiato!');
+        setTimeout(() => setCopyStatus('Copia'), 2000); // Resetta dopo 2 secondi
       },
       (err) => {
         console.error('Failed to copy markdown: ', err);
@@ -52,13 +45,13 @@ const ApiDocsModal = ({ isOpen, onClose }) => {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="API Documentation"
+      title="Documentazione API"
       fullscreen
     >
-      <div className="flex-grow min-h-0 overflow-y-auto">
-        <Article
-          dangerouslySetInnerHTML={{ __html: htmlContent }}
-        />
+      <div className="p-6 prose prose-invert max-w-none bg-gray-800 h-full overflow-y-auto">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {apiDocsContent}
+        </ReactMarkdown>
       </div>
       {/* Il footer ora usa flexbox per allineare i pulsanti */}
       <CardFooter className="flex items-center">
@@ -68,9 +61,9 @@ const ApiDocsModal = ({ isOpen, onClose }) => {
         <Button onClick={handleDownload} variant="secondary" className="ml-2">
           Download .md
         </Button>
-        <div className="flex-grow" /> {/* Questo spinge il pulsante Close a destra */}
-        <Button onClick={onClose} variant="secondary">
-          Close
+        <div className="flex-grow" />
+        <Button onClick={onClose} variant="primary">
+          Chiudi
         </Button>
       </CardFooter>
     </Modal>

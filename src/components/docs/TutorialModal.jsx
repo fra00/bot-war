@@ -1,11 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import PropTypes from "prop-types";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import CardFooter from "../ui/CardFooter";
-import Article from "../ui/Article";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import tutorialContent from "../../docs/tutorial.md?raw";
 
 /**
@@ -13,13 +12,6 @@ import tutorialContent from "../../docs/tutorial.md?raw";
  */
 const TutorialModal = ({ isOpen, onClose }) => {
   const [copyStatus, setCopyStatus] = useState("Copia");
-
-  // Converte il markdown in HTML in modo sicuro solo quando il modal si apre.
-  const htmlContent = useMemo(() => {
-    if (!isOpen) return "";
-    const rawHtml = marked.parse(tutorialContent, { gfm: true, breaks: true });
-    return DOMPurify.sanitize(rawHtml);
-  }, [isOpen]);
 
   // Gestisce la copia del contenuto markdown negli appunti.
   const handleCopy = () => {
@@ -58,10 +50,10 @@ const TutorialModal = ({ isOpen, onClose }) => {
       title="Tutorial di Gioco"
       fullscreen
     >
-      <div className="flex-grow min-h-0 overflow-y-auto">
-        <Article
-          dangerouslySetInnerHTML={{ __html: htmlContent }}
-        />
+      <div className="p-6 prose prose-invert max-w-none bg-gray-800 h-full overflow-y-auto">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {tutorialContent}
+        </ReactMarkdown>
       </div>
       <CardFooter className="flex items-center">
         <Button onClick={handleCopy} variant="secondary">
@@ -71,7 +63,7 @@ const TutorialModal = ({ isOpen, onClose }) => {
           Download .md
         </Button>
         <div className="flex-grow" />
-        <Button onClick={onClose} variant="secondary">
+        <Button onClick={onClose} variant="primary">
           Chiudi
         </Button>
       </CardFooter>

@@ -1,233 +1,197 @@
-import React from "react";
 import PropTypes from "prop-types";
 import Button from "../ui/Button";
-import {
-  Accordion,
-  AccordionItem,
-  AccordionHeader,
-  AccordionPanel,
-} from "../ui/Accordion";
+import { useAuth } from "../../context/AuthContext";
 
-const CodeBracketIcon = (props) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    fill="none"
-    viewBox="0 0 24 24"
-    strokeWidth={1.5}
-    stroke="currentColor"
-    {...props}
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z"
-    />
-  </svg>
+// Helper component for feature cards
+const FeatureCard = ({ icon, title, children }) => (
+  <div className="bg-gray-800/50 p-6 rounded-lg shadow-lg backdrop-blur-sm">
+    <div className="flex items-center mb-4">
+      <span className="text-3xl mr-4 text-cyan-400">{icon}</span>
+      <h3 className="text-xl font-bold text-white">{title}</h3>
+    </div>
+    <p className="text-gray-300">{children}</p>
+  </div>
 );
 
-const SparklesIcon = (props) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    fill="none"
-    viewBox="0 0 24 24"
-    strokeWidth={1.5}
-    stroke="currentColor"
-    {...props}
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.562L16.5 21.75l-.398-1.188a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.188-.398a2.25 2.25 0 001.423-1.423L16.5 15.75l.398 1.188a2.25 2.25 0 001.423 1.423L19.5 18.75l-1.188.398a2.25 2.25 0 00-1.423 1.423z"
-    />
-  </svg>
-);
-
-const BoltIcon = (props) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    fill="none"
-    viewBox="0 0 24 24"
-    strokeWidth={1.5}
-    stroke="currentColor"
-    {...props}
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"
-    />
-  </svg>
-);
+FeatureCard.propTypes = {
+  icon: PropTypes.string.isRequired,
+  title: PropTypes.string.isRequired,
+  children: PropTypes.node.isRequired,
+};
 
 const LandingPage = ({ onStartGame }) => {
+  const { user } = useAuth();
+
   return (
-    <div className="bg-gray-900 text-white">
+    <div className="bg-gray-900 text-white min-h-screen font-sans">
       {/* Hero Section con immagine di sfondo */}
-      {/* Aggiunto overflow-hidden per contenere l'immagine che si ingrandisce */}
-      <main
-        className="relative isolate min-h-screen flex items-center justify-center overflow-hidden"
-      >
-        {/* Div separato per l'immagine di sfondo animata */}
+      <div className="relative isolate min-h-screen flex items-center justify-center text-center px-4 overflow-hidden">
         <div
           className="absolute inset-0 w-full h-full bg-cover bg-center -z-20 animate-ken-burns"
           style={{ backgroundImage: "url('/landing-page.png')" }}
         />
-
-        {/* Overlay scuro per migliorare la leggibilità del testo */}
         <div className="absolute inset-0 bg-black/60 -z-10" />
-
-        {/* Il contenuto ora è relativo per assicurare il corretto stacking context */}
-        <div className="relative mx-auto max-w-4xl py-32 sm:py-48 lg:py-56 text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-white sm:text-6xl">
-            ai-BotWars
+        <div className="max-w-4xl">
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white">
+            Bot War
           </h1>
-          <p className="mt-6 text-lg leading-8 text-gray-300">
-            Crea. Combatti. Domina. La tua arena definitiva per l'intelligenza
-            artificiale.
+          <p className="mt-4 text-xl md:text-2xl text-gray-200 max-w-3xl mx-auto">
+            Scrivi il codice. Costruisci il bot. Domina l'arena.
           </p>
-          <div className="mt-10 flex items-center justify-center gap-x-6">
-            <Button
-              onClick={onStartGame}
-              className="rounded-md bg-indigo-500 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
-            >
-              Entra nell'Arena
+          <div className="mt-8">
+            <Button onClick={onStartGame} size="large" variant="primary">
+              {user ? "Entra nell'Arena" : "Inizia a Giocare"}
             </Button>
           </div>
         </div>
+      </div>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-24">
+        {/* What is Bot War Section */}
+        <section className="text-center">
+          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            La Battaglia si Vince con il Codice
+          </h2>
+          <p className="mt-6 max-w-2xl mx-auto text-lg leading-8 text-gray-300">
+            Bot War non è un gioco di riflessi, ma di intelletto. Il tuo compito
+            è programmare il cervello di un robot da combattimento usando
+            JavaScript. Crea strategie complesse, affina la tua logica e guarda
+            la tua creazione sfidare altri bot per la supremazia.
+          </p>
+          <img
+            src="/preview.png"
+            alt="Screenshot di Bot War che mostra l'editor e l'arena"
+            className="mt-10 rounded-lg shadow-2xl mx-auto"
+          />
+        </section>
+
+        {/* Two Ways to Create Section */}
+        <section>
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              Due Modalità per Creare la Tua IA
+            </h2>
+            <p className="mt-4 max-w-2xl mx-auto text-lg leading-8 text-gray-300">
+              Che tu sia un veterano della programmazione o un principiante,
+              abbiamo lo strumento giusto per te.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-10 items-center">
+            <div className="order-2 md:order-1">
+              <h3 className="text-2xl font-bold text-cyan-400">
+                Editor Visuale a Nodi
+              </h3>
+              <p className="mt-4 text-gray-300">
+                Progetta l'intelligenza del tuo bot in modo intuitivo con il
+                nostro editor visuale. Rappresenta la logica come una{" "}
+                <strong>macchina a stati finiti (FSM)</strong>, collegando stati
+                e transizioni. È il modo perfetto per visualizzare il flusso
+                decisionale e iniziare senza scrivere una riga di codice.
+              </p>
+            </div>
+            <div className="order-1 md:order-2">
+              <img
+                src="/visual_editor.png"
+                alt="Editor visuale a nodi"
+                className="rounded-lg shadow-xl"
+              />
+            </div>
+          </div>
+          <div className="grid md:grid-cols-2 gap-10 items-center mt-16">
+            <div>
+              <img
+                src="/editor.png"
+                alt="Editor di codice professionale"
+                className="rounded-lg shadow-xl"
+              />
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-cyan-400">
+                Editor di Codice Professionale
+              </h3>
+              <p className="mt-4 text-gray-300">
+                Per il massimo controllo, tuffati nel nostro editor basato su{" "}
+                <strong>Monaco</strong> (il motore di VS Code). Scrivi
+                JavaScript per definire ogni dettaglio del comportamento del tuo
+                bot, dall'evasione dei proiettili alla gestione dell'energia.
+                L'unico limite è la tua immaginazione.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Key Features Section */}
+        <section>
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+              Caratteristiche Chiave
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-2 gap-8">
+            <FeatureCard icon="⚡️" title="API Potente e Intuitiva">
+              Comanda il tuo bot con un'API semplice ma completa. Funzioni come{" "}
+              <code>api.scan()</code>, <code>api.moveTo(x, y)</code> e{" "}
+              <code>api.fire()</code> ti danno il pieno controllo sulle azioni,
+              mentre <code>api.getEvents()</code> ti permette di reagire in
+              tempo reale a ciò che accade nell'arena.
+            </FeatureCard>
+            <FeatureCard icon="🧠" title="Multiplayer Online">
+              Pensi che il tuo bot sia il migliore? Mettilo alla prova! Abilita
+              il tuo script per il multiplayer, sfida le creazioni di altri
+              giocatori in partite classificate e scala la classifica globale.
+            </FeatureCard>
+            <FeatureCard icon="🏗️" title="Parti da una Base Solida">
+              Non sai da dove iniziare? Ogni giocatore parte con una IA di base
+              ben commentata e strutturata come una macchina a stati finiti
+              (FSM). Studiala, modificala e usala come trampolino di lancio per
+              le tue strategie uniche.
+            </FeatureCard>
+            <FeatureCard icon="⚙️" title="Debug e Feedback Istantaneo">
+              Ogni bot ha una propria console di log. Usa <code>api.log()</code>{" "}
+              per tracciare le decisioni, i valori e gli stati del tuo bot in
+              tempo reale. Il ciclo di feedback rapido è essenziale per
+              migliorare la tua IA.
+            </FeatureCard>
+          </div>
+        </section>
+
+        {/* Tech Stack Section */}
+        <section className="text-center">
+          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            Costruito con Tecnologie Moderne
+          </h2>
+          <p className="mt-6 max-w-2xl mx-auto text-lg leading-8 text-gray-300">
+            Bot War è un'applicazione web moderna costruita con React, Vite e
+            TailwindCSS. La logica di gioco è disaccoppiata dalla UI, garantendo
+            performance e manutenibilità.
+          </p>
+        </section>
+
+        {/* Call to Action Section */}
+        <section className="text-center bg-gray-800/50 rounded-lg p-10">
+          <h2 className="text-3xl font-bold tracking-tight text-white">
+            Sei Pronto a Metterti alla Prova?
+          </h2>
+          <p className="mt-4 text-lg text-gray-300">
+            L'arena ti aspetta. Che tu voglia creare un aggressore implacabile,
+            un cecchino tattico o un evasore inafferrabile, è il momento di dare
+            vita al tuo codice.
+          </p>
+          <div className="mt-8">
+            <Button onClick={onStartGame} size="large" variant="primary">
+              Inizia la tua Battaglia
+            </Button>
+          </div>
+        </section>
       </main>
 
-      {/* Features Section */}
-      <section className="bg-gray-800/50 py-24 sm:py-32">
-        <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl lg:text-center">
-            <h2 className="text-base font-semibold leading-7 text-indigo-400">
-              Come Funziona
-            </h2>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              Forgia il tuo Campione Digitale
-            </p>
-            <p className="mt-6 text-lg leading-8 text-gray-300">
-              Dai vita al tuo bot con poche righe di codice e lancialo in
-              battaglie strategiche per dimostrare la tua superiorità.
-            </p>
-          </div>
-          <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
-            <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-3">
-              <div className="flex flex-col">
-                <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-white">
-                  <CodeBracketIcon className="h-5 w-5 flex-none text-indigo-400" />
-                  Progetta la Tua Mente
-                </dt>
-                <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-300">
-                  <p className="flex-auto">
-                    Scrivi la logica del tuo bot in JavaScript. Dalle strategie
-                    più semplici alle tattiche più complesse, il limite è la tua
-                    immaginazione.
-                  </p>
-                </dd>
-              </div>
-              <div className="flex flex-col">
-                <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-white">
-                  <BoltIcon className="h-5 w-5 flex-none text-indigo-400" />
-                  Scatena la Battaglia
-                </dt>
-                <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-300">
-                  <p className="flex-auto">
-                    Lancia il tuo bot nell'arena e osserva come si comporta
-                    contro avversari formidabili. Ogni battaglia è un test, ogni
-                    vittoria una conquista.
-                  </p>
-                </dd>
-              </div>
-              <div className="flex flex-col">
-                <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-white">
-                  <SparklesIcon className="h-5 w-5 flex-none text-indigo-400" />
-                  Potenziato dagli LLM
-                </dt>
-                <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-300">
-                  <p className="flex-auto">
-                    Sfrutta la potenza dei Large Language Models (come ChatGPT)
-                    per generare, migliorare o analizzare il codice del tuo bot.
-                    L'ingegneria incontra la creatività.
-                  </p>
-                </dd>
-              </div>
-            </dl>
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section className="bg-gray-800/50 py-24 sm:py-32">
-        <div className="mx-auto max-w-4xl px-6 lg:px-8">
-          <h2 className="text-center text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Domande Frequenti
-          </h2>
-          <div className="mt-12">
-            <Accordion allowMultiple>
-              <AccordionItem>
-                <AccordionHeader>
-                  Cos'è esattamente ai-BotWars?
-                </AccordionHeader>
-                <AccordionPanel>
-                  ai-BotWars è un'arena di simulazione dove puoi progettare,
-                  programmare e far combattere bot dotati di intelligenza
-                  artificiale. È un parco giochi per testare strategie,
-                  algoritmi e persino IA generate da modelli linguistici di
-                  grandi dimensioni (LLM) in un ambiente competitivo e
-                  divertente.
-                </AccordionPanel>
-              </AccordionItem>
-              <AccordionItem>
-                <AccordionHeader>
-                  Quale linguaggio di programmazione devo usare?
-                </AccordionHeader>
-                <AccordionPanel>
-                  Tutta la logica dei bot è scritta in{" "}
-                  <strong>JavaScript</strong>. Forniamo un editor di codice
-                  integrato e un'API semplice ma potente che ti permette di
-                  controllare le azioni del tuo bot, come muoversi, scansionare
-                  l'ambiente e sparare.
-                </AccordionPanel>
-              </AccordionItem>
-              <AccordionItem>
-                <AccordionHeader>
-                  Come posso usare un LLM per creare la mia IA?
-                </AccordionHeader>
-                <AccordionPanel>
-                  Questa è la parte più innovativa! Puoi descrivere la strategia
-                  del tuo bot a un LLM (es. "Crea un bot che si muove lungo i
-                  bordi e spara al nemico più vicino") e chiedergli di generare
-                  il codice JavaScript. Poi, puoi copiare e incollare quel
-                  codice direttamente nel nostro editor per testarlo e
-                  perfezionarlo.
-                </AccordionPanel>
-              </AccordionItem>
-            </Accordion>
-          </div>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="py-24 sm:py-32">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Pronto a creare il campione definitivo?
-          </h2>
-          <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-gray-300">
-            L'arena attende il tuo ingegno. Inizia ora e lascia il segno nella
-            storia di ai-BotWars.
+      <footer className="bg-gray-900/50 border-t border-gray-800">
+        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-gray-400">
+          <p>
+            &copy; {new Date().getFullYear()} Bot War. Un progetto open source.
           </p>
-          <div className="mt-10 flex items-center justify-center gap-x-6">
-            <Button
-              onClick={onStartGame}
-              className="rounded-md bg-indigo-500 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400"
-            >
-              Inizia a Programmare
-            </Button>
-          </div>
         </div>
-      </section>
+      </footer>
     </div>
   );
 };

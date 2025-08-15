@@ -37,6 +37,7 @@ const AIEditorPanel = ({
   activeView,
   onSwitchView,
   visualParseError,
+  onHelpOpen,
 }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [newScriptName, setNewScriptName] = useState("");
@@ -246,6 +247,7 @@ const AIEditorPanel = ({
               activeScript={activeScript}
               visualModel={visualModel}
               onModelChange={handleVisualModelChange}
+              onHelpOpen={onHelpOpen}
             />
           )}
         </div>
@@ -277,6 +279,7 @@ const AIEditorPanel = ({
               visualModel={visualModel}
               onModelChange={handleVisualModelChange}
               isInteractive={true}
+              onHelpOpen={onHelpOpen}
             />
           </div>
           <CardFooter><Button onClick={onVisualEditorFullscreenClose} variant="primary">Chiudi</Button></CardFooter>
@@ -317,6 +320,8 @@ AIEditorPanel.propTypes = {
   onSwitchView: PropTypes.func.isRequired,
   /** Messaggio di errore se il parsing per la vista visuale fallisce. */
   visualParseError: PropTypes.string,
+  /** Funzione per aprire la guida dell'editor visuale. */
+  onHelpOpen: PropTypes.func,
 };
 
 export default AIEditorPanel;

@@ -63,6 +63,7 @@ const GameUI = ({
   onSettingsModalClose,
   onTutorialModalOpen,
   onLLMGuideOpen,
+  onVisualEditorGuideOpen,
   onBotSettingsOpen,
 }) => {
   // Effetto per aprire il modale di fine partita
@@ -174,6 +175,7 @@ const GameUI = ({
         onUpdateSettings={onUpdateSettings}
         isLoading={isLoading}
         onBotSettingsOpen={onBotSettingsOpen}
+        onVisualEditorGuideOpen={onVisualEditorGuideOpen}
       />
 
       <LogDrawer
@@ -257,6 +259,17 @@ const GameUI = ({
             size="large"
           >
             Guida LLM
+          </Button>
+          <Button
+            onClick={() => {
+              onVisualEditorGuideOpen();
+              onSettingsModalClose();
+            }}
+            className="w-full"
+            size="large"
+            variant="secondary"
+          >
+            Guida Editor Visuale
           </Button>
         </div>
         <CardFooter>

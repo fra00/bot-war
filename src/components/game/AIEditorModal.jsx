@@ -36,6 +36,7 @@ const AIEditorModal = ({
   onUpdateSettings,
   isLoading,
   onBotSettingsOpen,
+  onVisualEditorGuideOpen,
 }) => {
   const { addToast } = useToast();
   const { user } = useAuth();
@@ -185,6 +186,7 @@ const AIEditorModal = ({
             activeView={activeView}
             onSwitchView={handleAttemptSwitchView}
             visualParseError={visualParseError}
+            onHelpOpen={onVisualEditorGuideOpen}
           />
         </div>
         <CardFooter>
@@ -260,6 +262,7 @@ AIEditorModal.propTypes = {
   onUpdateSettings: PropTypes.func.isRequired,
   isLoading: PropTypes.bool,
   onBotSettingsOpen: PropTypes.func,
+  onVisualEditorGuideOpen: PropTypes.func,
 };
 
 export default AIEditorModal;
