@@ -7,7 +7,7 @@ import Spinner from "../ui/Spinner";
 /**
  * Un wrapper per Monaco Editor che si integra con il sistema di temi dell'app.
  */
-const CodeEditor = ({ value, onChange, height = "100%" }) => {
+const CodeEditor = ({ value, onChange, height = "100%", readOnly = false }) => {
   const { theme } = useTheme();
 
   return (
@@ -19,6 +19,7 @@ const CodeEditor = ({ value, onChange, height = "100%" }) => {
       onChange={onChange}
       loading={<Spinner />}
       options={{
+        readOnly,
         minimap: { enabled: false },
         fontSize: 14,
         wordWrap: "on",
@@ -36,6 +37,8 @@ CodeEditor.propTypes = {
   onChange: PropTypes.func.isRequired,
   /** L'altezza dell'editor. Può essere un numero (pixel) o una stringa (es. "100%"). */
   height: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  /** Se l'editor deve essere di sola lettura. */
+  readOnly: PropTypes.bool,
 };
 
 export default CodeEditor;

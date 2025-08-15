@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import Button from "../ui/Button";
 import Alert from "../ui/Alert";
@@ -6,8 +6,12 @@ import Card from "../ui/Card";
 import CardHeader from "../ui/CardHeader";
 import Input from "../ui/Input";
 import CodeEditor from "./CodeEditor";
-import DefaultAIBase from "../../game/ai/DefaultAIBase.js";
-import initialPlayerCode, { stringifyAI } from "../../game/ai/PlayerAI.js";
+import VisualEditor from "./VisualEditor"; // Importa il nuovo componente
+import DefaultAIBase from "../../game/ai/DefaultAIBase";
+import initialPlayerCode from "../../game/ai/PlayerAI";
+import {
+  stringifyAI,
+} from "../../game/ai/compiler";
 import Spinner from "../ui/Spinner";
 
 /**
@@ -17,6 +21,8 @@ import Spinner from "../ui/Spinner";
 const AIEditorPanel = ({
   code,
   onCodeChange,
+  visualModel,
+  onVisualModelChange,
   compileError,
   scripts,
   activeScript,
@@ -24,28 +30,46 @@ const AIEditorPanel = ({
   onDeleteScript,
   onCreateNewScript,
   isLoading,
+  onDirty,
+  activeView,
+  onSwitchView,
+  visualParseError,
 }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [newScriptName, setNewScriptName] = useState("");
   const [creationMode, setCreationMode] = useState("new");
 
+  useEffect(() => {
+    // Non gestisce più activeView, ma potrebbe essere utile per altre logiche di reset
+  }, [activeScript]);
+
+  const handleCodeChange = (newCode) => {
+    onCodeChange(newCode);
+    onDirty();
+  };
+
+  const handleVisualModelChange = (newModel) => {
+    onVisualModelChange(newModel);
+    onDirty();
+  };
+
   const handleInitiateCreate = (mode = "new") => {
     setIsCreating(true);
     setCreationMode(mode);
-    // Chiama la prop senza argomenti per segnalare l'inizio della creazione
-    // e permettere al tutorial di avanzare.
     onCreateNewScript();
   };
 
   const handleConfirmCreate = () => {
     if (newScriptName.trim()) {
-      // Ora siamo espliciti: "base" usa DefaultAIBase, "new" usa initialPlayerCode.
-      const code =
-        creationMode === "base"
-          ? stringifyAI(DefaultAIBase)
-          : initialPlayerCode;
-      // Chiama la prop con il nome e il codice per confermare
-      onCreateNewScript(newScriptName.trim(), code);
+      let code;
+      const visualModel = null;
+
+      if (creationMode === "base") {
+        code = stringifyAI(DefaultAIBase);
+      } else {
+        code = initialPlayerCode;
+      }
+      onCreateNewScript(newScriptName.trim(), code, visualModel);
       setIsCreating(false);
       setNewScriptName("");
     }
@@ -65,8 +89,6 @@ const AIEditorPanel = ({
     );
   }
   return (
-    // Il contenitore principale è ora gestito dal componente Modal.
-    // Rimuoviamo la Toolbar e il div contenitore esterno.
     <div className="grid grid-cols-12 gap-4 h-full overflow-hidden">
       {/* Colonna Sinistra: Lista Script */}
       <div className="col-span-3 flex flex-col gap-4">
@@ -164,19 +186,58 @@ const AIEditorPanel = ({
 
       {/* Colonna Destra: Editor e Controlli */}
       <div className="col-span-9 flex flex-col h-full">
-        <div
-          data-tutorial-id="code-editor"
-          className="flex-grow relative rounded-md overflow-hidden border border-gray-700"
-        >
-          <CodeEditor
-            value={code}
-            onChange={(value) => onCodeChange(value || "")}
-          />
+        {/* Selettore Vista Codice/Visuale */}
+        <div className="flex mb-2">
+          <Button
+            onClick={() => onSwitchView("code")}
+            variant={activeView === "code" ? "primary" : "ghost"}
+            className={`rounded-r-none ${
+              activeView === "code" ? "bg-blue-600" : ""
+            }`}
+          >
+            Codice
+          </Button>
+          <Button
+            onClick={() => onSwitchView("visual")}
+            variant={activeView === "visual" ? "primary" : "ghost"}
+            className={`rounded-l-none ${
+              activeView === "visual" ? "bg-blue-600" : ""
+            }`}
+          >
+            Visuale
+          </Button>
+        </div>
+
+        {/* Area Editor Condizionale */}
+        <div className="flex-grow flex flex-col">
+          {activeView === "code" && (
+            <div
+              data-tutorial-id="code-editor"
+              className="flex-grow relative rounded-md overflow-hidden border border-gray-700"
+            >
+              <CodeEditor
+                value={code}
+                onChange={(value) => handleCodeChange(value || "")}
+              />
+            </div>
+          )}
+          {activeView === "visual" && (
+            <VisualEditor
+              activeScript={activeScript}
+              visualModel={visualModel}
+              onModelChange={handleVisualModelChange}
+            />
+          )}
         </div>
         <div className="flex-shrink-0 mt-4">
           {compileError && (
             <Alert variant="danger" role="alert" className="mb-2">
               {compileError}
+            </Alert>
+          )}
+          {visualParseError && (
+            <Alert variant="warning" role="alert" className="mb-2">
+              {visualParseError}
             </Alert>
           )}
         </div>
@@ -199,13 +260,23 @@ AIEditorPanel.propTypes = {
   }),
   code: PropTypes.string.isRequired,
   onCodeChange: PropTypes.func.isRequired,
+  visualModel: PropTypes.object,
+  onVisualModelChange: PropTypes.func,
   compileError: PropTypes.string,
   onSelectScript: PropTypes.func.isRequired,
   onDeleteScript: PropTypes.func.isRequired,
-  // Chiamata senza argomenti per iniziare, poi con (nome, codice) per confermare.
+  // Chiamata senza argomenti per iniziare, poi con (nome, codice, visualModel?) per confermare.
   onCreateNewScript: PropTypes.func.isRequired,
   /** Indica se gli script sono in fase di caricamento. */
   isLoading: PropTypes.bool,
+  /** Funzione chiamata quando viene apportata una modifica non salvata. */
+  onDirty: PropTypes.func.isRequired,
+  /** La vista attualmente attiva ('code' o 'visual'). */
+  activeView: PropTypes.string.isRequired,
+  /** Funzione per tentare di cambiare vista. */
+  onSwitchView: PropTypes.func.isRequired,
+  /** Messaggio di errore se il parsing per la vista visuale fallisce. */
+  visualParseError: PropTypes.string,
 };
 
 export default AIEditorPanel;

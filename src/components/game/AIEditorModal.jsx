@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import Modal from "../ui/Modal";
 import AIEditorPanel from "./AIEditorPanel";
@@ -9,6 +9,13 @@ import { useAuth } from "../../context/AuthContext";
 import useDisclosure from "../ui/useDisclosure";
 import BotSettingsModal from "./BotSettingsModal";
 import Tooltip from "../ui/Tooltip";
+import {
+  compileAI,
+  generateVisualModelFromAIObject,
+  generateAICodeFromVisualModel,
+  stringifyAI,
+} from "../../game/ai/compiler";
+import DefaultAIBase from "../../game/ai/DefaultAIBase.js";
 
 const AIEditorModal = ({
   isOpen,
@@ -20,6 +27,8 @@ const AIEditorModal = ({
   activeScript,
   code,
   onCodeChange,
+  visualModel,
+  onVisualModelChange,
   compileError,
   onSelectScript,
   onDeleteScript,
@@ -35,6 +44,22 @@ const AIEditorModal = ({
     onOpen: onSettingsOpen,
     onClose: onSettingsClose,
   } = useDisclosure();
+  const [isDirty, setIsDirty] = useState(false);
+  const [activeView, setActiveView] = useState("code");
+  const [visualParseError, setVisualParseError] = useState(null);
+
+  // Resetta lo stato "dirty" quando si cambia script o si chiude la modale,
+  // per evitare che un avviso di "modifiche non salvate" persista erroneamente.
+  useEffect(() => {
+    setIsDirty(false);
+    setActiveView("code"); // Torna sempre alla vista codice
+    setVisualParseError(null);
+  }, [activeScript, isOpen]);
+
+  // Funzione da passare al pannello dell'editor per segnalare una modifica.
+  const handleDirty = useCallback(() => {
+    setIsDirty(true);
+  }, []);
 
   const handleBotSettingsButtonClick = () => {
     onSettingsOpen();
@@ -44,31 +69,97 @@ const AIEditorModal = ({
   };
 
   const handleSaveClick = useCallback(async () => {
-    const { success } = await onSaveOnly();
+    let codeToSave = code;
+    if (activeView === "visual") {
+      try {
+        // 1. Genera il codice parziale dal modello visuale.
+        const partialCode = generateAICodeFromVisualModel(visualModel);
+
+        // 2. Valuta il codice parziale per ottenere un oggetto.
+        // Avvolgiamo il codice tra parentesi per assicurarci che un oggetto letterale
+        // venga interpretato come un'espressione, risolvendo l'errore "Unexpected token '{'".
+        // Questa modifica rende la funzione robusta, funzionando sia che partialCode
+        // contenga già le parentesi, sia che non le contenga.
+        const partialAiObject = new Function(`return (${partialCode})`)();
+        // 3. Esegui il "merge" con DefaultAIBase per creare l'oggetto completo.
+        const finalAiObject = { ...DefaultAIBase, ...partialAiObject };
+
+        // 4. Riconverti l'oggetto completo e normalizzato in una stringa.
+        codeToSave = stringifyAI(finalAiObject);
+      } catch (e) {
+        addToast(
+          `Errore nella generazione del codice: ${e.message}`,
+          "danger"
+        );
+        return; // Interrompe il processo di salvataggio
+      }
+    }
+
+    const { success } = await onSaveOnly(codeToSave);
     if (success) {
+      setIsDirty(false); // Resetta lo stato dirty dopo un salvataggio riuscito
       addToast("Script salvato con successo!", "success");
     } else {
-      // Aggiunge un feedback visibile anche in caso di fallimento.
-      // Il messaggio di errore dettagliato è già visibile nell'Alert sotto l'editor.
       addToast("Salvataggio fallito. Controlla gli errori.", "danger");
     }
-  }, [onSaveOnly, addToast]);
+  }, [
+    onSaveOnly,
+    addToast,
+    setIsDirty,
+    code,
+    visualModel,
+    activeView,
+  ]);
 
   const handleUpdateClick = useCallback(async () => {
-    const { success } = await onUpdate();
+    if (isDirty) {
+      addToast("Salva le modifiche prima di applicarle.", "warning");
+      return;
+    }
+
+    // La logica di "Applica" usa sempre il codice sorgente corrente,
+    // che è già stato normalizzato e salvato.
+    const { success } = await onUpdate(code);
     if (success) {
       addToast("Script applicato con successo! Riavvio partita...", "success");
-      onClose(); // Chiude la modale in caso di successo
+      onClose();
     } else {
       addToast("Applicazione fallita. Controlla gli errori.", "danger");
     }
-  }, [onUpdate, addToast, onClose]);
+  }, [onUpdate, addToast, onClose, isDirty, code]);
 
   const handleSaveSettings = (settings) => {
     if (activeScript) {
       onUpdateSettings(activeScript.id, settings);
     }
   };
+
+  const handleAttemptSwitchView = (targetView) => {
+    if (isDirty) {
+      addToast("Salva le modifiche prima di cambiare editor.", "warning");
+      return;
+    }
+
+    if (targetView === "visual") {
+      setVisualParseError(null);
+      try {
+        const aiObject = compileAI(code);
+        if (!aiObject || typeof aiObject.states !== "object") {
+          throw new Error(
+            "Il codice non è una macchina a stati valida (manca la proprietà 'states' o non è un oggetto)."
+          );
+        }
+        const newVisualModel = generateVisualModelFromAIObject(aiObject);
+        onVisualModelChange(newVisualModel);
+        setActiveView("visual");
+      } catch (e) {
+        setVisualParseError(`Impossibile generare la vista visuale: ${e.message}`);
+      }
+    } else {
+      setActiveView(targetView);
+    }
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -83,11 +174,17 @@ const AIEditorModal = ({
             activeScript={activeScript}
             code={code}
             onCodeChange={onCodeChange}
+            visualModel={visualModel}
+            onVisualModelChange={onVisualModelChange}
             compileError={compileError}
             onSelectScript={onSelectScript}
             onDeleteScript={onDeleteScript}
             onCreateNewScript={onCreateNewScript}
             isLoading={isLoading}
+            onDirty={handleDirty}
+            activeView={activeView}
+            onSwitchView={handleAttemptSwitchView}
+            visualParseError={visualParseError}
           />
         </div>
         <CardFooter>
@@ -115,13 +212,16 @@ const AIEditorModal = ({
                 </Button>
               </div>
             </Tooltip>
-            <Button onClick={handleSaveClick} variant="secondary">
-              Salva Modifiche
+            <Button
+              onClick={handleSaveClick}
+              variant={isDirty ? "primary" : "secondary"}
+            >
+              {isDirty ? "Salva Modifiche*" : "Salva Modifiche"}
             </Button>
             <Button
               data-tutorial-id="apply-and-restart-button"
               onClick={handleUpdateClick}
-              disabled={gameStateStatus === "running"}
+              disabled={gameStateStatus === "running" || isDirty}
               className="bg-green-600 hover:bg-green-700"
             >
               {activeScript
@@ -151,6 +251,8 @@ AIEditorModal.propTypes = {
   activeScript: PropTypes.object,
   code: PropTypes.string.isRequired,
   onCodeChange: PropTypes.func.isRequired,
+  visualModel: PropTypes.object,
+  onVisualModelChange: PropTypes.func,
   compileError: PropTypes.string,
   onSelectScript: PropTypes.func.isRequired,
   onDeleteScript: PropTypes.func.isRequired,

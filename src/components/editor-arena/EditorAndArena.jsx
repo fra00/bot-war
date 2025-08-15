@@ -76,9 +76,12 @@ const EditorAndArena = ({ onNavigateBack }) => {
     scripts,
     activeScript,
     playerCode,
+    visualModel,
     playerAI,
     compileError,
+    isLoading,
     setPlayerCode,
+    setVisualModel,
     handleSelectScript,
     handleDeleteScript,
     handleCreateNewScript,
@@ -86,7 +89,6 @@ const EditorAndArena = ({ onNavigateBack }) => {
     handleSaveOnly,
     handleUpdateBotSettings,
   } = useAIScripts();
-  const { isLoading } = useAIScripts();
 
   const {
     isTutorialActive,
@@ -116,10 +118,10 @@ const EditorAndArena = ({ onNavigateBack }) => {
 
   // Gestori di eventi "wrappati" per il tutorial
   const handleCreateNewScriptWithTutorial = useCallback(
-    (name, code) => {
+    (name, code, visualModel) => {
       if (typeof name === "string") {
         // L'utente ha confermato il nome, quindi creiamo lo script.
-        handleCreateNewScript(name, code);
+        handleCreateNewScript(name, code, visualModel);
         // Il tutorial è al passo 1 ("Dai un nome..."), quindi avanziamo.
         if (isTutorialActive && currentStepIndex === 3) {
           nextStep();
@@ -139,9 +141,9 @@ const EditorAndArena = ({ onNavigateBack }) => {
   const handleApplyAIChanges = useCallback(async () => {
     // Ora questa funzione si occupa solo di aggiornare l'IA.
     // Il riavvio del gioco è gestito dall'useEffect che osserva `playerAI`.
-    const result = await handleUpdateAI();
+    const result = await handleUpdateAI(playerCode);
     return result;
-  }, [handleUpdateAI]);
+  }, [handleUpdateAI, playerCode]);
 
   const handleApplyAIChangesWithTutorial = useCallback(async () => {
     const result = await handleApplyAIChanges();
@@ -414,6 +416,8 @@ const EditorAndArena = ({ onNavigateBack }) => {
                 onEditorClose={onEditorClose}
                 playerCode={playerCode}
                 onCodeChange={setPlayerCode}
+                visualModel={visualModel}
+                onVisualModelChange={setVisualModel}
                 onUpdate={handleApplyAIChangesWithTutorial}
                 compileError={compileError}
                 isLogOpen={isLogOpen}
@@ -438,6 +442,7 @@ const EditorAndArena = ({ onNavigateBack }) => {
                 onConfirmOpponentSelection={handleConfirmOpponentSelection}
                 // Passa l'ID temporaneo e la funzione per aggiornarlo alla modale
                 opponentScriptId={tempOpponentScriptId}
+                isLoading={isLoading}
                 onSelectOpponentScript={setTempOpponentScriptId}
                 opponentCompileError={opponentCompileError}
                 onClearOpponentCompileError={() =>

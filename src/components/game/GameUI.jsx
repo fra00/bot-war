@@ -38,6 +38,8 @@ const GameUI = ({
   activeScript,
   onSelectScript,
   onDeleteScript,
+  visualModel,
+  onVisualModelChange,
   onCreateNewScript,
   onSaveOnly,
   opponentScriptId,
@@ -163,6 +165,8 @@ const GameUI = ({
         activeScript={activeScript}
         code={playerCode}
         onCodeChange={onCodeChange}
+        visualModel={visualModel}
+        onVisualModelChange={onVisualModelChange}
         compileError={compileError}
         onSelectScript={onSelectScript}
         onDeleteScript={onDeleteScript}
@@ -302,6 +306,8 @@ GameUI.propTypes = {
   activeScript: PropTypes.object,
   onSelectScript: PropTypes.func.isRequired,
   onDeleteScript: PropTypes.func.isRequired,
+  visualModel: PropTypes.object,
+  onVisualModelChange: PropTypes.func,
   onCreateNewScript: PropTypes.func.isRequired,
   onSaveOnly: PropTypes.func.isRequired,
   opponentScriptId: PropTypes.string,

@@ -35,6 +35,7 @@ class FirestoreService {
       name: "Nuovo Bot", // Un nome di default
       description: "",
       script: "",
+      visualModel: null, // Campo per il modello visuale
       multiplayerScript: "",
       version: 1,
       isMultiplayerEligible: false,
