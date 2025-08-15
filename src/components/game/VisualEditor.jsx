@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useRef, useEffect } from "react";
 import PropTypes from "prop-types";
 import ReactFlow, {
   Background,
@@ -53,6 +53,19 @@ const VisualEditor = ({
     transition: null,
   });
 
+  // Ref per evitare di marcare l'editor come "dirty" al caricamento iniziale.
+  const isInitializedRef = useRef(false);
+
+  // Resetta il flag di inizializzazione quando lo script attivo cambia.
+  useEffect(() => {
+    isInitializedRef.current = false;
+  }, [activeScript]);
+
+  // La libreria imposta lo stato iniziale, quindi attendiamo che finisca.
+  const onInit = useCallback(() => {
+    setTimeout(() => (isInitializedRef.current = true), 50);
+  }, []);
+
   // Definiamo i tipi di nodi personalizzati che React Flow può usare.
   const nodeTypes = useMemo(() => ({ stateNode: StateNode }), []);
 
@@ -60,7 +73,7 @@ const VisualEditor = ({
 
   const onNodesChange = useCallback(
     (changes) => {
-      if (!isInteractive) return;
+      if (!isInteractive || !isInitializedRef.current) return;
       const newNodes = applyNodeChanges(changes, nodes);
       onModelChange({ ...visualModel, nodes: newNodes });
     },
@@ -69,7 +82,7 @@ const VisualEditor = ({
 
   const onEdgesChange = useCallback(
     (changes) => {
-      if (!isInteractive) return;
+      if (!isInteractive || !isInitializedRef.current) return;
       const newEdges = applyEdgeChanges(changes, edges);
       onModelChange({ ...visualModel, edges: newEdges });
     },
@@ -92,6 +105,37 @@ const VisualEditor = ({
       setEditingEdge(newEdge);
     },
     [visualModel, edges, onModelChange, setEditingEdge, isInteractive]
+  );
+
+  const onNodesDelete = useCallback(
+    (deletedNodes) => {
+      if (
+        !window.confirm(
+          `Sei sicuro di voler eliminare ${deletedNodes.length} stato/i? Questa azione eliminerà anche tutte le transizioni collegate.`
+        )
+      ) {
+        return;
+      }
+
+      const deletedNodeIds = new Set(deletedNodes.map((n) => n.id));
+      const newNodes = nodes.filter((n) => !deletedNodeIds.has(n.id));
+      // Rimuovi anche gli archi collegati ai nodi eliminati
+      const newEdges = edges.filter(
+        (e) => !deletedNodeIds.has(e.source) && !deletedNodeIds.has(e.target)
+      );
+      onModelChange({ ...visualModel, nodes: newNodes, edges: newEdges });
+    },
+    [nodes, edges, onModelChange, visualModel]
+  );
+
+  const onEdgesDelete = useCallback(
+    (deletedEdges) => {
+      // Nessuna conferma per l'eliminazione delle transizioni
+      const deletedEdgeIds = new Set(deletedEdges.map((e) => e.id));
+      const newEdges = edges.filter((e) => !deletedEdgeIds.has(e.id));
+      onModelChange({ ...visualModel, edges: newEdges });
+    },
+    [edges, onModelChange, visualModel]
   );
 
   const onNodeDoubleClick = useCallback((event, node) => {
@@ -217,6 +261,9 @@ const VisualEditor = ({
             onConnect={onConnect}
             onNodeDoubleClick={onNodeDoubleClick}
             onEdgeDoubleClick={onEdgeDoubleClick}
+            onNodesDelete={onNodesDelete}
+            onEdgesDelete={onEdgesDelete}
+            onInit={onInit}
             nodeTypes={nodeTypes}
             fitView
             className={`bg-gray-800 rounded-md ${!isInteractive ? 'cursor-not-allowed' : ''}`}

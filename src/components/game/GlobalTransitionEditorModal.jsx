@@ -11,7 +11,7 @@ const CodeTextarea = ({ value, onChange, ...props }) => (
   <textarea
     value={value}
     onChange={onChange}
-    className="w-full h-32 p-2 font-mono text-sm bg-gray-900 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-white"
+    className="w-full h-64 p-2 font-mono text-sm bg-gray-900 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-white"
     {...props}
   />
 );
@@ -68,6 +68,7 @@ const GlobalTransitionEditorModal = ({
       title={
         transition ? "Modifica Transizione Globale" : "Crea Transizione Globale"
       }
+      fullscreen={true}
     >
       <div className="p-6 space-y-4">
         <div>

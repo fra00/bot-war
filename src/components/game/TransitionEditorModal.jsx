@@ -11,7 +11,7 @@ const CodeTextarea = ({ value, onChange, ...props }) => (
   <textarea
     value={value}
     onChange={onChange}
-    className="w-full h-32 p-2 font-mono text-sm bg-gray-900 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-white"
+    className="w-full h-48 p-2 font-mono text-sm bg-gray-900 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-white"
     {...props}
   />
 );
@@ -49,7 +49,12 @@ const TransitionEditorModal = ({ edge, isOpen, onClose, onSave }) => {
   if (!edge) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Modifica Transizione`}>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Modifica Transizione`}
+      fullscreen={true}
+    >
       <div className="p-6 space-y-4">
         <div>
           <Label htmlFor="transition-label">Etichetta (Descrizione)</Label>

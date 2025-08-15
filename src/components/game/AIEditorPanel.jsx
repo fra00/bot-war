@@ -13,6 +13,9 @@ import {
   stringifyAI,
 } from "../../game/ai/compiler";
 import Spinner from "../ui/Spinner";
+import useDisclosure from "../ui/useDisclosure";
+import Modal from "../ui/Modal";
+import CardFooter from "../ui/CardFooter";
 
 /**
  * Un pannello che contiene l'editor di codice Monaco per l'IA del giocatore,
@@ -38,6 +41,11 @@ const AIEditorPanel = ({
   const [isCreating, setIsCreating] = useState(false);
   const [newScriptName, setNewScriptName] = useState("");
   const [creationMode, setCreationMode] = useState("new");
+  const {
+    isOpen: isVisualEditorFullscreen,
+    onOpen: onVisualEditorFullscreenOpen,
+    onClose: onVisualEditorFullscreenClose,
+  } = useDisclosure();
 
   useEffect(() => {
     // Non gestisce più activeView, ma potrebbe essere utile per altre logiche di reset
@@ -200,12 +208,24 @@ const AIEditorPanel = ({
           <Button
             onClick={() => onSwitchView("visual")}
             variant={activeView === "visual" ? "primary" : "ghost"}
-            className={`rounded-l-none ${
+            className={`rounded-l-none ${activeView === 'visual' ? 'rounded-r-none' : ''} ${
               activeView === "visual" ? "bg-blue-600" : ""
             }`}
           >
             Visuale
           </Button>
+          {activeView === "visual" && (
+            <Button
+              onClick={onVisualEditorFullscreenOpen}
+              variant="ghost"
+              className="rounded-l-none px-2"
+              title="Apri a schermo intero"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" />
+              </svg>
+            </Button>
+          )}
         </div>
 
         {/* Area Editor Condizionale */}
@@ -242,6 +262,26 @@ const AIEditorPanel = ({
           )}
         </div>
       </div>
+
+      {/* Modale a schermo intero per l'Editor Visuale */}
+      <Modal
+        isOpen={isVisualEditorFullscreen}
+        onClose={onVisualEditorFullscreenClose}
+        title="Editor Visuale - Schermo Intero"
+        fullscreen={true}
+      >
+        <div className="flex flex-col h-full bg-gray-800">
+          <div className="flex flex-grow p-2">
+            <VisualEditor
+              activeScript={activeScript}
+              visualModel={visualModel}
+              onModelChange={handleVisualModelChange}
+              isInteractive={true}
+            />
+          </div>
+          <CardFooter><Button onClick={onVisualEditorFullscreenClose} variant="primary">Chiudi</Button></CardFooter>
+        </div>
+      </Modal>
     </div>
   );
 };
