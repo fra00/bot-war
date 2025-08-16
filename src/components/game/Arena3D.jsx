@@ -48,6 +48,34 @@ Bot3D.propTypes = {
 };
 
 /**
+ * Componente per visualizzare un'esplosione quando un bot viene sconfitto.
+ */
+function Explosion3D() {
+  return (
+    <group>
+      <Sphere args={[15, 32, 32]}>
+        <meshStandardMaterial
+          color="#ffc40f" // Giallo/Arancio
+          emissive="#ffc40f"
+          emissiveIntensity={5}
+          transparent
+          opacity={0.7}
+        />
+      </Sphere>
+      <Sphere args={[25, 32, 32]}>
+        <meshStandardMaterial
+          color="#e74c3c" // Rosso
+          emissive="#e74c3c"
+          emissiveIntensity={3}
+          transparent
+          opacity={0.4}
+        />
+      </Sphere>
+    </group>
+  );
+}
+
+/**
  * Componente che renderizza l'arena di gioco in 3D.
  * @param {object} props
  * @param {import('../../game/Game.js').GameState} props.gameState - Lo stato attuale del gioco.
@@ -134,6 +162,16 @@ function Arena3D({ gameState }) {
         {robots.map((robot) => {
           const isPlayer = robot.id === "player";
           const botColor = isPlayer ? "#61dafb" : "#e06c75";
+
+          // Se il bot è sconfitto, mostra un'esplosione invece del modello.
+          // Questo previene anche errori di rendering che bloccavano la UI.
+          if (robot.hullHp <= 0) {
+            return (
+              <group key={robot.id} position={to3D(robot.x, robot.y, 10)}>
+                <Explosion3D />
+              </group>
+            );
+          }
 
           return (
             <Fragment key={robot.id}>
