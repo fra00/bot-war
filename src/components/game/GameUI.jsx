@@ -1,10 +1,10 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import Toolbar from "../ui/Toolbar";
 import Button from "../ui/Button";
 import Alert from "../ui/Alert";
-import Arena from "./Arena";
 import GameInfoPanel from "./GameInfoPanel";
+import GameView from "./GameView";
 import AIEditorModal from "./AIEditorModal";
 import LogDrawer from "./LogDrawer";
 import OpponentSelectionModal from "./OpponentSelectionModal";
@@ -66,6 +66,8 @@ const GameUI = ({
   onVisualEditorGuideOpen,
   onBotSettingsOpen,
 }) => {
+  const [viewMode, setViewMode] = useState("2D"); // '2D' o '3D'
+
   // Effetto per aprire il modale di fine partita
   useEffect(() => {
     if (gameState.status === "finished") {
@@ -90,6 +92,21 @@ const GameUI = ({
   return (
     <>
       <Toolbar title="Bot War" showThemeSwitcher={true}>
+        <div className="flex items-center gap-2 mr-4">
+          <span className="text-sm font-medium text-gray-300">Visuale:</span>
+          <Button
+            onClick={() => setViewMode("2D")}
+            variant={viewMode === "2D" ? "primary" : "secondary"}
+          >
+            2D
+          </Button>
+          <Button
+            onClick={() => setViewMode("3D")}
+            variant={viewMode === "3D" ? "primary" : "secondary"}
+          >
+            3D
+          </Button>
+        </div>
         {(gameState.status === "running" ||
           gameState.status === "paused" ||
           gameState.status === "finished") && (
@@ -148,7 +165,7 @@ const GameUI = ({
       <div className="grid grid-cols-12 gap-4">
         {/* Colonna sinistra: Arena (occupa 3 colonne) */}
         <div className="col-span-8">
-          <Arena gameState={gameState} />
+          <GameView gameState={gameState} viewMode={viewMode} />
         </div>
         {/* Colonna destra: Info Bots (occupa 1 colonna) */}
         <div className="col-span-4">
@@ -273,14 +290,22 @@ const GameUI = ({
           </Button>
         </div>
         <CardFooter>
-          <Button onClick={onSettingsModalClose} variant="secondary" className="w-full">
+          <Button
+            onClick={onSettingsModalClose}
+            variant="secondary"
+            className="w-full"
+          >
             Chiudi
           </Button>
         </CardFooter>
       </Modal>
 
       {/* Modale per il logout */}
-      <Modal isOpen={isLogoutModalOpen} onClose={onLogoutModalClose} title="Account">
+      <Modal
+        isOpen={isLogoutModalOpen}
+        onClose={onLogoutModalClose}
+        title="Account"
+      >
         <div className="p-4">
           <p className="text-center mb-4">Sei loggato come {user?.email}</p>
         </div>
