@@ -175,10 +175,12 @@ function CameraControlsHelper({
   cameraStyle,
   initialCameraPosition,
   height,
+  controlsRef,
 }) {
-  const { camera, controls } = useThree();
+  const { camera } = useThree();
 
   useEffect(() => {
+    const controls = controlsRef.current;
     if (viewMode === "3D" && controls) {
       if (cameraStyle === "perspective") {
         camera.position.set(...initialCameraPosition);
@@ -191,7 +193,7 @@ function CameraControlsHelper({
       // Aggiorna i controlli per applicare le modifiche
       controls.update();
     }
-  }, [viewMode, cameraStyle, initialCameraPosition, height, camera, controls]);
+  }, [viewMode, cameraStyle, initialCameraPosition, height, camera, controlsRef]);
 
   return null;
 }
@@ -201,6 +203,7 @@ CameraControlsHelper.propTypes = {
   cameraStyle: PropTypes.string.isRequired,
   initialCameraPosition: PropTypes.array.isRequired,
   height: PropTypes.number.isRequired,
+  controlsRef: PropTypes.object.isRequired,
 };
 
 /**
@@ -213,6 +216,7 @@ CameraControlsHelper.propTypes = {
 function Arena3D({ gameState, viewMode, onViewModeChange }) {
   const { width, height, obstacles } = gameState.arena;
   const { robots, projectiles } = gameState;
+  const controlsRef = useRef();
   const [cameraStyle, setCameraStyle] = useState("perspective"); // 'perspective' | 'top-down'
 
   // Trova il bot del giocatore
@@ -250,13 +254,14 @@ function Arena3D({ gameState, viewMode, onViewModeChange }) {
       >
         {/* Controlli per la camera (zoom, pan, rotate con il mouse) */}
         {/* Vengono disabilitati in modalità FPV per non entrare in conflitto con la nostra logica */}
-        <OrbitControls enabled={viewMode !== "FPV"} />
+        <OrbitControls ref={controlsRef} enabled={viewMode !== "FPV"} />
 
         {/* Componente per la gestione della logica della camera */}
         <CameraRig viewMode={viewMode} playerBot={playerBot} to3D={to3D} />
         <CameraControlsHelper
           viewMode={viewMode}
           cameraStyle={cameraStyle}
+          controlsRef={controlsRef}
           initialCameraPosition={initialCameraPosition}
           height={height}
         />
@@ -431,20 +436,9 @@ function Arena3D({ gameState, viewMode, onViewModeChange }) {
               title="Visuale dall'alto"
               className="p-2"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
+              <span className="font-bold text-lg w-5 h-5 flex items-center justify-center">
+                T
+              </span>
             </Button>
             <Button
               onClick={() => setCameraStyle("perspective")}
@@ -452,20 +446,9 @@ function Arena3D({ gameState, viewMode, onViewModeChange }) {
               title="Visuale in prospettiva"
               className="p-2"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21 12.792V6.208a2.25 2.25 0 00-2.25-2.25h-5.582a2.25 2.25 0 01-1.591-.659l-.622-.621a2.25 2.25 0 00-3.182 0l-.622.621A2.25 2.25 0 015.832 3.958H3.25A2.25 2.25 0 001 6.208v6.584A2.25 2.25 0 003.25 21h17.5A2.25 2.25 0 0023 18.75V15M13 12h4m-4 4h4m-4-8h4m-4-4h4"
-                />
-              </svg>
+              <span className="font-bold text-lg w-5 h-5 flex items-center justify-center">
+                P
+              </span>
             </Button>
           </>
         )}
