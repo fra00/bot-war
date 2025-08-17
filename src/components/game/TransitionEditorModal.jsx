@@ -28,7 +28,9 @@ const TransitionEditorModal = ({ edge, isOpen, onClose, onSave }) => {
   useEffect(() => {
     if (edge) {
       setLabel(edge.label || "");
-      setCondition(edge.data?.condition || "() => true");
+      setCondition(
+        edge.data?.condition || "(api, memory, context, events) => {\n  return true;\n}"
+      );
     }
   }, [edge]);
 

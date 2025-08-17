@@ -32,7 +32,9 @@ const GlobalTransitionEditorModal = ({
     if (transition) {
       setLabel(transition.label || "");
       setTarget(transition.target || "");
-      setCondition(transition.data?.condition || "() => false");
+      setCondition(
+        transition.data?.condition || "(api, memory, context, events) => {\n  return false;\n}"
+      );
     } else {
       // Defaults for a new transition
       setLabel("Nuova transizione globale");

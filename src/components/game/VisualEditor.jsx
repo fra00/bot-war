@@ -99,7 +99,7 @@ const VisualEditor = ({
         id: `edge-${params.source}-${params.target}`,
         label: "Nuova transizione",
         data: {
-          condition: "() => true",
+          condition: "(api, memory, context, events) => {\n  return true;\n}",
         },
       };
       onModelChange({ ...visualModel, edges: addEdge(newEdge, edges) });
@@ -235,8 +235,9 @@ const VisualEditor = ({
       position: { x: Math.random() * 400, y: Math.random() * 400 },
       data: {
         name: `NUOVO_STATO_${nodes.length + 1}`,
-        onEnter: "",
-        onExecute: "",
+        onEnter: "onEnter(api, memory, context) {\n  \n}",
+        onExecute: "onExecute(api, memory, events, context) {\n  \n}",
+        onExit: "onExit(api, memory) {\n  \n}",
       },
     };
     onModelChange({ ...visualModel, nodes: [...nodes, newNode] });

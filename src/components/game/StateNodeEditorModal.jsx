@@ -30,9 +30,14 @@ const StateNodeEditorModal = ({ node, isOpen, onClose, onSave }) => {
   useEffect(() => {
     if (node?.data) {
       setName(node.data.name || "");
-      setOnEnter(node.data.onEnter || "");
-      setOnExecute(node.data.onExecute || "");
-      setOnExit(node.data.onExit || "");
+      setOnEnter(
+        node.data.onEnter || "onEnter(api, memory, context) {\n  \n}"
+      );
+      setOnExecute(
+        node.data.onExecute ||
+          "onExecute(api, memory, events, context) {\n  \n}"
+      );
+      setOnExit(node.data.onExit || "onExit(api, memory) {\n  \n}");
     }
   }, [node]);
 

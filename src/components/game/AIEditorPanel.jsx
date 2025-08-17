@@ -7,11 +7,8 @@ import CardHeader from "../ui/CardHeader";
 import Input from "../ui/Input";
 import CodeEditor from "./CodeEditor";
 import VisualEditor from "./VisualEditor"; // Importa il nuovo componente
-import DefaultAIBase from "../../game/ai/DefaultAIBase";
+import DefaultAIBaseText from "../../game/ai/DefaultAIBase.js?raw";
 import initialPlayerCode from "../../game/ai/PlayerAI";
-import {
-  stringifyAI,
-} from "../../game/ai/compiler";
 import Spinner from "../ui/Spinner";
 import useDisclosure from "../ui/useDisclosure";
 import Modal from "../ui/Modal";
@@ -65,7 +62,6 @@ const AIEditorPanel = ({
   const handleInitiateCreate = (mode = "new") => {
     setIsCreating(true);
     setCreationMode(mode);
-    onCreateNewScript();
   };
 
   const handleConfirmCreate = () => {
@@ -74,7 +70,25 @@ const AIEditorPanel = ({
       const visualModel = null;
 
       if (creationMode === "base") {
-        code = stringifyAI(DefaultAIBase);
+        // Estrai l'oggetto letterale dal testo raw del modulo.
+        // Questo approccio è robusto perché cerca la prima parentesi graffa '{'
+        // e l'ultima '}', isolando l'oggetto principale del file.
+        const firstBrace = DefaultAIBaseText.indexOf("{");
+        const lastBrace = DefaultAIBaseText.lastIndexOf("}");
+        if (firstBrace !== -1 && lastBrace > firstBrace) {
+          const objectString = DefaultAIBaseText.substring(
+            firstBrace,
+            lastBrace + 1
+          );
+          // Avvolgilo tra parentesi per renderlo un'espressione valida per il compilatore.
+          code = `(${objectString})`;
+        } else {
+          // Fallback nel caso improbabile che il parsing fallisca.
+          console.error(
+            "Impossibile estrarre l'oggetto da DefaultAIBase.js. Uso il codice di fallback."
+          );
+          code = initialPlayerCode;
+        }
       } else {
         code = initialPlayerCode;
       }
@@ -209,9 +223,9 @@ const AIEditorPanel = ({
           <Button
             onClick={() => onSwitchView("visual")}
             variant={activeView === "visual" ? "primary" : "ghost"}
-            className={`rounded-l-none ${activeView === 'visual' ? 'rounded-r-none' : ''} ${
-              activeView === "visual" ? "bg-blue-600" : ""
-            }`}
+            className={`rounded-l-none ${
+              activeView === "visual" ? "rounded-r-none" : ""
+            } ${activeView === "visual" ? "bg-blue-600" : ""}`}
           >
             Visuale
           </Button>
@@ -222,8 +236,19 @@ const AIEditorPanel = ({
               className="rounded-l-none px-2"
               title="Apri a schermo intero"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5"
+                />
               </svg>
             </Button>
           )}
@@ -282,7 +307,11 @@ const AIEditorPanel = ({
               onHelpOpen={onHelpOpen}
             />
           </div>
-          <CardFooter><Button onClick={onVisualEditorFullscreenClose} variant="primary">Chiudi</Button></CardFooter>
+          <CardFooter>
+            <Button onClick={onVisualEditorFullscreenClose} variant="primary">
+              Chiudi
+            </Button>
+          </CardFooter>
         </div>
       </Modal>
     </div>
