@@ -36,8 +36,6 @@ const TransitionEditorModal = ({ edge, isOpen, onClose, onSave }) => {
     onClose();
   };
 
-  if (!edge) return null;
-
   const conditionLibs = useMemo(
     () => [
       {

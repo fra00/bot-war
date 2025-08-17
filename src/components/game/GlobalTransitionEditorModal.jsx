@@ -49,8 +49,6 @@ const GlobalTransitionEditorModal = ({
     onClose();
   };
 
-  if (!isOpen) return null;
-
   const stateOptions =
     availableStates.length > 0
       ? availableStates
