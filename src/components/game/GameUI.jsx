@@ -66,7 +66,7 @@ const GameUI = ({
   onVisualEditorGuideOpen,
   onBotSettingsOpen,
 }) => {
-  const [viewMode, setViewMode] = useState("2D"); // '2D' o '3D'
+  const [viewMode, setViewMode] = useState("2D"); // '2D', '3D' o 'FPV'
 
   // Effetto per aprire il modale di fine partita
   useEffect(() => {
@@ -165,7 +165,11 @@ const GameUI = ({
       <div className="grid grid-cols-12 gap-4">
         {/* Colonna sinistra: Arena (occupa 3 colonne) */}
         <div className="col-span-8">
-          <GameView gameState={gameState} viewMode={viewMode} />
+          <GameView
+            gameState={gameState}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+          />
         </div>
         {/* Colonna destra: Info Bots (occupa 1 colonna) */}
         <div className="col-span-4">
@@ -374,6 +378,7 @@ GameUI.propTypes = {
   onTutorialModalOpen: PropTypes.func.isRequired,
   /** Funzione per aprire la modale della guida LLM. */
   onLLMGuideOpen: PropTypes.func.isRequired,
+  onVisualEditorGuideOpen: PropTypes.func,
   onBotSettingsOpen: PropTypes.func,
 };
 

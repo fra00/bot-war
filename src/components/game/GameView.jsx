@@ -8,8 +8,9 @@ import Arena3D from "./Arena3D";
  * permettendo di passare dalla vista 2D a quella 3D.
  * @param {object} props
  * @param {import('../../game/Game.js').GameState} props.gameState - Lo stato attuale del gioco.
+ * @param {string} props.viewMode - La modalità di visualizzazione ('2D', '3D', 'FPV').
  */
-function GameView({ gameState, viewMode }) {
+function GameView({ gameState, viewMode, onViewModeChange }) {
   // Se gameState non è pronto, renderizza un placeholder per mantenere il layout
   if (!gameState || !gameState.arena) {
     return (
@@ -31,7 +32,11 @@ function GameView({ gameState, viewMode }) {
         {viewMode === "2D" ? (
           <Arena gameState={gameState} />
         ) : (
-          <Arena3D gameState={gameState} />
+          <Arena3D
+            gameState={gameState}
+            viewMode={viewMode}
+            onViewModeChange={onViewModeChange}
+          />
         )}
       </div>
     </div>
@@ -41,6 +46,7 @@ function GameView({ gameState, viewMode }) {
 GameView.propTypes = {
   gameState: PropTypes.object,
   viewMode: PropTypes.string.isRequired,
+  onViewModeChange: PropTypes.func,
 };
 
 export default GameView;
