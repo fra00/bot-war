@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
 import Modal from "../ui/Modal";
 import Input from "../ui/Input";
@@ -6,16 +6,8 @@ import Label from "../ui/Label";
 import Button from "../ui/Button";
 import CardFooter from "../ui/CardFooter";
 import Select from "../ui/Select";
-
-const CodeTextarea = ({ value, onChange, ...props }) => (
-  <textarea
-    value={value}
-    onChange={onChange}
-    className="w-full h-64 p-2 font-mono text-sm bg-gray-900 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-white"
-    {...props}
-  />
-);
-CodeTextarea.propTypes = { value: PropTypes.string, onChange: PropTypes.func };
+import CodeEditor from "./CodeEditor";
+import { generateAITypings } from "../../game/ai/ai-typings";
 
 const GlobalTransitionEditorModal = ({
   transition,
@@ -33,7 +25,8 @@ const GlobalTransitionEditorModal = ({
       setLabel(transition.label || "");
       setTarget(transition.target || "");
       setCondition(
-        transition.data?.condition || "(api, memory, context, events) => {\n  return false;\n}"
+        transition.data?.condition ||
+          "(api, memory, context, events) => {\n  return false;\n}"
       );
     } else {
       // Defaults for a new transition
@@ -62,6 +55,19 @@ const GlobalTransitionEditorModal = ({
     availableStates.length > 0
       ? availableStates
       : [{ value: "", label: "Nessuno stato disponibile", disabled: true }];
+
+  const conditionLibs = useMemo(
+    () => [
+      {
+        content: generateAITypings(["api", "memory", "context", "events"]),
+        filePath: "file:///ai-typings/condition.d.ts",
+      },
+    ],
+    []
+  );
+
+  const editorContainerStyle =
+    "h-64 w-full rounded-md overflow-hidden border border-gray-600";
 
   return (
     <Modal
@@ -99,11 +105,13 @@ const GlobalTransitionEditorModal = ({
           <Label htmlFor="global-transition-condition">
             Condizione (JavaScript)
           </Label>
-          <CodeTextarea
-            id="global-transition-condition"
-            value={condition}
-            onChange={(e) => setCondition(e.target.value)}
-          />
+          <div className={editorContainerStyle}>
+            <CodeEditor
+              value={condition}
+              onChange={(value) => setCondition(value || "")}
+              extraLibs={conditionLibs}
+            />
+          </div>
           <p className="mt-1 text-xs text-gray-400">
             La condizione deve essere una funzione che ritorna `true` o `false`.
           </p>

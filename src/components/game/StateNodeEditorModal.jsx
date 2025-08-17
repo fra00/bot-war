@@ -1,25 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
 import Modal from "../ui/Modal";
 import Input from "../ui/Input";
 import Label from "../ui/Label";
 import Button from "../ui/Button";
 import CardFooter from "../ui/CardFooter";
-
-// Un semplice textarea per gli snippet di codice.
-const CodeTextarea = ({ value, onChange, ...props }) => (
-  <textarea
-    value={value}
-    onChange={onChange}
-    className="w-full h-48 p-2 font-mono text-sm bg-gray-900 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-white"
-    {...props}
-  />
-);
-
-CodeTextarea.propTypes = {
-  value: PropTypes.string,
-  onChange: PropTypes.func,
-};
+import CodeEditor from "./CodeEditor";
+import { generateAITypings } from "../../game/ai/ai-typings";
 
 const StateNodeEditorModal = ({ node, isOpen, onClose, onSave }) => {
   const [name, setName] = useState("");
@@ -30,9 +17,7 @@ const StateNodeEditorModal = ({ node, isOpen, onClose, onSave }) => {
   useEffect(() => {
     if (node?.data) {
       setName(node.data.name || "");
-      setOnEnter(
-        node.data.onEnter || "onEnter(api, memory, context) {\n  \n}"
-      );
+      setOnEnter(node.data.onEnter || "onEnter(api, memory, context) {\n  \n}");
       setOnExecute(
         node.data.onExecute ||
           "onExecute(api, memory, events, context) {\n  \n}"
@@ -54,6 +39,41 @@ const StateNodeEditorModal = ({ node, isOpen, onClose, onSave }) => {
     onClose();
   };
 
+  // Genera le definizioni dei tipi per ogni handler usando useMemo per performance
+  const onEnterLibs = useMemo(
+    () => [
+      {
+        content: generateAITypings(["api", "memory", "context"]),
+        filePath: "file:///ai-typings/onEnter.d.ts",
+      },
+    ],
+    []
+  );
+
+  const onExecuteLibs = useMemo(
+    () => [
+      {
+        content: generateAITypings(["api", "memory", "events", "context"]),
+        filePath: "file:///ai-typings/onExecute.d.ts",
+      },
+    ],
+    []
+  );
+
+  const onExitLibs = useMemo(
+    () => [
+      {
+        content: generateAITypings(["api", "memory"]),
+        filePath: "file:///ai-typings/onExit.d.ts",
+      },
+    ],
+    []
+  );
+
+  // Stile comune per gli editor per ridurre la duplicazione
+  const editorContainerStyle =
+    "h-48 w-full rounded-md overflow-hidden border border-gray-600";
+
   return (
     <Modal
       isOpen={isOpen}
@@ -73,30 +93,33 @@ const StateNodeEditorModal = ({ node, isOpen, onClose, onSave }) => {
         </div>
         <div>
           <Label htmlFor="on-enter-code">Codice onEnter</Label>
-          <CodeTextarea
-            id="on-enter-code"
-            value={onEnter}
-            onChange={(e) => setOnEnter(e.target.value)}
-            placeholder="api.log('Entrato nello stato...');"
-          />
+          <div className={editorContainerStyle}>
+            <CodeEditor
+              value={onEnter}
+              onChange={(value) => setOnEnter(value || "")}
+              extraLibs={onEnterLibs}
+            />
+          </div>
         </div>
         <div>
           <Label htmlFor="on-execute-code">Codice onExecute</Label>
-          <CodeTextarea
-            id="on-execute-code"
-            value={onExecute}
-            onChange={(e) => setOnExecute(e.target.value)}
-            placeholder="if (context.enemy) { api.fire(); }"
-          />
+          <div className={editorContainerStyle}>
+            <CodeEditor
+              value={onExecute}
+              onChange={(value) => setOnExecute(value || "")}
+              extraLibs={onExecuteLibs}
+            />
+          </div>
         </div>
         <div>
           <Label htmlFor="on-exit-code">Codice onExit</Label>
-          <CodeTextarea
-            id="on-exit-code"
-            value={onExit}
-            onChange={(e) => setOnExit(e.target.value)}
-            placeholder="api.log('Uscito dallo stato...');"
-          />
+          <div className={editorContainerStyle}>
+            <CodeEditor
+              value={onExit}
+              onChange={(value) => setOnExit(value || "")}
+              extraLibs={onExitLibs}
+            />
+          </div>
         </div>
       </div>
       <CardFooter>

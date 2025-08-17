@@ -1,25 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
 import Modal from "../ui/Modal";
 import Input from "../ui/Input";
 import Label from "../ui/Label";
 import Button from "../ui/Button";
 import CardFooter from "../ui/CardFooter";
-
-// Un semplice textarea per gli snippet di codice, riutilizzabile.
-const CodeTextarea = ({ value, onChange, ...props }) => (
-  <textarea
-    value={value}
-    onChange={onChange}
-    className="w-full h-48 p-2 font-mono text-sm bg-gray-900 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-white"
-    {...props}
-  />
-);
-
-CodeTextarea.propTypes = {
-  value: PropTypes.string,
-  onChange: PropTypes.func,
-};
+import CodeEditor from "./CodeEditor";
+import { generateAITypings } from "../../game/ai/ai-typings";
 
 const TransitionEditorModal = ({ edge, isOpen, onClose, onSave }) => {
   const [label, setLabel] = useState("");
@@ -29,7 +16,8 @@ const TransitionEditorModal = ({ edge, isOpen, onClose, onSave }) => {
     if (edge) {
       setLabel(edge.label || "");
       setCondition(
-        edge.data?.condition || "(api, memory, context, events) => {\n  return true;\n}"
+        edge.data?.condition ||
+          "(api, memory, context, events) => {\n  return true;\n}"
       );
     }
   }, [edge]);
@@ -50,6 +38,19 @@ const TransitionEditorModal = ({ edge, isOpen, onClose, onSave }) => {
 
   if (!edge) return null;
 
+  const conditionLibs = useMemo(
+    () => [
+      {
+        content: generateAITypings(["api", "memory", "context", "events"]),
+        filePath: "file:///ai-typings/condition.d.ts",
+      },
+    ],
+    []
+  );
+
+  const editorContainerStyle =
+    "h-64 w-full rounded-md overflow-hidden border border-gray-600";
+
   return (
     <Modal
       isOpen={isOpen}
@@ -69,12 +70,13 @@ const TransitionEditorModal = ({ edge, isOpen, onClose, onSave }) => {
         </div>
         <div>
           <Label htmlFor="transition-condition">Condizione (JavaScript)</Label>
-          <CodeTextarea
-            id="transition-condition"
-            value={condition}
-            onChange={(e) => setCondition(e.target.value)}
-            placeholder="(api, memory, context) => context.enemy"
-          />
+          <div className={editorContainerStyle}>
+            <CodeEditor
+              value={condition}
+              onChange={(value) => setCondition(value || "")}
+              extraLibs={conditionLibs}
+            />
+          </div>
           <p className="mt-1 text-xs text-gray-400">
             La condizione deve essere una funzione JavaScript che ritorna `true`
             o `false`.
