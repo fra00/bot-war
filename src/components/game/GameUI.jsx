@@ -46,7 +46,6 @@ const GameUI = ({
   onOpponentModalOpen,
   isOpponentModalOpen,
   onOpponentModalClose,
-  onConfirmOpponentSelection,
   onSelectOpponentScript,
   opponentCompileError,
   onClearOpponentCompileError,
@@ -209,7 +208,6 @@ const GameUI = ({
       <OpponentSelectionModal
         isOpen={isOpponentModalOpen}
         onClose={onOpponentModalClose}
-        onConfirm={onConfirmOpponentSelection}
         scripts={scripts}
         selectedOpponentId={opponentScriptId}
         onSelectOpponent={onSelectOpponentScript}
@@ -356,7 +354,6 @@ GameUI.propTypes = {
   onOpponentModalOpen: PropTypes.func.isRequired,
   isOpponentModalOpen: PropTypes.bool.isRequired,
   onOpponentModalClose: PropTypes.func.isRequired,
-  onConfirmOpponentSelection: PropTypes.func.isRequired,
   onSelectOpponentScript: PropTypes.func.isRequired,
   opponentCompileError: PropTypes.string,
   onClearOpponentCompileError: PropTypes.func.isRequired,

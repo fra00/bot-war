@@ -1,13 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import GameManager from "../game/GameManager";
-import DefaultAI from "../../game/ai/DefaultAIBase";
 import useDisclosure from "../ui/useDisclosure";
 import ApiDocsModal from "../docs/ApiDocsModal";
 import TutorialModal from "../docs/TutorialModal";
 import VisualEditorGuideModal from "../docs/VisualEditorGuideModal";
 import LLMGuideModal from "../docs/LLMGuideModal";
-import { compileAI } from "../../game/ai/compiler";
 import { useAIScripts } from "../../hooks/useAIScripts";
 import { useTutorial } from "../../hooks/useTutorial";
 import InteractiveTutorial from "../tutorial/InteractiveTutorial";
@@ -70,12 +68,6 @@ const EditorAndArena = ({ onNavigateBack }) => {
     onClose: onOpponentModalClose,
   } = useDisclosure();
   const [gameKey, setGameKey] = useState(0);
-  // ID definitivo dello script avversario, usato per la logica di gioco
-  const [opponentScriptId, setOpponentScriptId] = useState(null);
-  // ID temporaneo dello script avversario, usato nella modale di selezione
-  const [tempOpponentScriptId, setTempOpponentScriptId] = useState(null);
-  const [opponentAI, setOpponentAI] = useState(() => DefaultAI);
-  const [opponentCompileError, setOpponentCompileError] = useState(null);
 
   const { user, logout } = useAuth();
   const {
@@ -85,6 +77,11 @@ const EditorAndArena = ({ onNavigateBack }) => {
     visualModel,
     playerAI,
     compileError,
+    opponentScriptId,
+    opponentAI,
+    opponentCompileError,
+    handleSelectOpponentScript,
+    handleClearOpponentCompileError,
     isLoading,
     setPlayerCode,
     setVisualModel,
@@ -120,7 +117,7 @@ const EditorAndArena = ({ onNavigateBack }) => {
 
     // Riavvia il gioco cambiando la chiave del GameManager.
     setGameKey((k) => k + 1);
-  }, [playerAI]); // La dipendenza è `playerAI`.
+  }, [playerAI, opponentAI]); // La dipendenza è `playerAI` e `opponentAI`.
 
   // Gestori di eventi "wrappati" per il tutorial
   const handleCreateNewScriptWithTutorial = useCallback(
@@ -220,44 +217,6 @@ const EditorAndArena = ({ onNavigateBack }) => {
     onNavigateBack(); // Torna al menu principale dopo il logout
   };
 
-  // Apre la modale e sincronizza lo stato temporaneo con quello attuale
-  const handleOpponentModalOpen = useCallback(() => {
-    setTempOpponentScriptId(opponentScriptId);
-    onOpponentModalOpen();
-  }, [opponentScriptId, onOpponentModalOpen]);
-
-  // Conferma la selezione, compila la nuova AI e riavvia il gioco
-  const handleConfirmOpponentSelection = useCallback(() => {
-    const scriptId = tempOpponentScriptId;
-    setOpponentScriptId(scriptId); // Applica la selezione temporanea a quella definitiva
-    setOpponentCompileError(null); // Pulisce errori precedenti
-
-    if (!scriptId) {
-      setOpponentAI(() => DefaultAI);
-    } else {
-      const script = scripts.find((s) => s.id === scriptId);
-      if (script) {
-        try {
-          // La funzione compileAI restituisce l'oggetto AI o lancia un'eccezione.
-          const compiledAI = compileAI(script.script || script.code);
-          setOpponentAI(() => compiledAI);
-        } catch (error) {
-          const errorMessage = `Errore di compilazione per l'IA "${script.name}": ${error.message}`;
-          setOpponentCompileError(errorMessage);
-          console.error(
-            `Errore durante la compilazione dell'IA avversaria "${script.name}":`,
-            error
-          );
-          // In caso di errore, torna alla AI di default e resetta la selezione.
-          setOpponentAI(() => DefaultAI);
-          setOpponentScriptId(null);
-        }
-      }
-    }
-    setGameKey((k) => k + 1); // Riavvia il gioco con il nuovo avversario
-    onOpponentModalClose();
-  }, [tempOpponentScriptId, scripts, onOpponentModalClose]);
-
   return (
     <div className="relative isolate min-h-screen p-4 pt-20 animate-fade-in">
       {/* Div per lo sfondo, posizionato dietro al contenuto */}
@@ -294,11 +253,7 @@ const EditorAndArena = ({ onNavigateBack }) => {
         </div>
       )}
       {!isLoading && (
-        <GameManager
-          key={gameKey}
-          playerAI={playerAI || DefaultAI}
-          defaultAI={opponentAI}
-        >
+        <GameManager key={gameKey} playerAI={playerAI} defaultAI={opponentAI}>
           {({ gameState, controls }) => {
             // Gli Hook devono essere chiamati incondizionatamente.
             // La logica che dipende da gameState viene eseguita solo quando non è null.
@@ -443,17 +398,13 @@ const EditorAndArena = ({ onNavigateBack }) => {
                 onUpdateSettings={handleUpdateBotSettingsWithTutorial}
                 // Props per la nuova modale di selezione avversario
                 isOpponentModalOpen={isOpponentModalOpen}
-                onOpponentModalOpen={handleOpponentModalOpen}
+                onOpponentModalOpen={onOpponentModalOpen}
                 onOpponentModalClose={onOpponentModalClose}
-                onConfirmOpponentSelection={handleConfirmOpponentSelection}
-                // Passa l'ID temporaneo e la funzione per aggiornarlo alla modale
-                opponentScriptId={tempOpponentScriptId}
+                opponentScriptId={opponentScriptId}
                 isLoading={isLoading}
-                onSelectOpponentScript={setTempOpponentScriptId}
+                onSelectOpponentScript={handleSelectOpponentScript}
                 opponentCompileError={opponentCompileError}
-                onClearOpponentCompileError={() =>
-                  setOpponentCompileError(null)
-                }
+                onClearOpponentCompileError={handleClearOpponentCompileError}
                 user={user}
                 onLogout={handleLogout}
                 isLogoutModalOpen={isLogoutModalOpen}

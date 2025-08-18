@@ -20,6 +20,11 @@ export function useAIScripts() {
   const [compileError, setCompileError] = useState(null);
   const [isLoading, setIsLoading] = useState(true); // Stato per il caricamento
 
+  // --- Stato per l'IA dell'avversario ---
+  const [opponentScriptId, setOpponentScriptId] = useState(null);
+  const [opponentAI, setOpponentAI] = useState(() => DefaultAI);
+  const [opponentCompileError, setOpponentCompileError] = useState(null);
+
   const { user } = useAuth();
   const { addToast } = useToast();
 
@@ -171,109 +176,115 @@ export function useAIScripts() {
     [handleSelectScript, user, addToast]
   );
 
-  const handleSaveOnly = useCallback(async (codeToSave) => {
-    if (!activeScript) return { success: false };
+  const handleSaveOnly = useCallback(
+    async (codeToSave) => {
+      if (!activeScript) return { success: false };
 
-    try {
-      // Tenta di compilare il codice per validarlo.
-      // La funzione compileAI eseguirà anche il merge se necessario.
-      const compiledObject = compileAI(codeToSave);
-      // Normalizza il codice: ri-stringifica l'oggetto compilato per avere sempre un codice completo.
-      const finalCode = stringifyAI(compiledObject);
+      try {
+        // Tenta di compilare il codice per validarlo.
+        // La funzione compileAI eseguirà anche il merge se necessario.
+        const compiledObject = compileAI(codeToSave);
+        // Normalizza il codice: ri-stringifica l'oggetto compilato per avere sempre un codice completo.
+        const finalCode = stringifyAI(compiledObject);
 
-      const modelToSave = visualModel || {
-        nodes: [],
-        edges: [],
-        globalTransitions: [],
-      };
+        const modelToSave = visualModel || {
+          nodes: [],
+          edges: [],
+          globalTransitions: [],
+        };
 
-      const minifiedCode = minifyScript(finalCode);
-      const updatedScript = {
-        ...activeScript,
-        script: finalCode,
-        visualModel: modelToSave,
-        multiplayerScript: minifiedCode,
-      };
-
-      if (user) {
-        await FirestoreService.updateBot(activeScript.id, {
+        const minifiedCode = minifyScript(finalCode);
+        const updatedScript = {
+          ...activeScript,
           script: finalCode,
-          multiplayerScript: minifiedCode,
           visualModel: modelToSave,
-        });
-      } else {
-        // Per localStorage, salviamo solo il codice principale
-        updatedScript.visualModel = modelToSave;
-        updatedScript.code = finalCode;
-        AIScriptService.saveScript(updatedScript);
-        // Imposta questo script come l'ultimo attivo solo se il salvataggio ha successo.
-        AIScriptService.setLastActiveScriptId(updatedScript.id);
+          multiplayerScript: minifiedCode,
+        };
+
+        if (user) {
+          await FirestoreService.updateBot(activeScript.id, {
+            script: finalCode,
+            multiplayerScript: minifiedCode,
+            visualModel: modelToSave,
+          });
+        } else {
+          // Per localStorage, salviamo solo il codice principale
+          updatedScript.visualModel = modelToSave;
+          updatedScript.code = finalCode;
+          AIScriptService.saveScript(updatedScript);
+          // Imposta questo script come l'ultimo attivo solo se il salvataggio ha successo.
+          AIScriptService.setLastActiveScriptId(updatedScript.id);
+        }
+
+        setPlayerCode(finalCode); // Aggiorna anche il codice nell'editor
+        setActiveScript(updatedScript);
+        setVisualModel(modelToSave);
+        setScripts((prev) =>
+          prev.map((s) => (s.id === updatedScript.id ? updatedScript : s))
+        );
+        setCompileError(null); // Pulisci eventuali errori precedenti
+        return { success: true };
+      } catch (error) {
+        // Se la compilazione fallisce, imposta il messaggio di errore e non salvare.
+        setCompileError(`Errore di compilazione: ${error.message}`);
+        return { success: false };
       }
+    },
+    [activeScript, user, visualModel, addToast, setPlayerCode]
+  );
 
-      setPlayerCode(finalCode); // Aggiorna anche il codice nell'editor
-      setActiveScript(updatedScript);
-      setVisualModel(modelToSave);
-      setScripts((prev) =>
-        prev.map((s) => (s.id === updatedScript.id ? updatedScript : s))
-      );
-      setCompileError(null); // Pulisci eventuali errori precedenti
-      return { success: true };
-    } catch (error) {
-      // Se la compilazione fallisce, imposta il messaggio di errore e non salvare.
-      setCompileError(`Errore di compilazione: ${error.message}`);
-      return { success: false };
-    }
-  }, [activeScript, user, visualModel, addToast, setPlayerCode]);
+  const handleUpdateAI = useCallback(
+    async (codeToSave) => {
+      if (!activeScript) return { success: false };
+      try {
+        const compiledObject = compileAI(codeToSave);
+        // Normalizza il codice: ri-stringifica l'oggetto compilato per avere sempre un codice completo.
+        const finalCode = stringifyAI(compiledObject);
 
-  const handleUpdateAI = useCallback(async (codeToSave) => {
-    if (!activeScript) return { success: false };
-    try {
-      const compiledObject = compileAI(codeToSave);
-      // Normalizza il codice: ri-stringifica l'oggetto compilato per avere sempre un codice completo.
-      const finalCode = stringifyAI(compiledObject);
+        const modelToSave = visualModel || {
+          nodes: [],
+          edges: [],
+          globalTransitions: [],
+        };
 
-      const modelToSave = visualModel || {
-        nodes: [],
-        edges: [],
-        globalTransitions: [],
-      };
-
-      const minifiedCode = minifyScript(finalCode);
-      const updatedScript = {
-        ...activeScript,
-        script: finalCode,
-        visualModel: modelToSave,
-        multiplayerScript: minifiedCode,
-      };
-
-      if (user) {
-        await FirestoreService.updateBot(activeScript.id, {
+        const minifiedCode = minifyScript(finalCode);
+        const updatedScript = {
+          ...activeScript,
           script: finalCode,
-          multiplayerScript: minifiedCode,
           visualModel: modelToSave,
-        });
-      } else {
-        // Per localStorage, salviamo solo il codice principale
-        updatedScript.code = finalCode;
-        AIScriptService.saveScript(updatedScript);
-        AIScriptService.setLastActiveScriptId(updatedScript.id);
+          multiplayerScript: minifiedCode,
+        };
+
+        if (user) {
+          await FirestoreService.updateBot(activeScript.id, {
+            script: finalCode,
+            multiplayerScript: minifiedCode,
+            visualModel: modelToSave,
+          });
+        } else {
+          // Per localStorage, salviamo solo il codice principale
+          updatedScript.code = finalCode;
+          AIScriptService.saveScript(updatedScript);
+          AIScriptService.setLastActiveScriptId(updatedScript.id);
+        }
+
+        setPlayerCode(finalCode); // Aggiorna anche il codice nell'editor
+        setPlayerAI(() => compiledObject);
+        setCompileError(null);
+        setVisualModel(modelToSave);
+        setActiveScript(updatedScript);
+        setScripts((prev) =>
+          prev.map((s) => (s.id === updatedScript.id ? updatedScript : s))
+        );
+
+        return { success: true };
+      } catch (error) {
+        setCompileError(`Errore di compilazione: ${error.message}`);
+        return { success: false };
       }
-
-      setPlayerCode(finalCode); // Aggiorna anche il codice nell'editor
-      setPlayerAI(() => compiledObject);
-      setCompileError(null);
-      setVisualModel(modelToSave);
-      setActiveScript(updatedScript);
-      setScripts((prev) =>
-        prev.map((s) => (s.id === updatedScript.id ? updatedScript : s))
-      );
-
-      return { success: true };
-    } catch (error) {
-      setCompileError(`Errore di compilazione: ${error.message}`);
-      return { success: false };
-    }
-  }, [activeScript, user, visualModel, addToast, setPlayerCode]);
+    },
+    [activeScript, user, visualModel, addToast, setPlayerCode]
+  );
 
   const handleUpdateBotSettings = useCallback(
     async (botId, settings) => {
@@ -305,6 +316,46 @@ export function useAIScripts() {
     [user, addToast, scripts, activeScript]
   );
 
+  const handleSelectOpponentScript = useCallback(
+    (scriptId) => {
+      setOpponentScriptId(scriptId);
+      setOpponentCompileError(null);
+
+      if (!scriptId) {
+        setOpponentAI(() => DefaultAI);
+        addToast("Avversario impostato su IA di Default.", "info");
+        return;
+      }
+
+      const script = scripts.find((s) => s.id === scriptId);
+      if (!script) {
+        const errorMsg = `Script avversario con ID ${scriptId} non trovato.`;
+        console.error(errorMsg);
+        setOpponentCompileError(errorMsg);
+        setOpponentAI(() => DefaultAI);
+        addToast(errorMsg, "danger");
+        return;
+      }
+
+      const code = script.script || script.code;
+      try {
+        const compiledAI = compileAI(code);
+        setOpponentAI(() => compiledAI);
+        addToast(`Avversario impostato su "${script.name}".`, "success");
+      } catch (e) {
+        const errorMsg = `Errore di compilazione per l'IA avversaria "${script.name}": ${e.message}`;
+        setOpponentCompileError(errorMsg);
+        setOpponentAI(() => DefaultAI);
+        addToast(errorMsg, "danger");
+      }
+    },
+    [scripts, addToast]
+  );
+
+  const handleClearOpponentCompileError = useCallback(() => {
+    setOpponentCompileError(null);
+  }, []);
+
   return {
     scripts,
     activeScript,
@@ -313,6 +364,9 @@ export function useAIScripts() {
     compileError,
     isLoading,
     visualModel,
+    opponentScriptId,
+    opponentAI,
+    opponentCompileError,
     setPlayerCode,
     setVisualModel,
     handleSelectScript,
@@ -321,5 +375,8 @@ export function useAIScripts() {
     handleUpdateAI,
     handleSaveOnly,
     handleUpdateBotSettings,
+    // Gestori per l'avversario
+    handleSelectOpponentScript,
+    handleClearOpponentCompileError,
   };
 }

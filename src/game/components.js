@@ -38,6 +38,6 @@ export const standardMotor = {
 // --- Componenti Radar ---
 export const standardRadar = {
   name: "Standard Radar",
-  range: 300,
+  range: 200, //300
   weight: 10,
 };

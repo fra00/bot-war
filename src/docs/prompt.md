@@ -12,7 +12,7 @@ Per creare un'IA robusta e reattiva, devi aderire ai seguenti principi architett
 
 #### A. Macchina a Stati Dichiarativa (FSM)
 
-L'IA è una macchina a stati con una precisa gerarchia di valutazione e una garanzia anti-conflitto. Il motore esegue solo la **prima transizione valida** che incontra e termina immediatamente l'elaborazione per quel tick, prevenendo "race condition" logiche.
+L'IA è una macchina a stati con una precisa gerarchia di valutazione e una garanzia anti-conflitto. Il motore esegue solo la **prima transizione valida** che incontra e termina immediatamente l'elaborazione per quel tick.
 
 #### B. Coda di Comandi Asincrona
 
@@ -47,7 +47,9 @@ const api = {
   // =================================================================
   move: (distance, speedPercentage = 100) => {},
   rotate: (angle, speedPercentage = 100) => {},
-  moveTo: (x, y, speedPercentage = 100) => { /* returns boolean */ },
+  moveTo: (x, y, speedPercentage = 100) => {
+    /* returns boolean */
+  },
   stop: (source = "AI_REQUEST") => {},
   sequence: (actions) => {},
 
@@ -60,39 +62,72 @@ const api = {
   // =================================================================
   // PERCEZIONE, STATO ED UTILITY (ISTANTANEI)
   // =================================================================
-  scan: () => { /* returns { distance, angle, x, y } or null */ },
-  scanObstacles: () => { /* returns Array of obstacles */ },
-  getState: () => { /* returns { x, y, rotation, hp, energy } */ },
-  getHullState: () => { /* returns { hp, maxHp } */ },
-  getArmorState: () => { /* returns { hp, maxHp } */ },
-  getBatteryState: () => { /* returns { energy, maxEnergy } */ },
-  getArenaDimensions: () => { /* returns { width, height, obstacles } */ },
-  isObstacleAhead: (probeDistance = 30) => { /* returns boolean */ },
-  isLineOfSightClear: (targetPosition) => { /* returns boolean */ },
-  isPositionValid: (position) => { /* returns boolean */ },
-  isQueueEmpty: () => { /* returns boolean */ },
-  getEvents: () => { /* returns Array of events */ },
+  scan: () => {
+    /* returns { distance, angle, x, y } or null */
+  },
+  scanObstacles: () => {
+    /* returns Array of obstacles */
+  },
+  getState: () => {
+    /* returns { x, y, rotation, hp, energy } */
+  },
+  getHullState: () => {
+    /* returns { hp, maxHp } */
+  },
+  getArmorState: () => {
+    /* returns { hp, maxHp } */
+  },
+  getBatteryState: () => {
+    /* returns { energy, maxEnergy } */
+  },
+  getArenaDimensions: () => {
+    /* returns { width, height, obstacles } */
+  },
+  isObstacleAhead: (probeDistance = 30) => {
+    /* returns boolean */
+  },
+  isLineOfSightClear: (targetPosition) => {
+    /* returns boolean */
+  },
+  isPositionValid: (position) => {
+    /* returns boolean */
+  },
+  isQueueEmpty: () => {
+    /* returns boolean */
+  },
+  getEvents: () => {
+    /* returns Array of events */
+  },
 
   /**
    * Genera un punto casuale valido all'interno dell'arena (o di un'area).
-   * Un punto è valido se non si trova all'interno di un ostacolo.
-   * Questo è il metodo consigliato per trovare destinazioni casuali.
    * @param {{x: number, y: number, endX: number, endY: number}} [bounds] - Area opzionale.
-   * @returns {{x: number, y: number}|null} Un oggetto con le coordinate o null se non trova un punto valido.
+   * @returns {{x: number, y: number}|null} Un oggetto con le coordinate o null.
    */
-  getRandomPoint: (bounds = null) => { /* returns {x, y} or null */ },
+  getRandomPoint: (bounds = null) => {
+    /* returns {x, y} or null */
+  },
 
   // =================================================================
   // GESTIONE MEMORIA E DEBUG
   // =================================================================
-  getMemory: () => { /* returns a persistent object */ },
+  getMemory: () => {
+    /* returns a persistent object */
+  },
   updateMemory: (dataObject) => {},
   log: (...args) => {},
 };
-3. Esempio Guidato: Implementazione di un'IA di Base
-Analizza questo esempio di base. Rappresenta la struttura e la qualità attesa. Nota l'uso di getRandomPoint() e la corretta sintassi delle funzioni.
-code
-JavaScript
+```
+
+---
+
+### 3. Esempio Guidato e i Suoi Limiti
+
+Analizza questo esempio di base. Il suo scopo è mostrare la **sintassi corretta** e la **struttura di base** di una FSM.
+
+**ATTENZIONE:** Questo è un esempio **minimale e volutamente semplicistico**. La sua logica di transizione (es. `SEARCHING` <-> `ATTACKING`) è troppo basilare per una strategia complessa e, se copiata ciecamente, causerà errori tattici come l'oscillazione di stato. **NON copiare la sua logica, ma impara dalla sua struttura.** La tua missione richiederà una logica di transizione molto più robusta.
+
+```javascript
 ({
   // CONFIGURAZIONE IA
   config: {
@@ -108,7 +143,10 @@ JavaScript
     {
       target: "EVADING",
       condition: function (api, memory, context, events) {
-        return (events.some((e) => e.type === "HIT_BY_PROJECTILE") && memory.evasionGraceTicks <= 0);
+        return (
+          events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
+          memory.evasionGraceTicks <= 0
+        );
       },
       description: "Colpiti, evasione ha la priorità.",
     },
@@ -126,37 +164,53 @@ JavaScript
         }
       },
       transitions: [
-        { target: 'ATTACKING', condition: (api, memory, context) => context.enemy }
-      ]
+        {
+          target: "ATTACKING",
+          condition: (api, memory, context) => context.enemy,
+        },
+      ],
     },
     ATTACKING: {
       onExecute: function (api, memory, events, context) {
         const { enemy } = context;
         if (!enemy) return;
         if (api.isQueueEmpty()) {
-            api.aimAt(enemy.x, enemy.y);
-            if (Math.abs(enemy.angle) < this.config.aimTolerance && api.isLineOfSightClear(enemy)) {
-              api.fire();
-            }
+          api.aimAt(enemy.x, enemy.y);
+          if (
+            Math.abs(enemy.angle) < this.config.aimTolerance &&
+            api.isLineOfSightClear(enemy)
+          ) {
+            api.fire();
+          }
         }
       },
       transitions: [
-        { target: 'SEARCHING', condition: (api, memory, context) => !context.enemy }
-      ]
+        {
+          target: "SEARCHING",
+          condition: (api, memory, context) => !context.enemy,
+        },
+      ],
     },
     EVADING: {
       onEnter: function (api, memory) {
         api.updateMemory({ evasionGraceTicks: this.config.evasionGracePeriod });
-        const randomAngle = (Math.random() > 0.5 ? 1 : -1) * this.config.evasionAngle;
+        const randomAngle =
+          (Math.random() > 0.5 ? 1 : -1) * this.config.evasionAngle;
         api.sequence([
-          { type: 'START_ROTATE', payload: { angle: randomAngle } },
-          { type: 'START_MOVE', payload: { distance: this.config.evasionDistance } }
+          { type: "START_ROTATE", payload: { angle: randomAngle } },
+          {
+            type: "START_MOVE",
+            payload: { distance: this.config.evasionDistance },
+          },
         ]);
       },
       transitions: [
-        { target: 'SEARCHING', condition: (api, memory, context) => api.isQueueEmpty() }
-      ]
-    }
+        {
+          target: "SEARCHING",
+          condition: (api, memory, context) => api.isQueueEmpty(),
+        },
+      ],
+    },
   },
 
   // MOTORE FSM (NON MODIFICARE)
@@ -210,50 +264,89 @@ JavaScript
     }
   },
 });
-4. Trappole Comuni e Anti-Pattern da Evitare
-Un ingegnere senior non solo scrive codice funzionante, ma previene attivamente i bug. Evita scrupolosamente queste trappole:
-Anti-Pattern Logico: Oscillazione di Stato (Thrashing).
-Problema: Il bot entra in un loop rapido tra due stati. Esempio: ATTACKING passa a KITING se distanza < 150. KITING torna ad ATTACKING se distanza > 150. Se il nemico si muove intorno a 150, il bot cambierà stato ad ogni tick, bloccandosi.
-Soluzione: Usa un "buffer" o "isteresi". La condizione per tornare indietro dovrebbe essere distanza > 170 (cioè 150 + buffer).
-Anti-Pattern Tattico: Memoria Corta.
-Problema: Il bot perde di vista il nemico e inizia a pattugliare a caso, anche se il nemico era lì un secondo fa.
-Soluzione: Usa memory. Salva la lastKnownEnemyPosition. Nello stato SEARCHING, la priorità deve essere muoversi verso quella posizione.
-Anti-Pattern Logico: Flag di Memoria Non Resettati.
-Problema: Uno stato imposta un flag (es. memory.isRepositioning = true) ma non c'è una logica chiara per resettarlo a false, bloccando l'IA.
-Soluzione: Assicurati che ogni flag impostato venga resettato quando la condizione che lo ha causato non è più vera (spesso in un onExit).
-Anti-Pattern Collisione:
-Problema: Durante una manovra di evasione o per sbloccarsi, il bot non controlla la direzione e collide con un altro ostacolo.
-Soluzione: Prima di un move o sequence di fuga, usa api.isObstacleAhead(). Per le destinazioni di moveTo, assicurati che siano sicure usando api.isPositionValid() prima di dare il comando.
-Anti-Pattern Tattico: Mancanza di Vie di Fuga.
-Problema: Il bot si posiziona in un angolo o contro un muro e, quando viene attaccato, ha le vie di fuga bloccate.
-Soluzione: Quando scegli una posizione (getRandomPoint, moveTo), privilegia aree più centrali e lontane dai bordi dell'arena, a meno che la strategia non richieda esplicitamente di usare gli angoli (es. per ricaricare o fare il cecchino).
-Anti-Pattern Logico: Loop tra stati.
-Problema: Il bot deve eseguire un movimento di KITING ma è impossibilitato ad eseguire il movimento, si può creare un loop tra stati ad esempio KITING -> UNSTUCKING -> KITING.
-Soluzione: Mettere delle logiche di timeout o di numero massimo di tentativi per evitare loop.
-5. La Tua Missione
-Ora, basandoti su tutto il contesto fornito, crea una nuova e diversa IA per il bot.
-IMPORTANTE: Non replicare ciecamente gli stati dell'esempio se non sono necessari. La tua sfida è creare una FSM su misura per la missione richiesta, creando nuovi stati se necessario.
-Strategia Richiesta:
-[INSERISCI QUI LA TUA STRATEGIA DETTAGLIATA]
-Esempi di strategie che potresti richiedere:
-Esempio 1: Cecchino Difensivo: "Crea un bot 'cecchino' difensivo. La sua priorità è trovare un buon punto di copertura (preferibilmente un angolo dell'arena), rimanere fermo e sparare solo a nemici a lunga distanza. Deve avere uno stato FINDING_COVER per la ricerca iniziale e uno stato REPOSITIONING per fuggire e trovare una nuova copertura se un nemico si avvicina troppo (es. a meno di 200 pixel) o se la sua linea di tiro è costantemente bloccata."
-Esempio 2: Aggressore Implacabile (Brawler): "Crea un bot iper-aggressivo. Non deve mai ritirarsi o evadere. La sua unica strategia è avvicinarsi il più possibile al nemico (ATTACKING) e sparare continuamente. Se perde di vista il nemico (SEARCHING), deve immediatamente dirigersi verso la sua ultima posizione nota. Ignora la gestione della batteria e le collisioni (le transizioni globali possono essere vuote)."
-Esempio 3: Tattico degli Ostacoli: "Crea un bot che sfrutta gli ostacoli. Deve avere uno stato AMBUSHING in cui si nasconde dietro un ostacolo vicino alla posizione del nemico, attendendo che il nemico si avvicini prima di attaccare. Quando viene colpito (EVADING), la sua priorità è trovare un altro ostacolo dietro cui nascondersi. Il movimento in campo aperto deve essere ridotto al minimo."
-6. Processo di Generazione e Auto-Valutazione Obbligatorio
-Prima di generare l'output finale, devi seguire internamente questo rigoroso processo di ragionamento e auto-valutazione. L'output finale deve essere solo il codice.
-Passo 1: Analisi della Strategia.
-Comprendi a fondo la strategia richiesta nella "Tua Missione".
-Passo 2: Progettazione della Macchina a Stati (FSM).
-Definisci mentalmente gli stati necessari e le transizioni chiave tra di essi. Quali sono gli stati critici? Quali transizioni devono essere globali?
-Passo 3: Scrittura del Codice.
-Implementa la FSM all'interno della struttura fornita, popolando config, globalTransitions e states.
-Passo 4: Revisione Critica e Auto-Correzione.
-Riesamina il codice che hai appena scritto ponendoti le seguenti domande. Se la risposta a una di queste è "No", correggi il codice prima di procedere.
-Correttezza di this: Ho usato la sintassi function() o il metodo breve (onExecute() {}) invece delle arrow functions (=>) per tutti i metodi degli stati e le condizioni, per preservare il contesto di this.config?
-Regola di aimAt: La mia logica previene rigorosamente la chiamata a api.aimAt() mentre il bot è in movimento (quando api.isQueueEmpty() è false)? Ho usato un pattern di mutua esclusività (es. if/else) per separare le azioni di movimento da quelle di mira?
-Conflitti tra Stati: Le mie transizioni a bassa priorità (specialmente quelle globali come "torna a SEARCHING se non vedi il nemico") sono "protette" per non interrompere stati critici e temporanei come EVADING, UNSTUCKING o REPOSITIONING? Ho aggiunto un controllo come !['EVADING'].includes(memory.current)?
-Anti-Pattern Evitati: Ho considerato l'oscillazione di stato, la gestione della memoria e la logica di fallback?
-API e Struttura: Ho usato solo l'API fornita, getRandomPoint, e ho lasciato intatto il motore FSM?
-Passo 5: Produzione dell'Output Finale.
-Dopo aver completato la revisione e le eventuali correzioni, genera come output solo e unicamente il blocco di codice JavaScript finale, racchiuso tra ({ e }) e senza alcun testo aggiuntivo.
 ```
+
+---
+
+### 4. Principio Guida: Strategia > Esempio
+
+Questa è la regola più importante da seguire. Quando crei la tua IA, la gerarchia di autorità è la seguente:
+
+1.  **La "Tua Missione" (Sezione 6) è il comandante supremo.** La logica che scrivi deve realizzare quella strategia.
+2.  Le **"Trappole Comuni da Evitare" (Sezione 5) sono le tue leggi non negoziabili.** Il tuo codice non deve mai violarle.
+3.  L'**"Esempio Guidato" (Sezione 3) è un semplice riferimento sintattico.** Ti mostra _come_ formattare uno stato, non _cosa_ quello stato debba fare.
+
+Se la logica semplice dell'esempio è in conflitto con le necessità complesse della missione, **la missione e le regole anti-pattern vincono sempre.**
+
+---
+
+### 5. Trappole Comuni e Anti-Pattern da Evitare
+
+Un ingegnere senior previene attivamente i bug. Evita scrupolosamente queste trappole:
+
+- **Anti-Pattern Logico: Oscillazione di Stato (Thrashing).**
+
+  - **Problema:** Loop rapido tra due stati a causa di condizioni di transizione troppo sensibili.
+  - **Soluzione:** Usa un "buffer" o "isteresi". Se passi a riposizionarti a `distanza < 150`, la condizione per tornare ad attaccare deve essere `distanza > 170`.
+
+- **Anti-Pattern Tattico: Memoria Corta.**
+
+  - **Problema:** Il bot perde il nemico e inizia subito a pattugliare a caso.
+  - **Soluzione:** Usa `memory` per salvare la `lastKnownEnemyPosition` e dai priorità a quella posizione in `SEARCHING`.
+
+- **Anti-Pattern Logico: Flag di Memoria Non Resettati.**
+
+  - **Problema:** Uno stato imposta un flag (`memory.isRepositioning = true`) ma non lo resetta mai, bloccando l'IA.
+  - **Soluzione:** Assicurati che ogni flag venga resettato (spesso in `onExit` o al completamento di un'azione).
+
+- **Anti-Pattern Collisione:**
+
+  - **Problema:** Il bot, evadendo, si schianta contro un muro.
+  - **Soluzione:** Usa `api.isObstacleAhead()` prima di un `move` e `api.isPositionValid()` per le destinazioni di `moveTo`.
+
+- **Anti-Pattern Tattico: Mancanza di Vie di Fuga.**
+
+  - **Problema:** Il bot si intrappola da solo negli angoli.
+  - **Soluzione:** Privilegia posizioni centrali a meno che la strategia non richieda esplicitamente di usare gli angoli.
+
+- **Anti-Pattern Logico: Loop tra Stati Impossibilitati.**
+  - **Problema:** Il bot tenta un'azione (es. `KITING`) ma è bloccato, causando una transizione a `UNSTUCKING`. Subito dopo, la condizione di `KITING` è ancora vera, creando un loop `KITING` -> `UNSTUCKING` -> `KITING`.
+  - **Soluzione:** Usa la memoria per implementare un contatore di tentativi (`memory.unstuckAttempts = 0`). Se il contatore supera una soglia, forza una transizione verso uno stato di fallback più drastico (es. `EVADING` verso un punto casuale).
+
+---
+
+### 6. La Tua Missione
+
+Ora, basandoti su tutto il contesto fornito, crea una **nuova e diversa** IA per il bot.
+
+**Strategia Richiesta:**
+
+> **[INSERISCI QUI LA TUA STRATEGIA DETTAGLIATA]**
+>
+> > **NOTA PER L'UTENTE UMANO:** Gli esempi seguenti servono come ispirazione per scrivere la tua strategia. Sostituisci questo intero blocco di testo, inclusi gli esempi, con la tua strategia specifica prima di inviare il prompt.
+> >
+> > - **Esempio 1: Cecchino Difensivo:** "Crea un bot 'cecchino' difensivo. La sua priorità è trovare un buon punto di copertura (preferibilmente un angolo dell'arena), rimanere fermo e sparare solo a nemici a lunga distanza. Deve avere uno stato `FINDING_COVER` per la ricerca iniziale e uno stato `REPOSITIONING` per fuggire e trovare una nuova copertura se un nemico si avvicina troppo (es. a meno di 200 pixel) o se la sua linea di tiro è costantemente bloccata."
+> >
+> > - **Esempio 2: Aggressore Implacabile (Brawler):** "Crea un bot iper-aggressivo. Non deve mai ritirarsi o evadere. La sua unica strategia è avvicinarsi il più possibile al nemico (`ATTACKING`) e sparare continuamente. Se perde di vista il nemico (`SEARCHING`), deve immediatamente dirigersi verso la sua ultima posizione nota. Ignora la gestione della batteria e le collisioni (le transizioni globali possono essere vuote)."
+> >
+> > - **Esempio 3: Tattico degli Ostacoli:** "Crea un bot che sfrutta gli ostacoli. Deve avere uno stato `AMBUSHING` in cui si nasconde dietro un ostacolo vicino alla posizione del nemico, attendendo che il nemico si avvicini prima di attaccare. Quando viene colpito (`EVADING`), la sua priorità è trovare un altro ostacolo dietro cui nascondersi. Il movimento in campo aperto deve essere ridotto al minimo."
+
+---
+
+### 7. Processo di Generazione e Auto-Valutazione Obbligatorio
+
+Prima di generare l'output finale, devi seguire **internamente** questo rigoroso processo di ragionamento e auto-valutazione.
+
+**Passo 1: Analisi.** Comprendi la strategia.
+**Passo 2: Progettazione.** Definisci mentalmente gli stati e le transizioni.
+**Passo 3: Scrittura.** Implementa la FSM.
+**Passo 4: Revisione Critica.** Riesamina il codice ponendoti queste domande:
+
+1.  **Strategia vs. Esempio:** Il mio codice risolve il problema strategico della missione, o ho semplicemente copiato un pattern dall'esempio che causa un comportamento errato (come l'oscillazione di stato)?
+2.  **Correttezza di `this`:** Ho evitato le arrow functions per i metodi che accedono a `this.config`?
+3.  **Regola di `aimAt`:** Ho separato chiaramente le fasi di movimento da quelle di mira?
+4.  **Conflitti tra Stati:** Le mie transizioni a bassa priorità sono protette per non interrompere stati critici?
+5.  **Anti-Pattern Evitati:** Ho considerato l'oscillazione, la gestione della memoria e le collisioni?
+6.  **API e Struttura:** Ho usato solo l'API fornita, `getRandomPoint`, e ho lasciato intatto il motore FSM?
+
+**Passo 5: Produzione Finale.** Dopo la revisione, genera come output **solo e unicamente** il blocco di codice JavaScript finale.

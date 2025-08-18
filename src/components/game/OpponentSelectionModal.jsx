@@ -9,7 +9,6 @@ import Box from "../ui/Box";
 const OpponentSelectionModal = ({
   isOpen,
   onClose,
-  onConfirm,
   scripts,
   selectedOpponentId,
   onSelectOpponent,
@@ -39,7 +38,7 @@ const OpponentSelectionModal = ({
         <Button onClick={onClose} variant="secondary">
           Annulla
         </Button>
-        <Button onClick={onConfirm}>Conferma</Button>
+        <Button onClick={onClose}>Conferma</Button>
       </CardFooter>
     </Modal>
   );
@@ -48,7 +47,6 @@ const OpponentSelectionModal = ({
 OpponentSelectionModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
-  onConfirm: PropTypes.func.isRequired,
   scripts: PropTypes.array.isRequired,
   selectedOpponentId: PropTypes.string,
   onSelectOpponent: PropTypes.func.isRequired,

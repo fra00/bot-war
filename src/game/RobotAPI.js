@@ -76,7 +76,7 @@ class RobotAPI {
     const cellSize = Robot.RADIUS * 2;
     const grid = this.gameState.arena.navigationGrid;
 
-    const startCoords = {
+    let startCoords = {
       x: Math.floor(this.robot.x / cellSize),
       y: Math.floor(this.robot.y / cellSize),
     };
@@ -88,7 +88,9 @@ class RobotAPI {
     // Se la posizione di partenza non è valida (es. troppo vicino a un muro),
     // cerca una cella calpestabile nelle vicinanze.
     if (!grid[startCoords.y]?.[startCoords.x]?.walkable) {
-      this.log(`Posizione di partenza (${startCoords.x},${startCoords.y}) non calpestabile. Cerco un'alternativa...`);
+      this.log(
+        `Posizione di partenza (${startCoords.x},${startCoords.y}) non calpestabile. Cerco un'alternativa...`
+      );
       let foundValidStart = false;
       for (let i = -1; i <= 1 && !foundValidStart; i++) {
         for (let j = -1; j <= 1 && !foundValidStart; j++) {
