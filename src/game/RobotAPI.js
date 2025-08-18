@@ -85,6 +85,25 @@ class RobotAPI {
       y: Math.floor(targetY / cellSize),
     };
 
+    // Se la posizione di partenza non è valida (es. troppo vicino a un muro),
+    // cerca una cella calpestabile nelle vicinanze.
+    if (!grid[startCoords.y]?.[startCoords.x]?.walkable) {
+      this.log(`Posizione di partenza (${startCoords.x},${startCoords.y}) non calpestabile. Cerco un'alternativa...`);
+      let foundValidStart = false;
+      for (let i = -1; i <= 1 && !foundValidStart; i++) {
+        for (let j = -1; j <= 1 && !foundValidStart; j++) {
+          if (i === 0 && j === 0) continue;
+          const newY = startCoords.y + i;
+          const newX = startCoords.x + j;
+          if (grid[newY]?.[newX]?.walkable) {
+            startCoords = { x: newX, y: newY };
+            this.log(`Trovata partenza alternativa valida a (${newX},${newY})`);
+            foundValidStart = true;
+          }
+        }
+      }
+    }
+
     if (!grid[endCoords.y]?.[endCoords.x]?.walkable) {
       this.log(
         `Destinazione (${endCoords.x},${endCoords.y}) non calpestabile. Cerco un'alternativa...`

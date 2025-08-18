@@ -35,6 +35,7 @@ const DefaultAIBase = {
     kitingBuffer: 20, // Margine oltre la distanza di kiting per smettere di arretrare
     evasionGracePeriod: 120, // Tick di "invulnerabilità" dopo un'evasione
     cornerPadding: 50, // Distanza dai bordi per i punti di ricarica
+    kitingLoopThreshold: 2, // Soglia per rilevare il loop di kiting
   },
 
   // =================================================================
@@ -212,6 +213,23 @@ const DefaultAIBase = {
     KITING: {
       onEnter(api, memory, context) {
         api.log("Nemico troppo vicino! Valuto manovra di kiting...");
+        // Rilevamento e gestione del loop KITING -> UNSTUCKING
+        if (
+          memory.lastState === "UNSTUCKING" &&
+          memory.kitingAttemptCounter >= this.config.kitingLoopThreshold
+        ) {
+          api.log(
+            `Loop di Kiting-Unstuck rilevato (${memory.kitingAttemptCounter} tentativi). Cambio strategia in EVADING.`
+          );
+          // Resetta il contatore e forza una manovra evasiva più complessa.
+          api.updateMemory({ kitingAttemptCounter: 0 });
+          this.setCurrentState("EVADING", api, context);
+          return; // Interrompe l'esecuzione di onEnter per KITING
+        }
+        // Incrementa il contatore di tentativi di kiting.
+        api.updateMemory({
+          kitingAttemptCounter: memory.kitingAttemptCounter + 1,
+        });
       },
       onExecute(api, memory, events, context) {
         // La logica di transizione è stata spostata.
@@ -603,7 +621,13 @@ const DefaultAIBase = {
       api.stop("STATE_TRANSITION");
 
       api.log(`Stato: ${oldState || "undefined"} -> ${newState}`);
-      api.updateMemory({ current: newState });
+      // Aggiorna lo stato precedente e lo stato corrente
+      api.updateMemory({ current: newState, lastState: oldState });
+
+      // Resetta il contatore di kiting se usciamo dal loop kiting/unstuck
+      if (newState !== "KITING" && newState !== "UNSTUCKING") {
+        api.updateMemory({ kitingAttemptCounter: 0 });
+      }
 
       // Chiama onEnter del nuovo stato, se esiste nel nuovo pattern
       if (this.states[newState]?.onEnter) {
@@ -624,6 +648,8 @@ const DefaultAIBase = {
         lastKnownEnemyPosition: null,
         isMovingToRecharge: false,
         evasionGraceTicks: 0, // Contatore per il periodo di grazia dell'evasione
+        lastState: null,
+        kitingAttemptCounter: 0,
       });
       this.setCurrentState("SEARCHING", api);
     }
