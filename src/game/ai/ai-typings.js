@@ -76,6 +76,9 @@ export const generateAITypings = (params = []) => {
 
         /** Controlla la presenza di un ostacolo molto vicino nella direzione di movimento attuale. */
         isObstacleAhead: (probeDistance?: number) => boolean;
+
+        /** Genera un punto casuale valido all'interno dell'arena o di un'area specificata. */
+        getRandomPoint: (bounds?: { x: number, y: number, endX: number, endY: number }) => { x: number, y: number } | null;
       };
     `,
     memory: `

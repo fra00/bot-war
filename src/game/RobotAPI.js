@@ -3,7 +3,7 @@ import {
   checkLineOfSight,
   isPositionWalkable,
   checkForObstacleAhead,
-} from "./systems/perceptionSystem.js"; 
+} from "./systems/perceptionSystem.js";
 import { findPath } from "./systems/pathfindingSystem.js";
 import {
   generateCommandsForPath,
@@ -60,20 +60,22 @@ class RobotAPI {
       { x: this.robot.x, y: this.robot.y },
       { x: destX, y: destY },
     ];
-    this.sequence([{ type: "START_MOVE", payload: { distance, speedPercentage } }]);
+    this.sequence([
+      { type: "START_MOVE", payload: { distance, speedPercentage } },
+    ]);
   };
 
   /**
    * Calcola e avvia un percorso verso una destinazione, evitando gli ostacoli.
    * @returns {boolean} True se un percorso è stato trovato e avviato, altrimenti false.
    */
-  moveTo = (targetX, targetY, speedPercentage = 100) => {    
+  moveTo = (targetX, targetY, speedPercentage = 100) => {
     this.robot.destination = { x: targetX, y: targetY };
     this.robot.path = null;
 
     const cellSize = Robot.RADIUS * 2;
     const grid = this.gameState.arena.navigationGrid;
-    
+
     const startCoords = {
       x: Math.floor(this.robot.x / cellSize),
       y: Math.floor(this.robot.y / cellSize),
@@ -128,7 +130,9 @@ class RobotAPI {
       this.robot.nextActions.push(...actions, { type: "END_SEQUENCE" });
       return true;
     } else {
-      this.log(`Impossibile trovare un percorso valido per (${targetX}, ${targetY}).`);
+      this.log(
+        `Impossibile trovare un percorso valido per (${targetX}, ${targetY}).`
+      );
       this.robot.destination = null; // Pulisce il marcatore di destinazione in caso di fallimento
       this.robot.path = null; // Pulisce il percorso visuale in caso di fallimento
       return false;
@@ -136,8 +140,10 @@ class RobotAPI {
   };
 
   rotate = (angle, speedPercentage = 100) => {
-    this.sequence([{ type: "START_ROTATE", payload: { angle, speedPercentage } }]);
-  }
+    this.sequence([
+      { type: "START_ROTATE", payload: { angle, speedPercentage } },
+    ]);
+  };
 
   stop = (source = "AI_REQUEST") => {
     this.robot.destination = null;
@@ -219,8 +225,56 @@ class RobotAPI {
     // per un controllo delle collisioni completo.
     const allRobotStates = this.gameState.robots;
     const selfId = this.robot.id;
-    return isPositionWalkable(position, Robot.RADIUS, this.gameState.arena, allRobotStates, selfId);
-  }
+    return isPositionWalkable(
+      position,
+      Robot.RADIUS,
+      this.gameState.arena,
+      allRobotStates,
+      selfId
+    );
+  };
+
+  /**
+   * Genera un punto casuale valido all'interno dell'arena o di un'area specificata.
+   * Un punto è valido se non si trova all'interno di un ostacolo e rispetta i confini.
+   * @param {{x: number, y: number, endX: number, endY: number}} [bounds] - Un'area rettangolare opzionale in cui generare il punto.
+   * @returns {{x: number, y: number}|null} Un oggetto con le coordinate del punto o null se non è stato possibile trovare un punto valido dopo vari tentativi.
+   */
+  getRandomPoint = (bounds = null) => {
+    const { width: arenaWidth, height: arenaHeight } =
+      this.getArenaDimensions();
+
+    const minX = bounds?.x ?? 0;
+    const minY = bounds?.y ?? 0;
+    const maxX = bounds?.endX ?? arenaWidth;
+    const maxY = bounds?.endY ?? arenaHeight;
+
+    let point;
+    let isValid = false;
+    const maxAttempts = 50; // Per evitare loop infiniti in aree affollate
+
+    for (let i = 0; i < maxAttempts && !isValid; i++) {
+      const randomX = Math.floor(minX + Math.random() * (maxX - minX));
+      const randomY = Math.floor(minY + Math.random() * (maxY - minY));
+      point = { x: randomX, y: randomY };
+
+      // Usiamo il metodo isPositionValid dell'API stessa.
+      // Questo metodo controlla i confini, gli ostacoli e gli altri robot,
+      // garantendo che il punto scelto sia effettivamente raggiungibile.
+      if (this.isPositionValid(point)) {
+        isValid = true;
+      }
+    }
+
+    if (!isValid) {
+      this.log(
+        `Impossibile trovare un punto casuale valido nell'area specificata dopo ${maxAttempts} tentativi.`
+      );
+      return null;
+    }
+
+    return point;
+  };
 
   // --- Memoria Persistente ---
 

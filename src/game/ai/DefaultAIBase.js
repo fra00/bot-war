@@ -124,10 +124,12 @@ const DefaultAIBase = {
           } else {
             // Priorità 2: Pattugliamento casuale.
             api.log("Inizio pattugliamento casuale...");
-            const arena = api.getArenaDimensions();
-            const randomX = Math.random() * arena.width;
-            const randomY = Math.random() * arena.height;
-            api.moveTo(randomX, randomY, this.config.patrolSpeed);
+            // Usiamo la nuova funzione per ottenere un punto valido,
+            // evitando di scegliere destinazioni dentro gli ostacoli.
+            const randomPoint = api.getRandomPoint();
+            if (randomPoint) {
+              api.moveTo(randomPoint.x, randomPoint.y, this.config.patrolSpeed);
+            }
           }
         }
       },

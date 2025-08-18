@@ -52,7 +52,7 @@ Che tu sia un programmatore esperto o un principiante, abbiamo lo strumento gius
 Pensi che il tuo bot sia il migliore? Mettilo alla prova! Abilita il tuo script per il multiplayer, sfida le creazioni di altri giocatori in partite classificate e scala la classifica globale.
 
 ### API Potente e Intuitiva
-Il tuo bot ha accesso a una ricca API per interagire con il mondo di gioco: `api.scan()`, `api.fire()`, `api.moveTo(x, y)`, `api.getMemory()`, `api.getEvents()` e molto altro.
+Il tuo bot ha accesso a una ricca API per interagire con il mondo di gioco: `api.scan()`, `api.fire()`, `api.moveTo(x, y)`, `api.getRandomPoint()`, `api.getMemory()`, `api.getEvents()` e molto altro.
 
 ### Parti da una Base Solida
 Ogni nuovo giocatore parte con `DefaultAIBase`, un'intelligenza artificiale di base ben commentata e strutturata come una **macchina a stati finiti (FSM)**, un ottimo punto di partenza per le tue personalizzazioni.

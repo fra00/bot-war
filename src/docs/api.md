@@ -818,6 +818,32 @@ api.isQueueEmpty()
       api.moveTo(100, 100);
     }
 
+api.getRandomPoint(bounds)
+
+    Genera un punto casuale valido all'interno dell'arena o di un'area specificata. Un punto è considerato valido se non si trova all'interno di un ostacolo e rispetta i confini dell'arena. Le coordinate restituite sono sempre intere.
+
+    Parametri:
+    - `bounds` (Object, opzionale): Un oggetto che definisce un'area rettangolare in cui generare il punto. Ha la forma `{ x: number, y: number, endX: number, endY: number }`. Se omesso, la ricerca avverrà in tutta l'arena.
+
+    Valore di ritorno:
+    - Un oggetto `{ x: number, y: number }` con le coordinate del punto casuale valido.
+    - `null` se non è stato possibile trovare un punto valido dopo un numero massimo di tentativi (utile per aree molto piccole o affollate).
+
+    Esempio di base:
+    ```javascript
+    // Ottiene un punto casuale in un punto qualsiasi dell'arena
+    const randomDestination = api.getRandomPoint();
+    if (randomDestination) {
+      api.moveTo(randomDestination.x, randomDestination.y);
+    }
+    ```
+
+    Esempio con area personalizzata:
+    ```javascript
+    // Ottiene un punto casuale nel quadrante in alto a sinistra
+    const pointInQuadrant = api.getRandomPoint({ x: 0, y: 0, endX: 400, endY: 300 });
+    ```
+
 ---
 
 ## Sistema di Eventi

@@ -135,10 +135,11 @@ Copia questo scheletro nell'editor. Definisce la struttura base con una mappa `s
 ## Passo 2: Implementare lo Stato `SEARCHING`
 
 Nello stato `SEARCHING`, il nostro bot deve pattugliare l'arena. La sua logica è:
+
 1.  **`transitions`**: Definiamo una regola di transizione per passare allo stato `ATTACKING` quando `api.scan()` rileva un nemico.
 2.  **`onExecute`**: Se il bot è inattivo (`api.isQueueEmpty()`), avvia un pattugliamento verso un punto casuale.
 
-Aggiungi questo oggetto all'interno della mappa `states` del tuo codice:
+Aggiungi questo oggetto all'interno della mappa `states` del tuo codice. Nota come usiamo `api.getRandomPoint()`: questa funzione è molto più intelligente di `Math.random()`, perché ci garantisce di ottenere un punto **valido e raggiungibile**, evitando di scegliere destinazioni all'interno degli ostacoli.
 
 ```javascript
 SEARCHING: {
@@ -148,10 +149,12 @@ SEARCHING: {
   onExecute: function (api, memory, events) {
     // Se il bot è inattivo, decide la prossima mossa di pattugliamento.
     if (api.isQueueEmpty()) {
-      const arena = api.getArenaDimensions();
-      const randomX = Math.random() * arena.width;
-      const randomY = Math.random() * arena.height;
-      api.moveTo(randomX, randomY, this.config.patrolSpeed); // Pattuglia a velocità ridotta
+      // Usiamo la nuova funzione per ottenere un punto valido,
+      // evitando di scegliere destinazioni dentro gli ostacoli.
+      const randomPoint = api.getRandomPoint();
+      if (randomPoint) {
+        api.moveTo(randomPoint.x, randomPoint.y, this.config.patrolSpeed);
+      }
     }
   },
   transitions: [
@@ -171,6 +174,7 @@ SEARCHING: {
 ## Passo 3: Implementare lo Stato `ATTACKING`
 
 Quando siamo in `ATTACKING`, la nostra logica è:
+
 1.  **`transitions`**: Definiamo una regola per tornare a `SEARCHING` se `api.scan()` restituisce `null`.
 2.  **`onExecute`**: Ad ogni tick, dichiara l'intento di mirare al nemico e spara se la mira è buona.
 
@@ -206,6 +210,7 @@ ATTACKING: {
 ## Passo 4: Implementare lo Stato `EVADING`
 
 La transizione a `EVADING` avviene automaticamente quando veniamo colpiti, grazie alla regola che abbiamo definito in `globalTransitions`. Il nostro compito è definire cosa fare una volta entrati in questo stato.
+
 1.  **`onEnter`**: Avvia una manovra evasiva (gira e muoviti) e imposta un "periodo di grazia" per non essere interrotti subito da un altro colpo.
 2.  **`transitions`**: Definiamo una regola per tornare a `SEARCHING` quando la manovra è finita.
 
@@ -213,10 +218,25 @@ Aggiungi questo oggetto all'interno di `states`:
 
 ```javascript
 EVADING: {
-  onEnter: function (api, memory) {
-    api.log("Eseguo manovra evasiva...");
+  onEnter: function (api, memory, context) {
+    api.log("Colpito! Eseguo manovra evasiva...");
     // Imposta un periodo di grazia per non entrare in questo stato ad ogni colpo.
     api.updateMemory({ evasionGraceTicks: this.config.evasionGracePeriod });
+
     // Gira di un angolo casuale e scatta in avanti.
-    
+    const randomAngle = (Math.random() > 0.5 ? 90 : -90);
+    api.sequence([
+      { type: 'START_ROTATE', payload: { angle: randomAngle } },
+      { type: 'START_MOVE', payload: { distance: 150 } }
+    ]);
+  },
+  transitions: [
+    {
+      target: 'SEARCHING',
+      // Torniamo a cercare non appena la manovra evasiva è terminata.
+      condition: (api, memory, context) => api.isQueueEmpty(),
+      description: "Torna a cercare dopo aver completato la manovra evasiva."
+    }
+  ]
+},
 ```
