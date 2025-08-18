@@ -227,6 +227,9 @@ Soluzione: Prima di un move o sequence di fuga, usa api.isObstacleAhead(). Per l
 Anti-Pattern Tattico: Mancanza di Vie di Fuga.
 Problema: Il bot si posiziona in un angolo o contro un muro e, quando viene attaccato, ha le vie di fuga bloccate.
 Soluzione: Quando scegli una posizione (getRandomPoint, moveTo), privilegia aree più centrali e lontane dai bordi dell'arena, a meno che la strategia non richieda esplicitamente di usare gli angoli (es. per ricaricare o fare il cecchino).
+Anti-Pattern Logico: Loop tra stati.
+Problema: Il bot deve eseguire un movimento di KITING ma è impossibilitato ad eseguire il movimento, si può creare un loop tra stati ad esempio KITING -> UNSTUCKING -> KITING.
+Soluzione: Mettere delle logiche di timeout o di numero massimo di tentativi per evitare loop.
 5. La Tua Missione
 Ora, basandoti su tutto il contesto fornito, crea una nuova e diversa IA per il bot.
 IMPORTANTE: Non replicare ciecamente gli stati dell'esempio se non sono necessari. La tua sfida è creare una FSM su misura per la missione richiesta, creando nuovi stati se necessario.
