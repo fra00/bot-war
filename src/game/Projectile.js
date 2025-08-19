@@ -15,8 +15,18 @@ class Projectile {
    * @param {number} options.rotation - Angolo di movimento in gradi.
    * @param {number} options.damage - Danno inflitto all'impatto.
    * @param {number} options.maxRange - Portata massima.
+   * @param {boolean} [options.trackMiss=false] - Se tracciare il colpo mancato.
    */
-  constructor({ id, ownerId, x, y, rotation, damage, maxRange }) {
+  constructor({
+    id,
+    ownerId,
+    x,
+    y,
+    rotation,
+    damage,
+    maxRange,
+    trackMiss = false,
+  }) {
     this.id = id;
     this.ownerId = ownerId;
     this.x = x;
@@ -26,6 +36,7 @@ class Projectile {
     this.distanceTraveled = 0;
     this.damage = damage;
     this.maxRange = maxRange;
+    this.trackMiss = trackMiss;
   }
 
   /**

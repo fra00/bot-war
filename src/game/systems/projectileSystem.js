@@ -14,14 +14,32 @@ export function updateProjectiles(projectiles, robots, arena) {
   const remainingProjectiles = [];
   const newEvents = [];
 
+  // Helper per generare l'evento di colpo mancato se necessario.
+  const checkNearMiss = (projectile, finalPosition) => {
+    if (projectile.trackMiss) {
+      const opponent = robots.find((r) => r.id !== projectile.ownerId);
+      if (opponent) {
+        const dx = opponent.x - finalPosition.x;
+        const dy = opponent.y - finalPosition.y;
+        const missDistance = Math.sqrt(dx * dx + dy * dy);
+        newEvents.push({
+          type: "PROJECTILE_NEAR_MISS",
+          ownerId: projectile.ownerId,
+          position: { ...finalPosition },
+          distance: missDistance,
+        });
+      }
+    }
+  };
+
   for (const projectile of projectiles) {
     const startPos = { x: projectile.x, y: projectile.y }; // Posizione prima dell'aggiornamento
     projectile.update();
     const endPos = { x: projectile.x, y: projectile.y }; // Posizione dopo l'aggiornamento
 
     // 1. Controlla se il proiettile ha esaurito la sua portata.
-    // Se sì, viene rimosso senza generare un evento.
     if (projectile.distanceTraveled > projectile.maxRange) {
+      checkNearMiss(projectile, endPos);
       continue;
     }
 
@@ -29,7 +47,14 @@ export function updateProjectiles(projectiles, robots, arena) {
     // Usiamo un flag per uscire dal loop principale del proiettile dopo una collisione.
     let hitSomething = false;
     for (const obstacle of arena.obstacles) {
-      if (projectileIntersectsObstacle(startPos, endPos, Projectile.RADIUS, obstacle)) {
+      if (
+        projectileIntersectsObstacle(
+          startPos,
+          endPos,
+          Projectile.RADIUS,
+          obstacle
+        )
+      ) {
         newEvents.push({
           type: "PROJECTILE_HIT_OBSTACLE",
           projectileId: projectile.id,
@@ -37,6 +62,7 @@ export function updateProjectiles(projectiles, robots, arena) {
           obstacleId: obstacle.id,
           position: endPos,
         });
+        checkNearMiss(projectile, endPos);
         hitSomething = true;
         break; // Un proiettile colpisce un solo ostacolo e viene rimosso.
       }
@@ -57,7 +83,15 @@ export function updateProjectiles(projectiles, robots, arena) {
         height: Robot.RADIUS * 2,
       };
 
-      if (robot.id !== projectile.ownerId && projectileIntersectsObstacle(startPos, endPos, Projectile.RADIUS, robotHitbox)) {
+      if (
+        robot.id !== projectile.ownerId &&
+        projectileIntersectsObstacle(
+          startPos,
+          endPos,
+          Projectile.RADIUS,
+          robotHitbox
+        )
+      ) {
         robot.takeDamage(projectile.damage);
 
         newEvents.push({
@@ -96,6 +130,7 @@ export function updateProjectiles(projectiles, robots, arena) {
         ownerId: projectile.ownerId,
         position: endPos,
       });
+      checkNearMiss(projectile, endPos);
       continue; // Passa al prossimo proiettile.
     }
 

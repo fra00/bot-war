@@ -33,6 +33,8 @@ export const standardMotor = {
   maxWeight: 90, // Peso massimo supportato
   energyCostPerMove: 0.06, // energia per unità di velocità
   energyCostPerRotation: 0.02, // energia per grado di rotazione
+  strafeDistance: 50, // Distanza fissa per lo spostamento laterale
+  strafeEnergyCostMultiplier: 1.5, // Moltiplicatore costo energia per lo strafe
 };
 
 // --- Componenti Radar ---

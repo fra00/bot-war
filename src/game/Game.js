@@ -11,7 +11,12 @@ import { updateRobotStates } from "./systems/robotStateSystem.js";
 import { setupGame } from "./gameSetup.js";
 import { createNavigationGrid } from "./systems/navigationGrid.js";
 import StatsTracker from "./StatsTracker.js";
-import { scanForEnemy, scanForObstacles } from "./systems/perceptionSystem.js";
+import {
+  scanForEnemy,
+  scanForObstacles,
+  scanForIncomingProjectiles,
+  checkLineOfSight,
+} from "./systems/perceptionSystem.js";
 
 /**
  * @typedef {Object} GameState
@@ -110,9 +115,15 @@ class Game {
     // 1. Aggiorna stati passivi (cooldown, energia).
     updateRobotStates(this.robots);
 
+    // Resetta il flag di puntamento ad ogni tick.
+    this.robots.forEach((r) => (r.isBeingAimedAt = false));
+
     // 2. Processa i comandi asincroni (movimento/rotazione) che continuano dall'ultimo tick.
     // Questa funzione restituisce gli eventi generati (es. MOVE_COMPLETED).
-    const { newEvents: commandEvents } = processActiveCommands(this.robots, this.arena);
+    const { newEvents: commandEvents } = processActiveCommands(
+      this.robots,
+      this.arena
+    );
 
     // 3. Prepara lo stato del gioco per il nuovo ciclo di decisioni dell'IA.
     // L'IA deve vedere gli eventi del tick PRECEDENTE, quindi `getGameState` usa `this.lastTickEvents`.
@@ -125,11 +136,19 @@ class Game {
     // Questo viene fatto centralmente per garantire coerenza.
     this.robots.forEach((robot) => {
       // L'API `scan` del robot ora restituisce semplicemente questo risultato.
-      robot.lastScanResult = scanForEnemy(robot, this.robots.map(r => r.getState()));
+      robot.lastScanResult = scanForEnemy(
+        robot,
+        this.robots.map((r) => r.getState())
+      );
       // Eseguiamo anche la scansione degli ostacoli
       robot.lastObstaclesScan = scanForObstacles(robot, this.arena.obstacles);
+      // Eseguiamo la scansione dei proiettili in arrivo
+      robot.lastProjectilesScan = scanForIncomingProjectiles(
+        robot,
+        this.projectiles
+      );
 
-      const enemyId = this.robots.find(r => r.id !== robot.id)?.id;
+      const enemyId = this.robots.find((r) => r.id !== robot.id)?.id;
 
       if (robot.lastScanResult && enemyId) {
         if (!this.detectionState[robot.id].has(enemyId)) {
@@ -140,8 +159,7 @@ class Game {
             target: robot.lastScanResult,
           });
         }
-      }
-      else if (enemyId) {
+      } else if (enemyId) {
         // Se il nemico non è più visibile, resetta lo stato di rilevamento.
         this.detectionState[robot.id].delete(enemyId);
       }
@@ -150,10 +168,34 @@ class Game {
     // 6. Aggiungi gli eventi generati dai comandi asincroni alla nuova coda.
     this.events.push(...commandEvents);
 
-    // 7. Ogni robot decide la sua prossima mossa in base allo stato aggiornato.
+    // 7. Determina chi è sotto mira in base alle azioni del tick precedente.
+    // Questo deve accadere PRIMA che l'IA calcoli le nuove azioni,
+    // in modo che api.isLockedOnByEnemy() restituisca il valore corretto per il tick corrente.
+    this.robots.forEach((robot) => {
+      const isAiming = robot.nextActions.some(
+        (a) => a.type === "AIM_AT_CONTINUOUS"
+      );
+      if (isAiming) {
+        const opponent = this.robots.find((r) => r.id !== robot.id);
+        if (opponent) {
+          // Controlla la linea di tiro prima di impostare il flag.
+          const isLineClear = checkLineOfSight(
+            { x: robot.x, y: robot.y },
+            { x: opponent.x, y: opponent.y },
+            robot.cannon.projectileRadius,
+            this.arena.obstacles
+          );
+          if (isLineClear) {
+            opponent.isBeingAimedAt = true;
+          }
+        }
+      }
+    });
+
+    // 8. Ogni robot decide la sua prossima mossa in base allo stato aggiornato.
     this.robots.forEach((robot) => robot.computeNextAction(gameState));
 
-    // 8. Esegui le azioni sincrone (es. fuoco) e avvia nuovi comandi asincroni.
+    // 9. Esegui le azioni sincrone (es. fuoco) e avvia nuovi comandi asincroni.
     const {
       newProjectiles,
       newEvents: actionEvents,
@@ -167,7 +209,10 @@ class Game {
           // Converte l'azione 'AIM_AT_CONTINUOUS' in un comando 'ROTATE' completo,
           // replicando la logica che si trova in actionSystem.js per START_ROTATE.
           const { angle, speedPercentage } = action.payload;
-          const clampedPercentage = Math.max(-100, Math.min(speedPercentage, 100));
+          const clampedPercentage = Math.max(
+            -100,
+            Math.min(speedPercentage, 100)
+          );
           const rotationSpeed =
             robot.motor.maxRotationSpeed *
             (clampedPercentage / 100) *
@@ -182,7 +227,10 @@ class Game {
           const activeCommand = robot.commandQueue[0];
 
           // Se il comando attivo non è già la stessa rotazione, interrompi e avvia la nuova.
-          if (!activeCommand || !isCommandEquivalent(activeCommand, newCommand)) {
+          if (
+            !activeCommand ||
+            !isCommandEquivalent(activeCommand, newCommand)
+          ) {
             robot.commandQueue = [newCommand];
           }
           return { handled: true }; // Indica che l'azione è stata gestita qui.
@@ -191,8 +239,8 @@ class Game {
       }
     );
 
-    // Traccia i colpi sparati
-    newProjectiles.forEach(p => {
+    // Traccia i colpi sparati (ora al passo 10)
+    newProjectiles.forEach((p) => {
       this.statsTracker.trackShotFired(p.ownerId);
     });
 
@@ -200,24 +248,21 @@ class Game {
     this.events.push(...actionEvents);
     this.projectileCounter = updatedProjectileCounter;
 
-    // 9. Aggiorna i proiettili e gestisce le collisioni.
-    const { remainingProjectiles, newEvents: projectileEvents } = updateProjectiles(
-      this.projectiles,
-      this.robots,
-      this.arena
-    );
+    // 11. Aggiorna i proiettili e gestisce le collisioni.
+    const { remainingProjectiles, newEvents: projectileEvents } =
+      updateProjectiles(this.projectiles, this.robots, this.arena);
     this.projectiles = remainingProjectiles;
     this.events.push(...projectileEvents);
 
-    // Traccia i colpi a segno e il danno
-    projectileEvents.forEach(event => {
-      if (event.type === 'ENEMY_HIT') {
+    // Traccia i colpi a segno e il danno (ora al passo 12)
+    projectileEvents.forEach((event) => {
+      if (event.type === "ENEMY_HIT") {
         this.statsTracker.trackHit(event.ownerId, event.damage);
         this.statsTracker.trackDamageTaken(event.targetId, event.damage);
       }
     });
 
-    // 10. Controlla le condizioni di fine partita.
+    // 13. Controlla le condizioni di fine partita.
     const aliveRobots = this.robots.filter((r) => r.hullHp > 0);
     if (aliveRobots.length <= 1) {
       // Finalizza il timer prima di interrompere lo stato.
@@ -231,7 +276,7 @@ class Game {
       return;
     }
 
-    // 11. Alla fine del tick, gli eventi generati diventano gli eventi del "tick precedente" per il frame successivo.
+    // 14. Alla fine del tick, gli eventi generati diventano gli eventi del "tick precedente" per il frame successivo.
     this.lastTickEvents = this.events;
   }
 

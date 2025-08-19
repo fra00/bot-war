@@ -51,6 +51,14 @@ const DefaultAIBase = {
       description: "Collisione con un muro, sbloccarsi è la priorità assoluta.",
     },
     {
+      target: "EVADING_AIM",
+      condition: (api, memory) =>
+        api.isLockedOnByEnemy() &&
+        !["EVADING_AIM", "UNSTUCKING", "EVADING"].includes(memory.current),
+      description:
+        "Nemico sta mirando, manovra evasiva proattiva per evitare il colpo.",
+    },
+    {
       target: "EVADING",
       condition: (api, memory, context, events) =>
         events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
@@ -73,14 +81,109 @@ const DefaultAIBase = {
     {
       target: "RECHARGING",
       condition: function (api, memory, context) {
+        // Aggiungiamo una condizione di sicurezza: non ricaricare se il nemico è troppo vicino.
+        // La sopravvivenza ha la priorità sulla ricarica.
+        const isEnemyTooClose =
+          context.enemy && context.enemy.distance < this.config.kitingDistance;
+
         return (
           context.batteryPercent < this.config.rechargeEnterThreshold &&
-          memory.current !== "RECHARGING"
+          memory.current !== "RECHARGING" &&
+          !isEnemyTooClose
         );
       },
       description: "Batteria scarica, cercare una stazione di ricarica.",
     },
   ],
+  // =================================================================
+  // FUNZIONI HELPER
+  // =================================================================
+  _predictTargetPosition: function (enemy, api, memory) {
+    // Velocità del nostro proiettile (dovrebbe essere letta dall'API in un'implementazione più avanzata)
+    const projectileSpeed = 5;
+
+    // Se il nemico è fermo o non abbiamo dati sulla sua velocità, mira alla sua posizione attuale.
+    if (!enemy.velocity || enemy.velocity.speed === 0) {
+      return { x: enemy.x, y: enemy.y };
+    }
+
+    // Calcolo del tempo di intercetto (semplice, non iterativo per ora)
+    const timeToIntercept = enemy.distance / projectileSpeed;
+
+    // Calcolo della distanza che il nemico percorrerà
+    const enemyTravelDistance =
+      enemy.velocity.speed * timeToIntercept * memory.aimLeadFactor;
+
+    // Calcolo della posizione futura del nemico
+    const enemyDirectionRad = (enemy.velocity.direction * Math.PI) / 180;
+    const predictedX =
+      enemy.x + enemyTravelDistance * Math.cos(enemyDirectionRad);
+    const predictedY =
+      enemy.y + enemyTravelDistance * Math.sin(enemyDirectionRad);
+
+    // api.log(`Mira predittiva: (${predictedX.toFixed(2)}, ${predictedY.toFixed(2)})`);
+
+    return { x: predictedX, y: predictedY };
+  },
+
+  _handleReactiveDodge: function (api, memory) {
+    if (memory.dodgeCooldown > 0) {
+      return false; // In cooldown, non schivare
+    }
+
+    const incomingProjectiles = api.scanForIncomingProjectiles();
+    if (incomingProjectiles.length === 0) {
+      return false;
+    }
+
+    // Trova il proiettile più minaccioso (quello con il minor tempo all'impatto)
+    const mostThreatening = incomingProjectiles.reduce((prev, curr) =>
+      prev.timeToImpact < curr.timeToImpact ? prev : curr
+    );
+
+    const DODGE_TIME_THRESHOLD = 15; // Schiva se l'impatto è entro 15 tick
+    if (mostThreatening.timeToImpact < DODGE_TIME_THRESHOLD) {
+      api.log(
+        `!!! Proiettile in arrivo! Schivata reattiva. t=${mostThreatening.timeToImpact.toFixed(
+          1
+        )}`
+      );
+
+      // --- NUOVA LOGICA DI DECISIONE PER LA SCHIVATA ---
+      const projectileAngle = Math.abs(mostThreatening.angle);
+      const dodgeDistance = 50; // Distanza di schivata, simile a quella dello strafe
+
+      // Se il proiettile arriva dai lati (es. tra 45 e 135 gradi),
+      // il bot è orientato perpendicolarmente al proiettile.
+      // Un 'move' (avanti/indietro) è la manovra più efficace.
+      if (projectileAngle > 45 && projectileAngle < 135) {
+        api.log("Proiettile laterale, schivo muovendomi...");
+        // Prova a muoverti in una direzione, se è bloccata, prova l'altra.
+        if (!api.isObstacleAhead(dodgeDistance)) {
+          api.move(dodgeDistance);
+        } else if (!api.isObstacleAhead(-dodgeDistance)) {
+          api.move(-dodgeDistance);
+        } else {
+          // Entrambe le direzioni sono bloccate, usa lo strafe come fallback.
+          api.log("Movimento bloccato, tento uno strafe laterale.");
+          const strafeDirection = Math.random() < 0.5 ? "left" : "right";
+          api.strafe(strafeDirection);
+        }
+      } else {
+        // Il proiettile arriva da davanti o da dietro.
+        // Uno 'strafe' (spostamento laterale) è la manovra più efficace.
+        api.log("Proiettile frontale/posteriore, uso lo strafe...");
+        const strafeDirection = Math.random() < 0.5 ? "left" : "right";
+        api.strafe(strafeDirection);
+      }
+
+      api.updateMemory({ dodgeCooldown: 20 });
+      return true; // Schivata eseguita
+    }
+
+    return false;
+  },
+
   // =================================================================
   // MACCHINA A STATI
   // =================================================================
@@ -166,15 +269,16 @@ const DefaultAIBase = {
           lastKnownEnemyPosition: { x: enemy.x, y: enemy.y },
         });
 
-        // Mira sempre al nemico
-        api.aimAt(enemy.x, enemy.y);
+        // Mira predittiva: calcola dove sarà il nemico e mira lì.
+        const predictedPos = this._predictTargetPosition(enemy, api, memory);
+        api.aimAt(predictedPos.x, predictedPos.y);
 
         // Spara se la mira è buona e la linea di tiro è libera
         if (
           Math.abs(enemy.angle) < this.config.aimTolerance &&
           api.isLineOfSightClear(enemy)
         ) {
-          api.fire();
+          api.fire({ trackMiss: true });
         }
 
         // Logica di azione (non di transizione): se il nemico è troppo lontano, avvicinati.
@@ -237,7 +341,11 @@ const DefaultAIBase = {
         const { enemy } = context;
         if (!enemy) return; // Guardia di sicurezza
 
-        api.fire();
+        // Mira predittiva anche durante il kiting
+        const predictedPos = this._predictTargetPosition(enemy, api, memory);
+        api.aimAt(predictedPos.x, predictedPos.y);
+
+        api.fire({ trackMiss: true });
 
         if (api.isQueueEmpty()) {
           // Se il nemico è alle nostre spalle, avanziamo per allontanarci.
@@ -467,6 +575,38 @@ const DefaultAIBase = {
     },
 
     // =================================================================
+    // STATO EVADING_AIM (Evasione Proattiva)
+    // =================================================================
+    EVADING_AIM: {
+      onEnter(api) {
+        api.log("Il nemico mi sta puntando! Manovra evasiva...");
+      },
+      onExecute(api, memory, events, context) {
+        // Se siamo inattivi, eseguiamo una manovra di "strafe" laterale.
+        if (api.isQueueEmpty()) {
+          const strafeDirection = Math.random() < 0.5 ? "left" : "right";
+          api.strafe(strafeDirection);
+        }
+      },
+      onExit(api) {
+        api.log("Il nemico ha smesso di puntare. Riprendo le operazioni.");
+      },
+      transitions: [
+        {
+          target: "ATTACKING",
+          condition: (api, memory, context) =>
+            !api.isLockedOnByEnemy() && context.enemy,
+          description: "Il nemico ha smesso di mirare, torno all'attacco.",
+        },
+        {
+          target: "SEARCHING",
+          condition: (api, memory, context) => !api.isLockedOnByEnemy(),
+          description: "Il nemico ha smesso di mirare, torno a cercare.",
+        },
+      ],
+    },
+
+    // =================================================================
     // STATO UNSTUCKING
     // =================================================================
     UNSTUCKING: {
@@ -650,6 +790,11 @@ const DefaultAIBase = {
         evasionGraceTicks: 0, // Contatore per il periodo di grazia dell'evasione
         lastState: null,
         kitingAttemptCounter: 0,
+        // --- Nuovi parametri per la correzione della mira ---
+        aimLeadFactor: 1.0, // Moltiplicatore per l'anticipo
+        aimAdjustment: 0.05, // Quanto aggiustare ad ogni colpo mancato
+        lastMissDistance: Infinity, // Distanza dell'ultimo colpo mancato
+        dodgeCooldown: 0, // Cooldown per la schivata reattiva
       });
       this.setCurrentState("SEARCHING", api);
     }
@@ -660,8 +805,57 @@ const DefaultAIBase = {
         evasionGraceTicks: memory.evasionGraceTicks - 1,
       });
     }
+    if (memory.dodgeCooldown > 0) {
+      api.updateMemory({ dodgeCooldown: memory.dodgeCooldown - 1 });
+    }
+
+    // --- LOGICA DI SCHIVATA REATTIVA AD ALTA PRIORITÀ ---
+    // 1. Tenta di avviare una schivata. Se lo fa, interrompe il resto della logica per questo tick.
+    if (this._handleReactiveDodge.call(this, api, memory)) {
+      return;
+    }
+
+    // 2. Se una schivata è in corso (cooldown attivo), non fare nient'altro.
+    // Questo impedisce alla FSM di cancellare la manovra di schivata.
+    if (memory.dodgeCooldown > 0) {
+      return;
+    }
 
     const events = api.getEvents();
+
+    // --- Gestione Evento PROJECTILE_NEAR_MISS ---
+    const nearMissEvent = events.find((e) => e.type === "PROJECTILE_NEAR_MISS");
+    if (nearMissEvent) {
+      const currentMissDistance = nearMissEvent.distance;
+      let newAdjustment = memory.aimAdjustment;
+
+      // Se questo colpo mancato è peggiore del precedente, abbiamo "overshottato" la correzione.
+      // Invertiamo la direzione dell'aggiustamento e lo dimezziamo.
+      if (currentMissDistance > memory.lastMissDistance) {
+        newAdjustment *= -0.5;
+        api.log(
+          `Correzione mira peggiorata (dist: ${currentMissDistance.toFixed(
+            2
+          )}). Inverto e dimezzo aggiustamento a ${newAdjustment.toFixed(3)}`
+        );
+      } else {
+        api.log(
+          `Correzione mira migliorata (dist: ${currentMissDistance.toFixed(
+            2
+          )}). Continuo nella stessa direzione.`
+        );
+      }
+
+      let newLeadFactor = memory.aimLeadFactor + newAdjustment;
+      // Manteniamo il fattore di anticipo entro limiti ragionevoli
+      newLeadFactor = Math.max(0.5, Math.min(1.5, newLeadFactor));
+
+      api.updateMemory({
+        aimLeadFactor: newLeadFactor,
+        aimAdjustment: newAdjustment,
+        lastMissDistance: currentMissDistance,
+      });
+    }
 
     // --- Gestione Transizioni ad Alta Priorità (controllate ad ogni tick) ---
     const enemy = api.scan();

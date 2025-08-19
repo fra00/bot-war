@@ -11,7 +11,7 @@ Utilizzeremo i concetti fondamentali dell'API, come la **coda di comandi**, gli 
 
 Ogni IA è un oggetto JavaScript che deve avere una funzione `run(api)`. Il modo migliore per organizzare la logica è usare una macchina a stati.
 
-Copia questo scheletro nell'editor. Definisce la struttura base con una mappa `states`, una lista di `globalTransitions` per le emergenze, e una funzione `run` che agisce come motore della nostra macchina a stati. Contiene anche la funzione `setCurrentState`, che non dovrai modificare.
+Copia questo scheletro nell'editor. Definisce la struttura base con una mappa `states`, una lista di `globalTransitions` per le emergenze, e una funzione `run` che agisce come motore della nostra macchina a stati. Contiene anche le funzioni `setCurrentState` e `_predictTargetPosition`, che non dovrai modificare.
 
 ```javascript
 ({
@@ -19,16 +19,19 @@ Copia questo scheletro nell'editor. Definisce la struttura base con una mappa `s
   // CONFIGURAZIONE (opzionale)
   // =================================================================
   config: {
-    // Qui puoi definire costanti per il tuo bot
+    // Qui puoi definire costanti per il tuo bot per una facile modifica
     patrolSpeed: 70,
     aimTolerance: 5,
     evasionGracePeriod: 120, // Tick di "invulnerabilità" dopo un'evasione
+    kitingDistance: 150, // Distanza sotto la quale iniziare ad arretrare
   },
 
   // =================================================================
   // TRANSIZIONI GLOBALI (Massima Priorità)
   // =================================================================
   globalTransitions: [
+    // Le transizioni globali vengono controllate ad ogni tick, prima di qualsiasi altra logica.
+    // Sono perfette per gestire le emergenze.
     {
       target: "EVADING",
       condition: function (api, memory, context, events) {
@@ -40,6 +43,18 @@ Copia questo scheletro nell'editor. Definisce la struttura base con una mappa `s
       },
       description: "Colpiti da un proiettile, evasione ha la priorità.",
     },
+    {
+      target: "KITING",
+      condition: function (api, memory, context) {
+        // Se il nemico è troppo vicino, arretra (kiting).
+        return (
+          context.enemy &&
+          context.enemy.distance < this.config.kitingDistance &&
+          !["KITING", "EVADING"].includes(memory.current) // Evita di interrompere un'altra evasione
+        );
+      },
+      description: "Nemico troppo vicino, iniziare il kiting.",
+    },
   ],
 
   // =================================================================
@@ -49,63 +64,21 @@ Copia questo scheletro nell'editor. Definisce la struttura base con una mappa `s
     // Qui definiremo i nostri stati: SEARCHING, ATTACKING, EVADING
   },
 
-  /**
-   * La funzione run viene chiamata ad ogni tick del gioco.
-   * @param {Object} api - L'API per controllare il tuo bot.
-   */
-  run: function (api) {
-    // Inizializzazione al primo tick.
-    const memory = api.getMemory();
-    if (typeof memory.current === "undefined") {
-      api.updateMemory({ evasionGraceTicks: 0 });
-      this.setCurrentState("SEARCHING", api);
-      return; // Esce per questo tick, la logica inizierà dal prossimo.
+  // =================================================================
+  // FUNZIONI HELPER (non modificare)
+  // =================================================================
+  _predictTargetPosition: function (enemy, api) {
+    const projectileSpeed = 5; // Velocità dei proiettili
+    if (!enemy.velocity || enemy.velocity.speed === 0) {
+      return { x: enemy.x, y: enemy.y };
     }
-
-    // Decrementa il contatore del periodo di grazia per l'evasione ad ogni tick.
-    if (memory.evasionGraceTicks > 0) {
-      api.updateMemory({ evasionGraceTicks: memory.evasionGraceTicks - 1 });
-    }
-
-    const events = api.getEvents();
-    const enemy = api.scan();
-    const context = { enemy, config: this.config }; // Passiamo dati utili agli stati
-
-    // --- Gestione Transizioni ad Alta Priorità ---
-    for (const transition of this.globalTransitions) {
-      if (transition.condition.call(this, api, memory, context, events)) {
-        this.setCurrentState(transition.target, api, context);
-        return;
-      }
-    }
-
-    // --- Esecuzione dello Stato Corrente ---
-    const currentStateName = memory.current;
-    const currentState = this.states[currentStateName];
-
-    // 1. Controlla le transizioni locali dello stato
-    if (currentState?.transitions) {
-      for (const transition of currentState.transitions) {
-        if (transition.condition.call(this, api, memory, context, events)) {
-          this.setCurrentState(transition.target, api, context);
-          return;
-        }
-      }
-    }
-
-    // 2. Se nessuna transizione è scattata, esegui la logica dello stato
-    if (currentState?.onExecute) {
-      const nextStateName = currentState.onExecute.call(
-        this,
-        api,
-        memory,
-        events,
-        context
-      );
-      if (nextStateName && nextStateName !== currentStateName) {
-        this.setCurrentState(nextStateName, api);
-      }
-    }
+    const timeToIntercept = enemy.distance / projectileSpeed;
+    const enemyTravelDistance = enemy.velocity.speed * timeToIntercept;
+    const enemyDirectionRad = (enemy.velocity.direction * Math.PI) / 180;
+    return {
+      x: enemy.x + enemyTravelDistance * Math.cos(enemyDirectionRad),
+      y: enemy.y + enemyTravelDistance * Math.sin(enemyDirectionRad),
+    };
   },
 
   // --- Motore della Macchina a Stati (non modificare) ---
@@ -117,13 +90,54 @@ Copia questo scheletro nell'editor. Definisce la struttura base con una mappa `s
       if (oldState && this.states[oldState]?.onExit) {
         this.states[oldState].onExit.call(this, api, memory);
       }
-
       api.stop("STATE_TRANSITION");
       api.log(`Stato: ${oldState || "undefined"} -> ${newState}`);
       api.updateMemory({ current: newState });
-
       if (this.states[newState]?.onEnter) {
         this.states[newState].onEnter.call(this, api, memory, context);
+      }
+    }
+  },
+  run: function (api) {
+    const memory = api.getMemory();
+    if (typeof memory.current === "undefined") {
+      api.updateMemory({ evasionGraceTicks: 0 });
+      this.setCurrentState("SEARCHING", api);
+      return;
+    }
+    if (memory.evasionGraceTicks > 0) {
+      api.updateMemory({ evasionGraceTicks: memory.evasionGraceTicks - 1 });
+    }
+    const events = api.getEvents();
+    const enemy = api.scan();
+    const battery = api.getBatteryState();
+    const batteryPercent = (battery.energy / battery.maxEnergy) * 100;
+    const context = { enemy, batteryPercent, config: this.config };
+    for (const transition of this.globalTransitions) {
+      if (transition.condition.call(this, api, memory, context, events)) {
+        this.setCurrentState(transition.target, api, context);
+        return;
+      }
+    }
+    const currentState = this.states[memory.current];
+    if (currentState?.transitions) {
+      for (const transition of currentState.transitions) {
+        if (transition.condition.call(this, api, memory, context, events)) {
+          this.setCurrentState(transition.target, api, context);
+          return;
+        }
+      }
+    }
+    if (currentState?.onExecute) {
+      const nextStateName = currentState.onExecute.call(
+        this,
+        api,
+        memory,
+        events,
+        context
+      );
+      if (nextStateName && nextStateName !== memory.current) {
+        this.setCurrentState(nextStateName, api, context);
       }
     }
   },

@@ -1,6 +1,6 @@
-API di Controllo del Bot (v4)
+API di Controllo del Bot (v5)
 
-Questa documentazione descrive l'API aggiornata per programmare il tuo robot. Il sistema di controllo è asincrono, basato su eventi e ora include una coda di comandi per semplificare la programmazione di sequenze di azioni.
+Questa documentazione descrive l'API aggiornata per programmare il tuo robot. Il sistema di controllo è asincrono, basato su eventi e ora include una coda di comandi per semplificare la programmazione di sequenze di azioni, oltre a nuove funzionalità di percezione avanzata.
 
 ---
 
@@ -18,7 +18,7 @@ Comandi Asincroni e Azioni Istantanee
 
 Le azioni rimangono divise in due categorie:
 
-- Comandi Asincroni Accodabili: Azioni come `move`, `rotate`, `moveTo`, `aimAt`. Vengono aggiunte alla coda e richiedono più tick per essere completate.
+- Comandi Asincroni Accodabili: Azioni come `move`, `rotate`, `moveTo`, `aimAt`, `strafe`. Vengono aggiunte alla coda e richiedono più tick per essere completate.
 - Azioni Istantanee: Azioni come `fire` e `scan`. Vengono eseguite immediatamente, nel tick in cui vengono chiamate, senza influenzare la coda di comandi.
 
 Logica Guidata dagli Eventi
@@ -81,8 +81,11 @@ SEARCHING: {
       if (memory.lastKnownEnemyPosition) {
         api.moveTo(memory.lastKnownEnemyPosition.x, memory.lastKnownEnemyPosition.y);
       } else {
-        const arena = api.getArenaDimensions();
-        api.moveTo(Math.random() * arena.width, Math.random() * arena.height);
+            // Usa getRandomPoint per assicurarti che la destinazione sia valida
+            const randomPoint = api.getRandomPoint();
+            if (randomPoint) {
+              api.moveTo(randomPoint.x, randomPoint.y);
+            }
       }
     }
   },
@@ -97,6 +100,7 @@ SEARCHING: {
 ```
 
 In questo esempio:
+
 - La transizione a `ATTACKING` è definita in modo chiaro e separato.
 - `onExecute` si occupa solo della logica di pattugliamento quando il bot è inattivo.
 
@@ -115,15 +119,12 @@ api.move(distance, speedPercentage)
     - `speedPercentage` (number, opzionale, default: 100): La percentuale della velocità massima da usare (da -100 a 100).
 
     Comportamento:
-    - L'azione viene aggiunta alla coda. Al termine del movimento, viene generato un evento `SEQUENCE_COMPLETED`.
+    - L'azione viene aggiunta alla coda. Se parte di una sequenza, al termine viene generato un evento `SEQUENCE_COMPLETED`.
     - Può essere interrotta da `api.stop()`, collisioni o mancanza di energia, generando un evento `ACTION_STOPPED`.
 
     Esempio:
-    // Accoda un movimento in avanti di 200 pixel, poi uno indietro di 50.
-    api.sequence([
-      { type: 'START_MOVE', payload: { distance: 200, speedPercentage: 75 } },
-      { type: 'START_MOVE', payload: { distance: -50, speedPercentage: 100 } }
-    ]);
+    // Accoda un movimento in avanti di 150 pixel.
+    api.move(150);
 
 api.rotate(angle, speedPercentage)
 
@@ -134,7 +135,7 @@ api.rotate(angle, speedPercentage)
     - `speedPercentage` (number, opzionale, default: 100): La percentuale della velocità di rotazione massima.
 
     Comportamento:
-    - L'azione viene aggiunta alla coda. Al termine, genera un evento `SEQUENCE_COMPLETED`.
+    - L'azione viene aggiunta alla coda. Se parte di una sequenza, al termine genera un evento `SEQUENCE_COMPLETED`.
 
     Esempio:
     // Accoda una rotazione a sinistra di 90 gradi.
@@ -157,6 +158,20 @@ api.moveTo(x, y, speedPercentage)
     // Calcola un percorso per il centro dell'arena e accoda i movimenti.
     const arena = api.getArenaDimensions();
     api.moveTo(arena.width / 2, arena.height / 2);
+
+api.strafe(direction)
+
+    Accoda un'azione di spostamento laterale (strafe) rapido, perpendicolare alla direzione attuale del bot.
+
+    Parametri:
+    - `direction` ('left' | 'right'): La direzione dello spostamento.
+
+    Comportamento:
+    - Esegue uno spostamento a distanza fissa (configurabile nel motore) con un costo energetico maggiorato.
+    - È la manovra evasiva più efficace e veloce.
+
+    Esempio:
+    api.strafe('left');
 
 api.stop()
 
@@ -249,9 +264,13 @@ api.aimAt(x, y, speedPercentage)
       }
     }
 
-api.fire()
+api.fire(options)
 
     Spara un proiettile nella direzione attuale. Questa è un'azione istantanea.
+
+    Parametri:
+    - `options` (Object, opzionale): Un oggetto di opzioni.
+      - `trackMiss` (boolean): Se `true`, il motore genererà un evento `PROJECTILE_NEAR_MISS` se questo proiettile non colpisce il nemico.
 
     Comportamento:
     - Viene eseguita immediatamente nel tick in cui viene chiamata.
@@ -259,11 +278,9 @@ api.fire()
     - Ha un costo in energia e un tempo di ricarica (cooldown). Se non hai abbastanza energia o il cannone è in ricarica, l'azione fallisce silenziosamente.
 
     Esempio:
-    // Spara mentre ti stai muovendo lateralmente.
-    // La coda di comandi potrebbe contenere un'azione 'move'.
-    // Se la linea di tiro è libera, spara.
+    // Spara e richiedi un feedback se il colpo manca.
     if (api.isLineOfSightClear(enemyPosition)) {
-      api.fire();
+      api.fire({ trackMiss: true });
     }
 
 ---
@@ -277,11 +294,14 @@ api.scan()
     Restituisce il risultato dell'ultima scansione radar eseguita dal motore di gioco. Questa è un'azione istantanea e non consuma energia.
 
     Valore di ritorno:
-    - Un oggetto `{ distance, angle, x, y }` se il nemico è nel raggio del radar.
+    - Un oggetto con le seguenti proprietà se il nemico è nel raggio del radar:
       - `distance` (number): Distanza in linea d'aria dal nemico.
       - `angle` (number): Angolo relativo al nemico in gradi (da -180 a 180). `0` è la direzione in cui il tuo robot sta puntando. Un valore negativo è a sinistra, uno positivo a destra.
       - `x` (number): Coordinata X stimata del nemico.
       - `y` (number): Coordinata Y stimata del nemico.
+      - `velocity` (Object): Un oggetto che descrive il movimento del nemico.
+        - `speed` (number): La velocità del nemico in pixel per tick.
+        - `direction` (number): La direzione di movimento del nemico in gradi (0-360).
     - `null` se il nemico non viene rilevato.
 
 api.scanObstacles()
@@ -295,6 +315,27 @@ api.scanObstacles()
       - `distance` (number): Distanza dal centro del tuo robot al centro dell'ostacolo.
       - `angle` (number): Angolo relativo al centro dell'ostacolo (0-360).
     - Un array vuoto `[]` se non vengono rilevati ostacoli.
+
+api.scanForIncomingProjectiles()
+
+    Restituisce una lista di proiettili nemici in arrivo.
+
+    Valore di ritorno:
+    - Un array di oggetti, dove ogni oggetto rappresenta un proiettile minaccioso.
+      - `angle` (number): L'angolo relativo da cui proviene il proiettile (da -180 a 180).
+      - `timeToImpact` (number): Una stima dei tick rimanenti prima dell'impatto.
+    - Un array vuoto `[]` se non ci sono minacce immediate.
+
+api.isLockedOnByEnemy()
+
+    Controlla se il nemico sta attualmente mirando verso il tuo bot con una linea di tiro libera.
+
+    Valore di ritorno:
+    - `true` se sei sotto mira.
+    - `false` altrimenti.
+
+    Comportamento:
+    - È fondamentale per le manovre evasive proattive. Si attiva solo se il nemico ha una linea di tiro libera.
 
 api.getState()
 
@@ -327,6 +368,15 @@ api.getBatteryState()
 
     **Nota sulla Ricarica:** L'energia si ricarica passivamente ad ogni tick del gioco. La quantità di ricarica è definita dalla proprietà `rechargeRate` del componente batteria equipaggiato. Se il consumo di energia dovuto alle azioni (movimento, fuoco, etc.) è inferiore alla ricarica passiva, l'energia totale del bot aumenterà.
 
+api.getSelfWeaponState()
+
+    Restituisce lo stato attuale del cannone del tuo robot.
+
+    Valore di ritorno: Un oggetto `{ canFire: boolean, cooldownRemaining: number, energyCost: number }`.
+    - `canFire`: `true` se il cannone è pronto a sparare.
+    - `cooldownRemaining`: Il numero di tick rimanenti prima di poter sparare di nuovo.
+    - `energyCost`: Il costo in energia per sparare un colpo.
+
 api.getArenaDimensions()
 
     Restituisce le dimensioni e gli ostacoli dell'arena.
@@ -348,6 +398,26 @@ api.isPositionValid(position)
 
     Parametri:
     - `position` (Object): Un oggetto con coordinate `{ x, y }`.
+
+api.getRandomPoint(bounds)
+
+    Genera un punto casuale valido all'interno dell'arena o di un'area specificata. Un punto è considerato valido se non si trova all'interno di un ostacolo e rispetta i confini dell'arena.
+
+    Parametri:
+    - `bounds` (Object, opzionale): Un oggetto che definisce un'area rettangolare in cui generare il punto. Ha la forma `{ x: number, y: number, endX: number, endY: number }`. Se omesso, la ricerca avverrà in tutta l'arena.
+
+    Valore di ritorno:
+    - Un oggetto `{ x: number, y: number }` con le coordinate del punto casuale valido.
+    - `null` se non è stato possibile trovare un punto valido dopo un numero massimo di tentativi (utile per aree molto piccole o affollate).
+
+    Esempio di base:
+    ```javascript
+    // Ottiene un punto casuale in un punto qualsiasi dell'arena
+    const randomDestination = api.getRandomPoint();
+    if (randomDestination) {
+      api.moveTo(randomDestination.x, randomDestination.y);
+    }
+    ```
 
 api.isQueueEmpty()
 
@@ -377,12 +447,13 @@ api.getEvents()
     Restituisce un array di eventi accaduti nell'ultimo tick che riguardano il tuo robot.
 
     Tipi di Evento Principali:
-    - `SEQUENCE_COMPLETED`: Una sequenza di azioni (da `moveTo`, `move`, `rotate` o `sequence`) è terminata con successo. Contiene un `payload` per identificare l'ultimo tipo di comando: `{ payload: { lastCommandType: 'MOVE' | 'ROTATE' | 'EMPTY' } }`.
+    - `SEQUENCE_COMPLETED`: Una sequenza di azioni (da `moveTo`, `sequence`, etc.) è terminata con successo. Contiene un `payload` per identificare l'ultimo tipo di comando: `{ payload: { lastCommandType: 'MOVE' | 'ROTATE' | 'MOVE_LATERAL' | 'EMPTY' } }`.
     - `ACTION_STOPPED`: Un comando nella coda è stato interrotto. Motivi: `USER_COMMAND`, `COLLISION`, `NO_ENERGY`. Contiene una `source` per identificare la causa (`"STATE_TRANSITION"`, `"AI_REQUEST"`, `"ENGINE"`).
     - `HIT_BY_PROJECTILE`: Il tuo robot è stato colpito da un proiettile nemico.
     - `ENEMY_HIT`: Un tuo proiettile ha colpito il bersaglio nemico.
     - `PROJECTILE_HIT_WALL`: Un tuo proiettile ha colpito un muro dell'arena.
     - `PROJECTILE_HIT_OBSTACLE`: Un tuo proiettile ha colpito un ostacolo.
+    - `PROJECTILE_NEAR_MISS`: Un tuo proiettile (sparato con `trackMiss: true`) ha terminato la sua corsa senza colpire il nemico. Contiene `{ distance: number }` che indica di quanto ha mancato il bersaglio.
     - `ENEMY_DETECTED`: Il radar ha rilevato un nemico che non era visibile nel tick precedente. Contiene i dati del bersaglio.
 
 ## La Struttura di Base
@@ -391,7 +462,7 @@ Ogni IA è un oggetto JavaScript che deve esportare una funzione `run(api)`. Il 
 
 Ecco uno scheletro di partenza che puoi copiare nell'editor:
 
-```javascript
+````javascript
 ({
   // =================================================================
   // CONFIGURAZIONE IA
@@ -409,7 +480,7 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
   // =================================================================
   globalTransitions: [
     {
-      target: 'EVADING',
+      target: "EVADING",
       condition: (api, memory, context, events) =>
         events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
         memory.evasionGraceTicks <= 0,
@@ -444,11 +515,11 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
               memory.lastKnownEnemyPosition.y
             );
           } else {
-            const arena = api.getArenaDimensions();
-            api.moveTo(
-              Math.random() * arena.width,
-              Math.random() * arena.height
-            );
+            // Usa getRandomPoint per assicurarti che la destinazione sia valida
+            const randomPoint = api.getRandomPoint();
+            if (randomPoint) {
+              api.moveTo(randomPoint.x, randomPoint.y);
+            }
           }
         }
       },
@@ -519,7 +590,13 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
     }
 
     if (currentState?.onExecute) {
-      const nextStateName = currentState.onExecute.call(this, api, memory, events, context);
+      const nextStateName = currentState.onExecute.call(
+        this,
+        api,
+        memory,
+        events,
+        context
+      );
       if (nextStateName && nextStateName !== memory.current) {
         this.setCurrentState(nextStateName, api, context);
         return;
@@ -527,188 +604,6 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
     }
   },
 });
-```
-  if (
-    memory.lastKnownEnemyPosition &&
-    events.some(
-      (e) =>
-        e.type === "SEQUENCE_COMPLETED" ||
-        (e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")
-    )
-  ) {
-    api.updateMemory({ lastKnownEnemyPosition: null });
-  }
-
-  // Se il bot è inattivo, decide la prossima mossa.
-  if (api.isQueueEmpty()) {
-    // Priorità 1: Caccia all'ultima posizione nota.
-    if (memory.lastKnownEnemyPosition) {
-      api.moveTo(memory.lastKnownEnemyPosition.x, memory.lastKnownEnemyPosition.y);
-    } else {
-      // Priorità 2: Pattugliamento casuale.
-      const arena = api.getArenaDimensions();
-      api.moveTo(Math.random() * arena.width, Math.random() * arena.height);
-    }
-  }
-}
-```
-
----
-
-## Comandi di Movimento e Navigazione
-
-Questi comandi vengono aggiunti alla coda di comandi del robot.
-
-api.move(distance, speedPercentage)
-
-    Accoda un'azione di movimento per una distanza specifica.
-
-    Parametri:
-    - `distance` (number): La distanza in pixel da percorrere. Un valore negativo indica un movimento all'indietro.
-    - `speedPercentage` (number, opzionale, default: 100): La percentuale della velocità massima da usare (da -100 a 100).
-
-    Comportamento:
-    - L'azione viene aggiunta alla coda. Al termine del movimento, viene generato un evento `MOVE_COMPLETED`.
-    - Può essere interrotta da `api.stop()`, collisioni o mancanza di energia, generando un evento `ACTION_STOPPED`.
-
-    Esempio:
-    // Accoda un movimento in avanti di 200 pixel, poi uno indietro di 50.
-    api.move(200, 75);
-    api.move(-50, 100);
-
-api.rotate(angle, speedPercentage)
-
-    Accoda un'azione di rotazione di un angolo specifico.
-
-    Parametri:
-    - `angle` (number): L'angolo in gradi di cui ruotare. Positivo per senso orario (destra), negativo per antiorario (sinistra).
-    - `speedPercentage` (number, opzionale, default: 100): La percentuale della velocità di rotazione massima.
-
-    Comportamento:
-    - L'azione viene aggiunta alla coda. Al termine, genera un evento `ROTATION_COMPLETED`.
-
-    Esempio:
-    // Accoda una rotazione a sinistra di 90 gradi.
-    api.rotate(-90);
-
-api.moveTo(x, y, speedPercentage)
-
-    Comando di alto livello che calcola un percorso per raggiungere le coordinate specificate e accoda i comandi necessari.
-
-    Parametri:
-    - `x` (number): La coordinata X di destinazione.
-    - `y` (number): La coordinata Y di destinazione.
-    - `speedPercentage` (number, opzionale, default: 100): La velocità da usare per i movimenti.
-
-    Comportamento:
-    - Utilizza un algoritmo di pathfinding (A*) per trovare il percorso più breve fino al punto (x, y), aggirando gli ostacoli.
-    - Se un percorso viene trovato, il comando accoda automaticamente una sequenza di comandi `rotate` e `move` per seguirlo.
-
-    Esempio:
-    // Calcola un percorso per il centro dell'arena e accoda i movimenti.
-    const arena = api.getArenaDimensions();
-    api.moveTo(arena.width / 2, arena.height / 2);
-
-api.stop()
-
-    Interrompe immediatamente il comando in esecuzione e svuota l'intera coda di comandi. Questa è un'azione istantanea.
-
-    Comportamento:
-    - Se un comando era attivo, viene interrotto e viene generato un evento `ACTION_STOPPED` con una `source` specifica.
-    - Tutta la `commandQueue` viene cancellata. Qualsiasi azione pianificata viene annullata.
-    - È il comando principale per implementare una logica reattiva.
-
-    **Nota:** La chiamata a `stop()` accetta un parametro opzionale `source` (stringa) per identificare chi ha richiesto lo stop. Il motore della macchina a stati usa `"STATE_TRANSITION"`.
-
-    Esempio:
-    // Se vieni colpito mentre ti muovi, annulla tutto e fermati.
-    const events = api.getEvents();
-    if (events.some(e => e.type === 'HIT_BY_PROJECTILE')) {
-      api.stop();
-      // Ora la coda è vuota, puoi pianificare una manovra evasiva.
-    }
-
-api.sequence(actions)
-
-    Accoda una serie di comandi personalizzati che verranno eseguiti in sequenza.
-    Questo è un comando avanzato per creare catene di azioni complesse.
-
-    Parametri:
-    - `actions` (Array<Object>): Un array di oggetti azione, dove ogni oggetto ha la forma `{ type: string, payload: any }`. I tipi e i payload devono corrispondere a quelli usati internamente (es. `{ type: 'START_MOVE', payload: { distance: 100 } }`).
-
-    Comportamento:
-    - Le azioni vengono aggiunte alla coda di comandi.
-    - Al termine dell'intera sequenza, viene generato un evento `SEQUENCE_COMPLETED`.
-
-    Esempio:
-    // Accoda una sequenza per muoversi a zig-zag
-    const zigZag = [
-      { type: 'START_ROTATE', payload: { angle: 45 } },
-      { type: 'START_MOVE', payload: { distance: 100 } },
-      { type: 'START_ROTATE', payload: { angle: -90 } },
-      { type: 'START_MOVE', payload: { distance: 100 } },
-    ];
-    api.sequence(zigZag);
-
----
-
-## Azioni di Debug
-
-api.log(...args)
-
-    Registra un messaggio o un oggetto nel pannello di log del bot per il debug. Questa è un'azione istantanea.
-
-    Parametri:
-    - `...args` (any): Una serie di argomenti (stringhe, numeri, oggetti) da registrare. Gli oggetti verranno convertiti in stringhe JSON.
-
-    Esempio:
-    api.log("Stato attuale:", api.getMemory().current);
-    const enemy = api.scan();
-    if (enemy) {
-      api.log("Nemico trovato a distanza:", enemy.distance);
-    }
-
----
-
-## Comandi di Combattimento e Mira
-
-Questi comandi gestiscono le capacità offensive del bot. `fire` è un'azione istantanea, mentre `aimAt` avvia e mantiene un'azione di mira che richiede tempo per essere completata.
-
-api.aimAt(x, y, speedPercentage)
-
-    Comando "continuo" per mirare a una destinazione. Se chiamato ad ogni tick, il bot correggerà la sua mira verso il bersaglio.
-
-    Parametri:
-    - `x` (number): La coordinata X del bersaglio.
-    - `y` (number): La coordinata Y del bersaglio.
-    - `speedPercentage` (number, opzionale, default: 100): La velocità di rotazione.
-
-    Comportamento:
-    - Questo comando è **dichiarativo**. Ad ogni tick, l'IA dovrebbe semplicemente dichiarare "voglio puntare qui".
-    - Il motore di gioco si occupa di avviare, continuare o correggere la rotazione in modo efficiente.
-    - Questo elimina la necessità di controllare `isQueueEmpty` prima di mirare e di attendere l'evento `ROTATION_COMPLETED`.
-
-    Esempio di utilizzo corretto:
-    // Nello stato ATTACKING, ad ogni tick:
-    const target = api.scan();
-    if (target) {
-      // 1. Dichiara l'intento di mirare. Il motore gestisce la rotazione.
-      api.aimAt(target.x, target.y);
-      // 2. Controlla se la mira è già allineata e spara.
-      // Questo può accadere anche mentre la rotazione è in corso.
-      if (Math.abs(target.angle) < 5) {
-        api.fire();
-      }
-    }
-
-api.fire()
-
-    Spara un proiettile nella direzione attuale. Questa è un'azione istantanea.
-
-    Comportamento:
-    - Viene eseguita immediatamente nel tick in cui viene chiamata.
-    - Non viene aggiunta alla coda di comandi e non interrompe l'azione in corso (es. un movimento).
-    - Ha un costo in energia e un tempo di ricarica (cooldown). Se non hai abbastanza energia o il cannone è in ricarica, l'azione fallisce silenziosamente.
 
     Esempio:
     // Spara mentre ti stai muovendo lateralmente.
@@ -729,11 +624,14 @@ api.scan()
     Restituisce il risultato dell'ultima scansione radar eseguita dal motore di gioco. Questa è un'azione istantanea e non consuma energia.
 
     Valore di ritorno:
-    - Un oggetto `{ distance, angle, x, y }` se il nemico è nel raggio del radar.
+    - Un oggetto con le seguenti proprietà se il nemico è nel raggio del radar:
       - `distance` (number): Distanza in linea d'aria dal nemico.
       - `angle` (number): Angolo relativo al nemico in gradi (da -180 a 180). `0` è la direzione in cui il tuo robot sta puntando. Un valore negativo è a sinistra, uno positivo a destra.
       - `x` (number): Coordinata X stimata del nemico.
       - `y` (number): Coordinata Y stimata del nemico.
+      - `velocity` (Object): Un oggetto che descrive il movimento del nemico.
+        - `speed` (number): La velocità del nemico in pixel per tick.
+        - `direction` (number): La direzione di movimento del nemico in gradi (0-360).
     - `null` se il nemico non viene rilevato.
 
 api.scanObstacles()
@@ -779,6 +677,15 @@ api.getBatteryState()
 
     **Nota sulla Ricarica:** L'energia si ricarica passivamente ad ogni tick del gioco. La quantità di ricarica è definita dalla proprietà `rechargeRate` del componente batteria equipaggiato. Se il consumo di energia dovuto alle azioni (movimento, fuoco, etc.) è inferiore alla ricarica passiva, l'energia totale del bot aumenterà.
 
+api.getSelfWeaponState()
+
+    Restituisce lo stato attuale del cannone del tuo robot.
+
+    Valore di ritorno: Un oggetto `{ canFire: boolean, cooldownRemaining: number, energyCost: number }`.
+    - `canFire`: `true` se il cannone è pronto a sparare.
+    - `cooldownRemaining`: Il numero di tick rimanenti prima di poter sparare di nuovo.
+    - `energyCost`: Il costo in energia per sparare un colpo.
+
 api.getArenaDimensions()
 
     Restituisce le dimensioni e gli ostacoli dell'arena.
@@ -801,26 +708,9 @@ api.isPositionValid(position)
     Parametri:
     - `position` (Object): Un oggetto con coordinate `{ x, y }`.
 
-api.isQueueEmpty()
-
-    Controlla se la coda di comandi del robot è vuota.
-
-    Valore di ritorno:
-    - `true` se non ci sono comandi in coda o in esecuzione.
-    - `false` se c'è almeno un comando in attesa o in esecuzione.
-
-    Comportamento:
-    - Questa funzione è il modo preferito per verificare se il robot è "occupato" con una sequenza di azioni. Sostituisce la necessità di gestire manualmente un flag di stato come `isQueueBusy`.
-
-    Esempio:
-    if (api.isQueueEmpty()) {
-      // La coda è libera, posso pianificare una nuova sequenza di azioni.
-      api.moveTo(100, 100);
-    }
-
 api.getRandomPoint(bounds)
 
-    Genera un punto casuale valido all'interno dell'arena o di un'area specificata. Un punto è considerato valido se non si trova all'interno di un ostacolo e rispetta i confini dell'arena. Le coordinate restituite sono sempre intere.
+    Genera un punto casuale valido all'interno dell'arena o di un'area specificata. Un punto è considerato valido se non si trova all'interno di un ostacolo e rispetta i confini dell'arena.
 
     Parametri:
     - `bounds` (Object, opzionale): Un oggetto che definisce un'area rettangolare in cui generare il punto. Ha la forma `{ x: number, y: number, endX: number, endY: number }`. Se omesso, la ricerca avverrà in tutta l'arena.
@@ -838,11 +728,22 @@ api.getRandomPoint(bounds)
     }
     ```
 
-    Esempio con area personalizzata:
-    ```javascript
-    // Ottiene un punto casuale nel quadrante in alto a sinistra
-    const pointInQuadrant = api.getRandomPoint({ x: 0, y: 0, endX: 400, endY: 300 });
-    ```
+api.isQueueEmpty()
+
+    Controlla se la coda di comandi del robot è vuota.
+
+    Valore di ritorno:
+    - `true` se non ci sono comandi in coda o in esecuzione.
+    - `false` se c'è almeno un comando in attesa o in esecuzione.
+
+    Comportamento:
+    - Questa funzione è il modo preferito per verificare se il robot è "occupato" con una sequenza di azioni. Sostituisce la necessità di gestire manualmente un flag di stato come `isQueueBusy`.
+
+    Esempio:
+    if (api.isQueueEmpty()) {
+      // La coda è libera, posso pianificare una nuova sequenza di azioni.
+      api.moveTo(100, 100);
+    }
 
 ---
 
@@ -960,4 +861,4 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
     // e gestisce il ciclo di vita onExit/onEnter.
   },
 });
-```
+````

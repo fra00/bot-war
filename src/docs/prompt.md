@@ -12,19 +12,19 @@ Per creare un'IA robusta e reattiva, devi aderire ai seguenti principi architett
 
 #### A. Macchina a Stati Dichiarativa (FSM)
 
-L'IA è una macchina a stati con una precisa gerarchia di valutazione e una garanzia anti-conflitto. Il motore esegue solo la **prima transizione valida** che incontra e termina immediatamente l'elaborazione per quel tick.
+L'IA è una macchina a stati con una precisa gerarchia di valutazione. Il motore esegue solo la **prima transizione valida** che incontra e termina l'elaborazione per quel tick.
 
 #### B. Coda di Comandi Asincrona
 
-Le azioni di movimento (`move`, `moveTo`) vengono aggiunte a una coda e richiedono tempo. Usa `api.isQueueEmpty()` per verificare se il bot è inattivo.
+Le azioni di movimento (`move`, `moveTo`, `rotate`, `strafe`) vengono aggiunte a una coda e richiedono tempo. Usa `api.isQueueEmpty()` per verificare se un'azione è in corso. Lo `strafe` è la manovra evasiva più efficace.
 
-#### C. Mira Prioritaria (`aimAt`)
+#### C. Mira Prioritaria e Dichiarativa (`aimAt`)
 
-`api.aimAt()` **cancella la coda di comandi**. Non puoi muoverti e mirare contemporaneamente con `aimAt`. Separa le fasi di movimento da quelle di mira/fuoco.
+Il comando `api.aimAt(x, y)` è **dichiarativo e ad alta priorità**. La sua chiamata **cancella immediatamente la coda di comandi** per dare priorità all'acquisizione del bersaglio. Questo crea un trade-off tattico: non puoi muoverti e mirare nello stesso momento.
 
-#### D. Reattività tramite Eventi (`api.getEvents()`)
+#### D. Reattività tramite Eventi e Sensori
 
-Usa gli eventi (`HIT_BY_PROJECTILE`) come trigger per le transizioni.
+Usa gli eventi (`HIT_BY_PROJECTILE`) per le emergenze e i sensori (`isLockedOnByEnemy`) per una difesa proattiva.
 
 #### E. Gestione dei Conflitti tra Stati (Multi-Tick)
 
@@ -36,7 +36,7 @@ Il motore usa `this` per accedere a `this.config`. Le **Arrow Functions (`=>`)**
 
 ---
 
-### 2. API di Riferimento Completa (v4.1)
+### 2. API di Riferimento Completa (v5)
 
 **Devi usare ESCLUSIVAMENTE le funzioni definite in questa API.**
 
@@ -50,41 +50,42 @@ const api = {
   moveTo: (x, y, speedPercentage = 100) => {
     /* returns boolean */
   },
+  strafe: (direction) => {}, // 'left' or 'right'
   stop: (source = "AI_REQUEST") => {},
   sequence: (actions) => {},
 
   // =================================================================
   // AZIONI DI COMBATTIMENTO E MIRA
   // =================================================================
-  aimAt: (x, y, speedPercentage = 100) => {}, // ATTENZIONE: Interrompe il movimento e svuota la coda di comandi.
-  fire: () => {}, // Istantaneo
+  aimAt: (x, y, speedPercentage = 100) => {}, // Dichiarativo. Interrompe il movimento e svuota la coda.
+  fire: (options) => {}, // Istantaneo. options: { trackMiss: boolean }
 
   // =================================================================
   // PERCEZIONE, STATO ED UTILITY (ISTANTANEI)
   // =================================================================
   scan: () => {
-    /* returns { distance, angle, x, y } or null */
+    /* returns { distance, angle, x, y, velocity: { speed, direction } } or null */
   },
   scanObstacles: () => {
     /* returns Array of obstacles */
   },
+  scanForIncomingProjectiles: () => {
+    /* returns Array of { angle, timeToImpact } */
+  },
+  isLockedOnByEnemy: () => {
+    /* returns boolean */
+  },
   getState: () => {
     /* returns { x, y, rotation, hp, energy } */
-  },
-  getHullState: () => {
-    /* returns { hp, maxHp } */
-  },
-  getArmorState: () => {
-    /* returns { hp, maxHp } */
   },
   getBatteryState: () => {
     /* returns { energy, maxEnergy } */
   },
+  getSelfWeaponState: () => {
+    /* returns { canFire, cooldownRemaining, energyCost } */
+  },
   getArenaDimensions: () => {
     /* returns { width, height, obstacles } */
-  },
-  isObstacleAhead: (probeDistance = 30) => {
-    /* returns boolean */
   },
   isLineOfSightClear: (targetPosition) => {
     /* returns boolean */
@@ -98,12 +99,6 @@ const api = {
   getEvents: () => {
     /* returns Array of events */
   },
-
-  /**
-   * Genera un punto casuale valido all'interno dell'arena (o di un'area).
-   * @param {{x: number, y: number, endX: number, endY: number}} [bounds] - Area opzionale.
-   * @returns {{x: number, y: number}|null} Un oggetto con le coordinate o null.
-   */
   getRandomPoint: (bounds = null) => {
     /* returns {x, y} or null */
   },
@@ -121,21 +116,20 @@ const api = {
 
 ---
 
-### 3. Esempio Guidato e i Suoi Limiti
+### 3. Esempio Guidato: IA Tattica di Base (Best Practice v5)
 
-Analizza questo esempio di base. Il suo scopo è mostrare la **sintassi corretta** e la **struttura di base** di una FSM.
+Analizza questo esempio. Il suo scopo è mostrare la sintassi corretta e come usare le nuove API, **rispettando la regola di `aimAt`**.
 
-**ATTENZIONE:** Questo è un esempio **minimale e volutamente semplicistico**. La sua logica di transizione (es. `SEARCHING` <-> `ATTACKING`) è troppo basilare per una strategia complessa e, se copiata ciecamente, causerà errori tattici come l'oscillazione di stato. **NON copiare la sua logica, ma impara dalla sua struttura.** La tua missione richiederà una logica di transizione molto più robusta.
+**ATTENZIONE:** Questo è un esempio **minimale e volutamente semplicistico**. La sua logica di transizione è troppo basilare per una strategia complessa. **NON copiare la sua logica, ma impara dalla sua struttura.**
 
 ```javascript
 ({
   // CONFIGURAZIONE IA
   config: {
     patrolSpeed: 70,
-    aimTolerance: 5,
-    evasionGracePeriod: 120,
-    evasionDistance: 150,
-    evasionAngle: 90,
+    aimTolerance: 3,
+    evasionGracePeriod: 90,
+    predictiveAimingLead: 15,
   },
 
   // TRANSIZIONI GLOBALI
@@ -148,14 +142,13 @@ Analizza questo esempio di base. Il suo scopo è mostrare la **sintassi corretta
           memory.evasionGraceTicks <= 0
         );
       },
-      description: "Colpiti, evasione ha la priorità.",
     },
   ],
 
   // MACCHINA A STATI
   states: {
     SEARCHING: {
-      onExecute: function (api, memory, events) {
+      onExecute: function (api, memory) {
         if (api.isQueueEmpty()) {
           const point = api.getRandomPoint();
           if (point) {
@@ -174,13 +167,27 @@ Analizza questo esempio di base. Il suo scopo è mostrare la **sintassi corretta
       onExecute: function (api, memory, events, context) {
         const { enemy } = context;
         if (!enemy) return;
+        if (api.isLockedOnByEnemy() && api.isQueueEmpty()) {
+          api.strafe(Math.random() < 0.5 ? "left" : "right");
+          return;
+        }
         if (api.isQueueEmpty()) {
-          api.aimAt(enemy.x, enemy.y);
+          const leadTime = this.config.predictiveAimingLead;
+          const enemyDirectionRad = enemy.velocity.direction * (Math.PI / 180);
+          const futureX =
+            enemy.x +
+            Math.cos(enemyDirectionRad) * enemy.velocity.speed * leadTime;
+          const futureY =
+            enemy.y +
+            Math.sin(enemyDirectionRad) * enemy.velocity.speed * leadTime;
+          api.aimAt(futureX, futureY);
+          const weapon = api.getSelfWeaponState();
           if (
+            weapon.canFire &&
             Math.abs(enemy.angle) < this.config.aimTolerance &&
             api.isLineOfSightClear(enemy)
           ) {
-            api.fire();
+            api.fire({ trackMiss: true });
           }
         }
       },
@@ -194,15 +201,7 @@ Analizza questo esempio di base. Il suo scopo è mostrare la **sintassi corretta
     EVADING: {
       onEnter: function (api, memory) {
         api.updateMemory({ evasionGraceTicks: this.config.evasionGracePeriod });
-        const randomAngle =
-          (Math.random() > 0.5 ? 1 : -1) * this.config.evasionAngle;
-        api.sequence([
-          { type: "START_ROTATE", payload: { angle: randomAngle } },
-          {
-            type: "START_MOVE",
-            payload: { distance: this.config.evasionDistance },
-          },
-        ]);
+        api.strafe(Math.random() < 0.5 ? "left" : "right");
       },
       transitions: [
         {
@@ -215,103 +214,40 @@ Analizza questo esempio di base. Il suo scopo è mostrare la **sintassi corretta
 
   // MOTORE FSM (NON MODIFICARE)
   setCurrentState: function (newState, api, context = {}) {
-    const memory = api.getMemory();
-    const oldState = memory.current;
-    if (oldState !== newState) {
-      if (oldState && this.states[oldState]?.onExit) {
-        this.states[oldState].onExit.call(this, api, memory);
-      }
-      api.stop("STATE_TRANSITION");
-      api.log(`Stato: ${oldState || "undefined"} -> ${newState}`);
-      api.updateMemory({ current: newState });
-      if (this.states[newState]?.onEnter) {
-        this.states[newState].onEnter.call(this, api, memory, context);
-      }
-    }
+    /* ... codice completo ... */
   },
   run: function (api) {
-    const memory = api.getMemory();
-    if (typeof memory.current === "undefined") {
-      api.updateMemory({ evasionGraceTicks: 0 });
-      this.setCurrentState("SEARCHING", api);
-      return;
-    }
-    if (memory.evasionGraceTicks > 0) {
-      api.updateMemory({ evasionGraceTicks: memory.evasionGraceTicks - 1 });
-    }
-    const events = api.getEvents();
-    const enemy = api.scan();
-    const battery = api.getBatteryState();
-    const batteryPercent = (battery.energy / battery.maxEnergy) * 100;
-    const context = { enemy, batteryPercent, config: this.config };
-    for (const transition of this.globalTransitions) {
-      if (transition.condition.call(this, api, memory, context, events)) {
-        this.setCurrentState(transition.target, api, context);
-        return;
-      }
-    }
-    const currentState = this.states[memory.current];
-    if (currentState?.transitions) {
-      for (const transition of currentState.transitions) {
-        if (transition.condition.call(this, api, memory, context, events)) {
-          this.setCurrentState(transition.target, api, context);
-          return;
-        }
-      }
-    }
-    if (currentState?.onExecute) {
-      currentState.onExecute.call(this, api, memory, events, context);
-    }
+    /* ... codice completo ... */
   },
 });
 ```
+
+_(Nota: Il codice di `run` e `setCurrentState` deve essere la versione completa e non minificata)._
 
 ---
 
 ### 4. Principio Guida: Strategia > Esempio
 
-Questa è la regola più importante da seguire. Quando crei la tua IA, la gerarchia di autorità è la seguente:
+Questa è la regola più importante. La gerarchia di autorità è:
 
-1.  **La "Tua Missione" (Sezione 6) è il comandante supremo.** La logica che scrivi deve realizzare quella strategia.
-2.  Le **"Trappole Comuni da Evitare" (Sezione 5) sono le tue leggi non negoziabili.** Il tuo codice non deve mai violarle.
-3.  L'**"Esempio Guidato" (Sezione 3) è un semplice riferimento sintattico.** Ti mostra _come_ formattare uno stato, non _cosa_ quello stato debba fare.
+1.  **La "Tua Missione" (Sezione 6) è il comandante supremo.**
+2.  Le **"Trappole Comuni da Evitare" (Sezione 5) sono le tue leggi non negoziabili.**
+3.  L'**"Esempio Guidato" (Sezione 3) è un semplice riferimento sintattico,** non una strategia da copiare.
 
-Se la logica semplice dell'esempio è in conflitto con le necessità complesse della missione, **la missione e le regole anti-pattern vincono sempre.**
+Se la logica dell'esempio è in conflitto con la missione, **la missione e le regole anti-pattern vincono sempre.**
 
 ---
 
 ### 5. Trappole Comuni e Anti-Pattern da Evitare
 
-Un ingegnere senior previene attivamente i bug. Evita scrupolosamente queste trappole:
+Un ingegnere senior previene i bug. Evita scrupolosamente queste trappole:
 
 - **Anti-Pattern Logico: Oscillazione di Stato (Thrashing).**
-
-  - **Problema:** Loop rapido tra due stati a causa di condizioni di transizione troppo sensibili.
-  - **Soluzione:** Usa un "buffer" o "isteresi". Se passi a riposizionarti a `distanza < 150`, la condizione per tornare ad attaccare deve essere `distanza > 170`.
-
 - **Anti-Pattern Tattico: Memoria Corta.**
-
-  - **Problema:** Il bot perde il nemico e inizia subito a pattugliare a caso.
-  - **Soluzione:** Usa `memory` per salvare la `lastKnownEnemyPosition` e dai priorità a quella posizione in `SEARCHING`.
-
 - **Anti-Pattern Logico: Flag di Memoria Non Resettati.**
-
-  - **Problema:** Uno stato imposta un flag (`memory.isRepositioning = true`) ma non lo resetta mai, bloccando l'IA.
-  - **Soluzione:** Assicurati che ogni flag venga resettato (spesso in `onExit` o al completamento di un'azione).
-
-- **Anti-Pattern Collisione:**
-
-  - **Problema:** Il bot, evadendo, si schianta contro un muro.
-  - **Soluzione:** Usa `api.isObstacleAhead()` prima di un `move` e `api.isPositionValid()` per le destinazioni di `moveTo`.
-
-- **Anti-Pattern Tattico: Mancanza di Vie di Fuga.**
-
-  - **Problema:** Il bot si intrappola da solo negli angoli.
-  - **Soluzione:** Privilegia posizioni centrali a meno che la strategia non richieda esplicitamente di usare gli angoli.
-
-- **Anti-Pattern Logico: Loop tra Stati Impossibilitati.**
-  - **Problema:** Il bot tenta un'azione (es. `KITING`) ma è bloccato, causando una transizione a `UNSTUCKING`. Subito dopo, la condizione di `KITING` è ancora vera, creando un loop `KITING` -> `UNSTUCKING` -> `KITING`.
-  - **Soluzione:** Usa la memoria per implementare un contatore di tentativi (`memory.unstuckAttempts = 0`). Se il contatore supera una soglia, forza una transizione verso uno stato di fallback più drastico (es. `EVADING` verso un punto casuale).
+- **Anti-Pattern Collisione:** (Usa `isObstacleAhead` e `isPositionValid`).
+- **Anti-Pattern Tattico: Mancanza di Vie di Fuga.** (Privilegia posizioni centrali).
+- **Anti-Pattern Logico: Loop tra Stati Impossibilitati.** (Usa contatori di tentativi).
 
 ---
 
@@ -321,15 +257,19 @@ Ora, basandoti su tutto il contesto fornito, crea una **nuova e diversa** IA per
 
 **Strategia Richiesta:**
 
-> **[INSERISCI QUI LA TUA STRATEGIA DETTAGLIATA]**
+> **Crea un'IA "Predatore Tattico".**
 >
-> > **NOTA PER L'UTENTE UMANO:** Gli esempi seguenti servono come ispirazione per scrivere la tua strategia. Sostituisci questo intero blocco di testo, inclusi gli esempi, con la tua strategia specifica prima di inviare il prompt.
-> >
-> > - **Esempio 1: Cecchino Difensivo:** "Crea un bot 'cecchino' difensivo. La sua priorità è trovare un buon punto di copertura (preferibilmente un angolo dell'arena), rimanere fermo e sparare solo a nemici a lunga distanza. Deve avere uno stato `FINDING_COVER` per la ricerca iniziale e uno stato `REPOSITIONING` per fuggire e trovare una nuova copertura se un nemico si avvicina troppo (es. a meno di 200 pixel) o se la sua linea di tiro è costantemente bloccata."
-> >
-> > - **Esempio 2: Aggressore Implacabile (Brawler):** "Crea un bot iper-aggressivo. Non deve mai ritirarsi o evadere. La sua unica strategia è avvicinarsi il più possibile al nemico (`ATTACKING`) e sparare continuamente. Se perde di vista il nemico (`SEARCHING`), deve immediatamente dirigersi verso la sua ultima posizione nota. Ignora la gestione della batteria e le collisioni (le transizioni globali possono essere vuote)."
-> >
-> > - **Esempio 3: Tattico degli Ostacoli:** "Crea un bot che sfrutta gli ostacoli. Deve avere uno stato `AMBUSHING` in cui si nasconde dietro un ostacolo vicino alla posizione del nemico, attendendo che il nemico si avvicini prima di attaccare. Quando viene colpito (`EVADING`), la sua priorità è trovare un altro ostacolo dietro cui nascondersi. Il movimento in campo aperto deve essere ridotto al minimo."
+> Il suo obiettivo è controllare il campo di battaglia attraverso un posizionamento superiore e attaccare solo quando le condizioni sono ottimali. Deve essere un maestro della difesa proattiva e della mira predittiva.
+>
+> **Stati Richiesti:**
+>
+> 1.  `HUNTING`: Lo stato di default. Il bot pattuglia il centro dell'arena, evitando i bordi, alla ricerca del nemico.
+> 2.  `ENGAGING`: Una volta che il nemico è in vista, il bot entra in questo stato. Il suo unico scopo è combattere in modo intelligente:
+>     - Deve mantenere una **distanza di combattimento ottimale** (es. 200-300 pixel). Se il nemico è troppo vicino o troppo lontano, deve riposizionarsi usando `move`.
+>     - Deve usare **costantemente la difesa proattiva**. Se `api.isLockedOnByEnemy()` è vero e non si sta già muovendo, deve eseguire immediatamente uno `strafe` per schivare, interrompendo qualsiasi altra logica per quel tick.
+>     - Solo quando è alla distanza giusta e non deve schivare, deve usare la **mira predittiva** basata su `enemy.velocity` per mirare e sparare. Deve controllare `api.getSelfWeaponState()` per sparare in modo efficiente.
+> 3.  `FLANKING`: Se in `ENGAGING` la linea di tiro è bloccata per troppo tempo (es. 3 secondi, usa un contatore in `memory`), deve transitare in `FLANKING` per eseguire una manovra di aggiramento e trovare una nuova linea di tiro.
+> 4.  `EVADING`: Uno stato di emergenza a cui si accede tramite una transizione globale se viene colpito da un proiettile. Deve eseguire uno `strafe` e poi tornare a `HUNTING` o `ENGAGING` a seconda se vede ancora il nemico.
 
 ---
 
@@ -342,11 +282,11 @@ Prima di generare l'output finale, devi seguire **internamente** questo rigoroso
 **Passo 3: Scrittura.** Implementa la FSM.
 **Passo 4: Revisione Critica.** Riesamina il codice ponendoti queste domande:
 
-1.  **Strategia vs. Esempio:** Il mio codice risolve il problema strategico della missione, o ho semplicemente copiato un pattern dall'esempio che causa un comportamento errato (come l'oscillazione di stato)?
-2.  **Correttezza di `this`:** Ho evitato le arrow functions per i metodi che accedono a `this.config`?
-3.  **Regola di `aimAt`:** Ho separato chiaramente le fasi di movimento da quelle di mira?
-4.  **Conflitti tra Stati:** Le mie transizioni a bassa priorità sono protette per non interrompere stati critici?
-5.  **Anti-Pattern Evitati:** Ho considerato l'oscillazione, la gestione della memoria e le collisioni?
-6.  **API e Struttura:** Ho usato solo l'API fornita, `getRandomPoint`, e ho lasciato intatto il motore FSM?
+1.  **Strategia vs. Esempio:** Il mio codice risolve il problema strategico della missione, o sto solo copiando un pattern dall'esempio?
+2.  **Sfruttamento API v5:** Sto usando la mira predittiva (`enemy.velocity`)? Sto usando la difesa proattiva (`isLockedOnByEnemy`, `strafe`)? Sto gestendo l'arma con `getSelfWeaponState`?
+3.  **Regola di `aimAt`:** La mia logica rispetta il fatto che `aimAt` è un'azione prioritaria che interrompe il movimento?
+4.  **Anti-Pattern Evitati:** Ho considerato l'oscillazione di stato, la gestione della memoria, le collisioni e i loop tra stati?
+5.  **Correttezza di `this`:** Ho evitato le arrow functions dove necessario?
+6.  **Integrità Strutturale:** Ho lasciato intatto il motore FSM?
 
 **Passo 5: Produzione Finale.** Dopo la revisione, genera come output **solo e unicamente** il blocco di codice JavaScript finale.

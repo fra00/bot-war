@@ -54,6 +54,13 @@ class Robot {
     this.rotation =
       typeof rotation === "number" ? rotation : Math.random() * 360; // Usa il valore passato, altrimenti casuale
 
+    /** @type {number} */
+    this.vx = 0;
+    this.vy = 0;
+
+    /** @type {boolean} */
+    this.isBeingAimedAt = false;
+
     // Componenti
     this.armor = armor;
     this.cannon = cannon;
@@ -112,6 +119,18 @@ class Robot {
      * @type {Array<Object>}
      */
     this.lastObstaclesScan = [];
+
+    /**
+     * The result of the last projectile scan.
+     * @type {Array<Object>}
+     */
+    this.lastProjectilesScan = [];
+
+    /**
+     * The result of the last projectile scan.
+     * @type {Array<Object>}
+     */
+    this.lastProjectilesScan = [];
 
     /**
      * A list of log entries created by the AI.
@@ -209,6 +228,9 @@ class Robot {
       x: this.x,
       y: this.y,
       rotation: this.rotation,
+      vx: this.vx,
+      vy: this.vy,
+      isBeingAimedAt: this.isBeingAimedAt,
       hullHp: this.hullHp,
       maxHullHp: this.maxHullHp,
       armorHp: this.armor.hp,

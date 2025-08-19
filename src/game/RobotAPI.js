@@ -166,6 +166,20 @@ class RobotAPI {
     ]);
   };
 
+  /**
+   * Esegue uno spostamento laterale (strafe) a sinistra o a destra rispetto alla direzione attuale del bot.
+   * @param {'left' | 'right'} direction - La direzione dello spostamento.
+   */
+  strafe = (direction) => {
+    if (direction !== "left" && direction !== "right") {
+      this.log(
+        `Errore: la direzione dello strafe deve essere 'left' o 'right'. Ricevuto: ${direction}`
+      );
+      return;
+    }
+    this._setAction("START_STRAFE", { direction });
+  };
+
   stop = (source = "AI_REQUEST") => {
     this.robot.destination = null;
     this.robot.path = null;
@@ -201,11 +215,13 @@ class RobotAPI {
   };
 
   // --- Azioni Sincrone ---
-  fire = () => this._setAction("FIRE");
+  fire = (options = {}) =>
+    this._setAction("FIRE", { trackMiss: !!options.trackMiss });
 
   // --- Azioni di scansione/percezione ---
   scan = () => this.robot.lastScanResult;
   scanObstacles = () => this.robot.lastObstaclesScan;
+  scanForIncomingProjectiles = () => this.robot.lastProjectilesScan;
 
   // --- Informazioni sull'arena ---
   getArenaDimensions = () => this.gameState.arena;
@@ -231,7 +247,15 @@ class RobotAPI {
 
   getHullState = () => ({ hp: this.robot.hullHp, maxHp: this.robot.maxHullHp });
 
+  getSelfWeaponState = () => ({
+    canFire: this.robot.cannonCooldown <= 0,
+    cooldownRemaining: this.robot.cannonCooldown,
+    energyCost: this.robot.cannon.energyCost,
+  });
+
   isQueueEmpty = () => this.robot.commandQueue.length === 0;
+
+  isLockedOnByEnemy = () => this.robot.isBeingAimedAt;
 
   isLineOfSightClear = (targetPosition) =>
     checkLineOfSight(

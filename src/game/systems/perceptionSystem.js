@@ -8,7 +8,7 @@ import {
  * Scansiona l'area per trovare il nemico più vicino all'interno del raggio del radar.
  * @param {Robot} self - Il robot che sta scansionando.
  * @param {Array<import('../Robot.js').RobotState>} allRobots - Lo stato di tutti i robot nell'arena.
- * @returns {{distance: number, angle: number} | null} Dati del nemico o null.
+ * @returns {{distance: number, angle: number, x: number, y: number, velocity: {speed: number, direction: number}} | null} Dati del nemico o null.
  */
 export function scanForEnemy(self, allRobots) {
   const enemyState = allRobots.find((r) => r.id !== self.id);
@@ -32,7 +32,61 @@ export function scanForEnemy(self, allRobots) {
   // Normalizza l'angolo nell'intervallo [-180, 180] per una gestione più semplice
   if (angle > 180) angle -= 360;
   if (angle < -180) angle += 360;
-  return { distance, angle, x: enemyState.x, y: enemyState.y };
+
+  // Calcola la velocità e la direzione del nemico
+  const { vx, vy } = enemyState;
+  const speed = Math.sqrt(vx * vx + vy * vy);
+  // Calcola la direzione solo se c'è velocità, per evitare NaN con atan2(0,0)
+  const direction = speed > 0 ? (Math.atan2(vy, vx) * 180) / Math.PI : 0;
+
+  return {
+    distance,
+    angle,
+    x: enemyState.x,
+    y: enemyState.y,
+    velocity: { speed, direction },
+  };
+}
+
+/**
+ * Scansiona l'area per trovare proiettili in arrivo.
+ * Per ora, rileva i proiettili nemici in un raggio di percezione.
+ * @param {Robot} self - Il robot che sta scansionando.
+ * @param {Array<import('../Projectile.js').default>} allProjectiles - Tutti i proiettili nel gioco.
+ * @returns {Array<{ angle: number, timeToImpact: number }>}
+ */
+export function scanForIncomingProjectiles(self, allProjectiles) {
+  const incoming = [];
+  const perceptionRadius = self.radar.range / 2; // Raggio più corto per i proiettili
+
+  for (const p of allProjectiles) {
+    // Ignora i propri proiettili
+    if (p.ownerId === self.id) {
+      continue;
+    }
+
+    const dx = p.x - self.x;
+    const dy = p.y - self.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Considera solo i proiettili entro il raggio di percezione
+    if (distance > perceptionRadius) {
+      continue;
+    }
+
+    // Calcola l'angolo da cui arriva il proiettile (rispetto al mondo, 0° = destra)
+    const projectileAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
+    // Calcola l'angolo relativo alla rotazione del bot
+    let relativeAngle = projectileAngle - self.rotation;
+    if (relativeAngle > 180) relativeAngle -= 360;
+    if (relativeAngle < -180) relativeAngle += 360;
+
+    incoming.push({
+      angle: relativeAngle,
+      timeToImpact: distance / p.speed,
+    });
+  }
+  return incoming;
 }
 
 /**
@@ -51,7 +105,8 @@ export function scanForObstacles(self, obstacles) {
       const dx = obstacle.x + obstacle.width / 2 - self.x;
       const dy = obstacle.y + obstacle.height / 2 - self.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      const angle = ((Math.atan2(dy, dx) * 180) / Math.PI - self.rotation + 360) % 360;
+      const angle =
+        ((Math.atan2(dy, dx) * 180) / Math.PI - self.rotation + 360) % 360;
 
       detectedObstacles.push({
         ...obstacle,
@@ -74,7 +129,13 @@ export function scanForObstacles(self, obstacles) {
  * @param {string} [selfId=null] - L'ID del robot che sta controllando la posizione.
  * @returns {boolean}
  */
-export function isPositionWalkable(position, robotRadius, arenaData, allRobots = [], selfId = null) {
+export function isPositionWalkable(
+  position,
+  robotRadius,
+  arenaData,
+  allRobots = [],
+  selfId = null
+) {
   const { width, height, obstacles } = arenaData;
   const { x, y } = position;
 
@@ -119,9 +180,21 @@ export function isPositionWalkable(position, robotRadius, arenaData, allRobots =
  * @param {Array<import('../Arena.js').Obstacle>} obstacles - La lista degli ostacoli.
  * @returns {boolean} - True se la linea di tiro è libera, false altrimenti.
  */
-export function checkLineOfSight(startPosition, targetPosition, projectileRadius, obstacles) {
+export function checkLineOfSight(
+  startPosition,
+  targetPosition,
+  projectileRadius,
+  obstacles
+) {
   for (const obstacle of obstacles) {
-    if (projectileIntersectsObstacle(startPosition, targetPosition, projectileRadius, obstacle)) {
+    if (
+      projectileIntersectsObstacle(
+        startPosition,
+        targetPosition,
+        projectileRadius,
+        obstacle
+      )
+    ) {
       return false; // Ostacolo rilevato
     }
   }

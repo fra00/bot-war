@@ -67,6 +67,14 @@ export function executeNextActions(
           });
           break;
         }
+        case "START_STRAFE": {
+          const { direction } = action.payload;
+          robot.commandQueue.push({
+            type: "MOVE_LATERAL",
+            direction: direction, // 'left' o 'right'
+          });
+          break;
+        }
         case "STOP_ACTION": {
           // Interrompe il comando corrente e svuota l'intera coda
           if (robot.commandQueue.length > 0) {
@@ -96,6 +104,7 @@ export function executeNextActions(
               rotation: robot.rotation,
               damage: robot.cannon.damage,
               maxRange: robot.cannon.range,
+              trackMiss: !!action.payload?.trackMiss,
             });
             newProjectiles.push(projectile);
           }
