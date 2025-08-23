@@ -118,6 +118,8 @@ api.move(distance, speedPercentage)
     - `distance` (number): La distanza in pixel da percorrere. Un valore negativo indica un movimento all'indietro.
     - `speedPercentage` (number, opzionale, default: 100): La percentuale della velocità massima da usare (da -100 a 100).
 
+    **Valore di ritorno:** `void`
+
     Comportamento:
     - L'azione viene aggiunta alla coda. Se parte di una sequenza, al termine viene generato un evento `SEQUENCE_COMPLETED`.
     - Può essere interrotta da `api.stop()`, collisioni o mancanza di energia, generando un evento `ACTION_STOPPED`.
@@ -133,6 +135,8 @@ api.rotate(angle, speedPercentage)
     Parametri:
     - `angle` (number): L'angolo in gradi di cui ruotare. Positivo per senso orario (destra), negativo per antiorario (sinistra).
     - `speedPercentage` (number, opzionale, default: 100): La percentuale della velocità di rotazione massima.
+
+    **Valore di ritorno:** `void`
 
     Comportamento:
     - L'azione viene aggiunta alla coda. Se parte di una sequenza, al termine genera un evento `SEQUENCE_COMPLETED`.
@@ -150,6 +154,8 @@ api.moveTo(x, y, speedPercentage)
     - `y` (number): La coordinata Y di destinazione.
     - `speedPercentage` (number, opzionale, default: 100): La velocità da usare per i movimenti.
 
+    **Valore di ritorno:** `boolean` - `true` se un percorso valido è stato trovato e accodato, `false` altrimenti.
+
     Comportamento:
     - Utilizza un algoritmo di pathfinding (A*) per trovare il percorso più breve fino al punto (x, y), aggirando gli ostacoli.
     - Se un percorso viene trovato, il comando accoda automaticamente una sequenza di comandi `rotate` e `move` per seguirlo.
@@ -166,6 +172,8 @@ api.strafe(direction)
     Parametri:
     - `direction` ('left' | 'right'): La direzione dello spostamento.
 
+    **Valore di ritorno:** `void`
+
     Comportamento:
     - Esegue uno spostamento a distanza fissa (configurabile nel motore) con un costo energetico maggiorato.
     - È la manovra evasiva più efficace e veloce.
@@ -176,6 +184,8 @@ api.strafe(direction)
 api.stop()
 
     Interrompe immediatamente il comando in esecuzione e svuota l'intera coda di comandi. Questa è un'azione istantanea.
+
+    **Valore di ritorno:** `void`
 
     Comportamento:
     - Se un comando era attivo, viene interrotto e viene generato un evento `ACTION_STOPPED` con una `source` specifica.
@@ -199,6 +209,8 @@ api.sequence(actions)
 
     Parametri:
     - `actions` (Array<Object>): Un array di oggetti azione, dove ogni oggetto ha la forma `{ type: string, payload: any }`. I tipi e i payload devono corrispondere a quelli usati internamente (es. `{ type: 'START_MOVE', payload: { distance: 100 } }`).
+
+    **Valore di ritorno:** `void`
 
     Comportamento:
     - Le azioni vengono aggiunte alla coda di comandi.
@@ -247,6 +259,8 @@ api.aimAt(x, y, speedPercentage)
     - `y` (number): La coordinata Y del bersaglio.
     - `speedPercentage` (number, opzionale, default: 100): La velocità di rotazione.
 
+    **Valore di ritorno:** `void`
+
     Comportamento:
     - Questo comando è **dichiarativo**. Ad ogni tick, l'IA dovrebbe semplicemente dichiarare "voglio puntare qui".
     - Il motore di gioco si occupa di avviare, continuare o correggere la rotazione in modo efficiente.
@@ -272,6 +286,8 @@ api.fire(options)
     - `options` (Object, opzionale): Un oggetto di opzioni.
       - `trackMiss` (boolean): Se `true`, il motore genererà un evento `PROJECTILE_NEAR_MISS` se questo proiettile non colpisce il nemico.
 
+    **Valore di ritorno:** `void`
+
     Comportamento:
     - Viene eseguita immediatamente nel tick in cui viene chiamata.
     - Non viene aggiunta alla coda di comandi e non interrompe l'azione in corso (es. un movimento).
@@ -293,7 +309,7 @@ api.scan()
 
     Restituisce il risultato dell'ultima scansione radar eseguita dal motore di gioco. Questa è un'azione istantanea e non consuma energia.
 
-    Valore di ritorno:
+    **Valore di ritorno:** `Object | null`
     - Un oggetto con le seguenti proprietà se il nemico è nel raggio del radar:
       - `distance` (number): Distanza in linea d'aria dal nemico.
       - `angle` (number): Angolo relativo al nemico in gradi (da -180 a 180). `0` è la direzione in cui il tuo robot sta puntando. Un valore negativo è a sinistra, uno positivo a destra.
@@ -308,7 +324,7 @@ api.scanObstacles()
 
     Restituisce una lista di ostacoli all'interno del raggio del radar. Questa è un'azione istantanea.
 
-    Valore di ritorno:
+    **Valore di ritorno:** `Array<Object>`
     - Un array di oggetti, dove ogni oggetto rappresenta un ostacolo rilevato. Gli ostacoli sono ordinati dal più vicino al più lontano.
       - `id` (string): ID univoco dell'ostacolo.
       - `x`, `y`, `width`, `height` (number): Posizione e dimensioni dell'ostacolo.
@@ -320,7 +336,7 @@ api.scanForIncomingProjectiles()
 
     Restituisce una lista di proiettili nemici in arrivo.
 
-    Valore di ritorno:
+    **Valore di ritorno:** `Array<Object>`
     - Un array di oggetti, dove ogni oggetto rappresenta un proiettile minaccioso.
       - `angle` (number): L'angolo relativo da cui proviene il proiettile (da -180 a 180).
       - `timeToImpact` (number): Una stima dei tick rimanenti prima dell'impatto.
@@ -330,7 +346,7 @@ api.isLockedOnByEnemy()
 
     Controlla se il nemico sta attualmente mirando verso il tuo bot con una linea di tiro libera.
 
-    Valore di ritorno:
+    **Valore di ritorno:** `boolean`
     - `true` se sei sotto mira.
     - `false` altrimenti.
 
@@ -341,7 +357,8 @@ api.getState()
 
     Restituisce lo stato attuale e istantaneo del tuo robot.
 
-    Valore di ritorno: Un oggetto con le seguenti proprietà:
+    **Valore di ritorno:** `Object`
+    - Un oggetto con le seguenti proprietà:
     - `x` (number): Coordinata X.
     - `y` (number): Coordinata Y.
     - `rotation` (number): Angolo di rotazione attuale (0-360).
@@ -352,19 +369,19 @@ api.getHullState()
 
     Restituisce lo stato attuale dello scafo del robot.
 
-    Valore di ritorno: Un oggetto `{ hp: number, maxHp: number }`.
+    **Valore di ritorno:** `Object` - Un oggetto `{ hp: number, maxHp: number }`.
 
 api.getArmorState()
 
     Restituisce lo stato attuale dell'armatura del robot.
 
-    Valore di ritorno: Un oggetto `{ hp: number, maxHp: number }`.
+    **Valore di ritorno:** `Object` - Un oggetto `{ hp: number, maxHp: number }`.
 
 api.getBatteryState()
 
     Restituisce lo stato attuale della batteria del robot.
 
-    Valore di ritorno: Un oggetto `{ energy: number, maxEnergy: number }`.
+    **Valore di ritorno:** `Object` - Un oggetto `{ energy: number, maxEnergy: number }`.
 
     **Nota sulla Ricarica:** L'energia si ricarica passivamente ad ogni tick del gioco. La quantità di ricarica è definita dalla proprietà `rechargeRate` del componente batteria equipaggiato. Se il consumo di energia dovuto alle azioni (movimento, fuoco, etc.) è inferiore alla ricarica passiva, l'energia totale del bot aumenterà.
 
@@ -372,7 +389,7 @@ api.getSelfWeaponState()
 
     Restituisce lo stato attuale del cannone del tuo robot.
 
-    Valore di ritorno: Un oggetto `{ canFire: boolean, cooldownRemaining: number, energyCost: number }`.
+    **Valore di ritorno:** `Object` - Un oggetto `{ canFire: boolean, cooldownRemaining: number, energyCost: number }`.
     - `canFire`: `true` se il cannone è pronto a sparare.
     - `cooldownRemaining`: Il numero di tick rimanenti prima di poter sparare di nuovo.
     - `energyCost`: Il costo in energia per sparare un colpo.
@@ -381,6 +398,8 @@ api.getArenaDimensions()
 
     Restituisce le dimensioni e gli ostacoli dell'arena.
 
+    **Valore di ritorno:** `Object` - Un oggetto con le proprietà `width`, `height` e `obstacles`.
+
 api.isObstacleAhead(probeDistance)
 
     Controlla la presenza di un ostacolo (muro o oggetto) molto vicino nella direzione di movimento attuale.
@@ -388,9 +407,13 @@ api.isObstacleAhead(probeDistance)
     Parametri:
     - `probeDistance` (number, opzionale, default: 30): La distanza in pixel davanti al robot da controllare.
 
+    **Valore di ritorno:** `boolean`
+
 api.isLineOfSightClear(targetPosition)
 
     Verifica se c'è una linea di tiro libera da ostacoli tra il tuo robot e una posizione.
+
+    **Valore di ritorno:** `boolean`
 
 api.isPositionValid(position)
 
@@ -398,6 +421,8 @@ api.isPositionValid(position)
 
     Parametri:
     - `position` (Object): Un oggetto con coordinate `{ x, y }`.
+
+    **Valore di ritorno:** `boolean`
 
 api.getRandomPoint(bounds)
 
@@ -423,7 +448,7 @@ api.isQueueEmpty()
 
     Controlla se la coda di comandi del robot è vuota.
 
-    Valore di ritorno:
+    **Valore di ritorno:** `boolean`
     - `true` se non ci sono comandi in coda o in esecuzione.
     - `false` se c'è almeno un comando in attesa o in esecuzione.
 
@@ -435,6 +460,35 @@ api.isQueueEmpty()
       // La coda è libera, posso pianificare una nuova sequenza di azioni.
       api.moveTo(100, 100);
     }
+
+---
+
+## Gestione Memoria ed Eventi
+
+api.getMemory()
+
+    Restituisce l'oggetto di memoria persistente del robot. Le modifiche a questo oggetto verranno mantenute tra i tick.
+
+    **Valore di ritorno:** `Object`
+
+api.updateMemory(propertiesToUpdate)
+
+    Aggiorna o aggiunge proprietà all'oggetto di memoria del robot. Esegue un merge superficiale delle nuove proprietà nell'oggetto esistente.
+
+    Parametri:
+    - `propertiesToUpdate` (Object): Le nuove proprietà da impostare o aggiornare.
+
+    **Valore di ritorno:** `Object` - Il nuovo oggetto di memoria aggiornato.
+
+api.getEvents()
+
+    Restituisce un array di eventi accaduti nell'ultimo tick che riguardano il tuo robot.
+
+    **Valore di ritorno:** `Array<Object>`
+
+    Tipi di Evento Principali:
+    - `SEQUENCE_COMPLETED`: Una sequenza di azioni (da `moveTo`, `sequence`, etc.) è terminata con successo. Contiene un `payload` per identificare l'ultimo tipo di comando: `{ payload: { lastCommandType: 'MOVE' | 'ROTATE' | 'MOVE_LATERAL' | 'EMPTY' } }`.
+    - `ACTION_STOPPED`: Un comando nella coda è stato interrotto. Motivi: `USER_COMMAND`, `COLLISION`, `NO_ENERGY`. Contiene una `source` per identificare la causa (`"STATE_TRANSITION"`, `"AI_REQUEST"`, `"ENGINE"`).
 
 ---
 

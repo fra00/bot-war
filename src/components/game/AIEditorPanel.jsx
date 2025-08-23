@@ -7,12 +7,13 @@ import CardHeader from "../ui/CardHeader";
 import Input from "../ui/Input";
 import CodeEditor from "./CodeEditor";
 import VisualEditor from "./VisualEditor"; // Importa il nuovo componente
-import DefaultAIBaseText from "../../game/ai/DefaultAIBase.js?raw";
+import DefaultAIBase from "../../game/ai/DefaultAIBase.js";
 import initialPlayerCode from "../../game/ai/PlayerAI";
 import Spinner from "../ui/Spinner";
 import useDisclosure from "../ui/useDisclosure";
 import Modal from "../ui/Modal";
 import CardFooter from "../ui/CardFooter";
+import { stringifyAI, isStandardFSM } from "../../game/ai/compiler.js";
 
 /**
  * Un pannello che contiene l'editor di codice Monaco per l'IA del giocatore,
@@ -30,7 +31,6 @@ const AIEditorPanel = ({
   onDeleteScript,
   onCreateNewScript,
   isLoading,
-  onDirty,
   activeView,
   onSwitchView,
   visualParseError,
@@ -45,19 +45,15 @@ const AIEditorPanel = ({
     onClose: onVisualEditorFullscreenClose,
   } = useDisclosure();
 
+  // Stato locale per determinare se lo script è una FSM standard.
+  // Questo risolve il bug logico centralizzando il controllo qui,
+  // derivandolo direttamente dal codice ricevuto come prop.
+  const [isFsm, setIsFsm] = useState(false);
+
   useEffect(() => {
-    // Non gestisce più activeView, ma potrebbe essere utile per altre logiche di reset
-  }, [activeScript]);
-
-  const handleCodeChange = (newCode) => {
-    onCodeChange(newCode);
-    onDirty();
-  };
-
-  const handleVisualModelChange = (newModel) => {
-    onVisualModelChange(newModel);
-    onDirty();
-  };
+    // Ogni volta che il codice cambia, ricalcoliamo se è una FSM.
+    setIsFsm(isStandardFSM(code));
+  }, [code]);
 
   const handleInitiateCreate = (mode = "new") => {
     setIsCreating(true);
@@ -70,25 +66,9 @@ const AIEditorPanel = ({
       const visualModel = null;
 
       if (creationMode === "base") {
-        // Estrai l'oggetto letterale dal testo raw del modulo.
-        // Questo approccio è robusto perché cerca la prima parentesi graffa '{'
-        // e l'ultima '}', isolando l'oggetto principale del file.
-        const firstBrace = DefaultAIBaseText.indexOf("{");
-        const lastBrace = DefaultAIBaseText.lastIndexOf("}");
-        if (firstBrace !== -1 && lastBrace > firstBrace) {
-          const objectString = DefaultAIBaseText.substring(
-            firstBrace,
-            lastBrace + 1
-          );
-          // Avvolgilo tra parentesi per renderlo un'espressione valida per il compilatore.
-          code = `(${objectString})`;
-        } else {
-          // Fallback nel caso improbabile che il parsing fallisca.
-          console.error(
-            "Impossibile estrarre l'oggetto da DefaultAIBase.js. Uso il codice di fallback."
-          );
-          code = initialPlayerCode;
-        }
+        // Genera la stringa di codice completa a partire dall'oggetto Base.
+        // Questo è l'approccio corretto che sfrutta l'architettura che abbiamo costruito.
+        code = stringifyAI(DefaultAIBase);
       } else {
         code = initialPlayerCode;
       }
@@ -222,12 +202,23 @@ const AIEditorPanel = ({
           </Button>
           <Button
             onClick={() => onSwitchView("visual")}
+            disabled={!isFsm}
             variant={activeView === "visual" ? "primary" : "ghost"}
             className={`rounded-l-none ${
               activeView === "visual" ? "rounded-r-none" : ""
             } ${activeView === "visual" ? "bg-blue-600" : ""}`}
+            title={
+              !isFsm
+                ? "La vista visuale è disponibile solo per i Base Script"
+                : ""
+            }
           >
-            Visuale
+            Visuale{" "}
+            {!isFsm && (
+              <span className="ml-1 text-xs text-gray-500">
+                (Solo Base Script)
+              </span>
+            )}
           </Button>
           {activeView === "visual" && (
             <Button
@@ -263,7 +254,7 @@ const AIEditorPanel = ({
             >
               <CodeEditor
                 value={code}
-                onChange={(value) => handleCodeChange(value || "")}
+                onChange={(value) => onCodeChange(value || "")}
               />
             </div>
           )}
@@ -271,7 +262,7 @@ const AIEditorPanel = ({
             <VisualEditor
               activeScript={activeScript}
               visualModel={visualModel}
-              onModelChange={handleVisualModelChange}
+              onModelChange={onVisualModelChange}
               onHelpOpen={onHelpOpen}
             />
           )}
@@ -302,7 +293,7 @@ const AIEditorPanel = ({
             <VisualEditor
               activeScript={activeScript}
               visualModel={visualModel}
-              onModelChange={handleVisualModelChange}
+              onModelChange={onVisualModelChange}
               isInteractive={true}
               onHelpOpen={onHelpOpen}
             />
@@ -341,8 +332,6 @@ AIEditorPanel.propTypes = {
   onCreateNewScript: PropTypes.func.isRequired,
   /** Indica se gli script sono in fase di caricamento. */
   isLoading: PropTypes.bool,
-  /** Funzione chiamata quando viene apportata una modifica non salvata. */
-  onDirty: PropTypes.func.isRequired,
   /** La vista attualmente attiva ('code' o 'visual'). */
   activeView: PropTypes.string.isRequired,
   /** Funzione per tentare di cambiare vista. */

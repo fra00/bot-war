@@ -74,210 +74,302 @@ export const compileAI = (code) => {
   return aiObject;
 };
 
-import * as dagre from "dagre";
-
 /**
- * Genera una stringa di codice JavaScript eseguibile a partire dal visualModel.
- * @param {object} visualModel - Il modello visuale dell'IA.
- * @returns {string} Una stringa di codice JavaScript che rappresenta l'IA.
+ * Analizza il codice di uno script per determinare se è basato su FSM standard.
+ * Questa funzione è un modo leggero per controllare il tipo di script senza
+ * eseguire il merge completo di `compileAI`.
+ * @param {string} code - Il codice sorgente dello script.
+ * @returns {boolean} - True se lo script ha la proprietà `standardFSM: true`, altrimenti false.
  */
-export const generateAICodeFromVisualModel = (visualModel) => {
-  if (!visualModel) {
-    return "/* No visual model found */";
+export const isStandardFSM = (code) => {
+  if (!code || code.trim() === "") {
+    return false;
   }
 
-  const { nodes, edges, globalTransitions } = visualModel;
-
-  // Crea una mappa per cercare rapidamente il nome di un nodo dal suo ID.
-  const nodeNameMap = new Map(nodes.map((node) => [node.id, node.data.name]));
-
-  // 1. Genera il codice per la mappa degli stati
-  const statesCode = nodes
-    .map((node) => {
-      const { id, data } = node;
-      // 1. Genera il frammento di codice per questo stato specifico.
-      // Usiamo JSON.stringify per garantire che nomi, target e descrizioni
-      // con caratteri speciali (es. apostrofi) vengano gestiti correttamente.
-      // Questa è la soluzione standard e robusta per questo tipo di problema.
-      const stateCodeFragment = `${JSON.stringify(data.name)}: {
-       ${data.onEnter || ""} ,
-       ${data.onExecute || ""} ,
-      ${data.onExit || ""} ,
-      transitions: [
-        ${edges
-          .filter((edge) => edge.source === id)
-          .map((edge) => {
-            const targetNodeName = nodeNameMap.get(edge.target);
-            if (!targetNodeName) {
-              // Questo caso non dovrebbe accadere se il modello è consistente.
-              // Aggiungiamo un commento per il debug in caso di problemi.
-              return `/* Transizione non valida: target ${edge.target} non trovato */`;
-            }
-            return `
-          {
-            target: ${JSON.stringify(targetNodeName)},
-            condition: ${edge.data.condition || "() => true"},
-            description: ${JSON.stringify(edge.label || "")}
-          }
-        `;
-          })
-          .join(",\n")}
-      ]
-    }`;
-
-      // 2. Tenta di validare questo frammento isolandolo in un oggetto valido.
-      // Questo cattura errori di sintassi sia nel codice utente (onEnter, etc.)
-      // sia nella struttura (es. un nome di stato con un apostrofo non gestito).
-      try {
-        const validationWrapper = `({ ${stateCodeFragment} })`;
-        new Function(`return ${validationWrapper}`)();
-      } catch (e) {
-        // Se la validazione fallisce, lancia un errore specifico e utile.
-        throw new Error(
-          `Errore di sintassi nello stato "${data.name}": ${e.message}`
-        );
-      }
-
-      // 3. Se la validazione ha successo, restituisci il frammento per l'assemblaggio finale.
-      return stateCodeFragment;
-    })
-    .join(",\n");
-
-  // 2. Genera il codice per le transizioni globali
-  const globalTransitionsCode = globalTransitions
-    .map(
-      (transition) => `
-    {
-      target: ${JSON.stringify(transition.target)},
-      condition: ${transition.data.condition || "() => true"},
-      description: ${JSON.stringify(transition.label || "")}
-    }
-  `
-    )
-    .join(",\n");
-
-  // 3. Assembla il codice completo
-  const code = `
-  ({
-    states: {${statesCode}},
-    globalTransitions: [${globalTransitionsCode}]
-  })
-  `;
-
-  return code;
+  try {
+    const factory = new Function(`return (${code})`);
+    const aiObject = factory();
+    return !!(aiObject && aiObject.standardFSM === true);
+  } catch (e) {
+    // Se il codice non è parsabile, non è una FSM valida.
+    return false;
+  }
 };
 
 /**
- * Genera un oggetto visualModel compatibile con React Flow a partire da un oggetto AI.
- * @param {object} aiObject - L'oggetto AI da "decompilare".
- * @returns {object} Un visualModel con nodi, archi e transizioni globali.
+ * Prepara il codice per l'editor. Se è una FSM standard,
+ * rimuove le funzioni interne per mostrare solo la configurazione.
+ * @param {string} fullScriptCode - Il codice completo dello script.
+ * @returns {string} - Il codice "pulito" da mostrare nell'editor.
  */
-export const generateVisualModelFromAIObject = (aiObject) => {
-  const nodes = [];
-  const edges = [];
-  const globalTransitions = [];
-
-  if (!aiObject || !aiObject.states) {
-    return { nodes, edges, globalTransitions };
+export const prepareCodeForEditor = (fullScriptCode) => {
+  if (!isStandardFSM(fullScriptCode)) {
+    // Se non è una FSM standard, restituisce il codice originale.
+    return fullScriptCode;
   }
 
-  const stateNames = Object.keys(aiObject.states);
-  const nameToIdMap = new Map();
+  try {
+    const factory = new Function(`return (${fullScriptCode})`);
+    const fullAiObject = factory();
 
-  // Crea prima gli ID dei nodi, perché servono sia per i nodi che per gli archi
-  stateNames.forEach((stateName, index) => {
-    const nodeId = `state_${stateName.replace(/\s+/g, "_")}_${index}`;
-    nameToIdMap.set(stateName, nodeId);
+    // Crea un nuovo oggetto contenente solo le parti modificabili dall'utente.
+    // Le altre proprietà (run, onEnter, onExecute, etc.) vengono omesse.
+    const editableParts = {
+      standardFSM: true,
+      config: fullAiObject.config,
+      emergencyTransitions: fullAiObject.emergencyTransitions,
+      tacticalTransitions: fullAiObject.tacticalTransitions,
+      states: fullAiObject.states,
+    };
+
+    return stringifyAI(editableParts);
+  } catch (e) {
+    console.error("Errore durante la preparazione del codice per l'editor:", e);
+    return fullScriptCode;
+  }
+};
+
+/**
+ * Prepara il codice per il salvataggio. Se è una FSM standard,
+ * fonde il codice parziale con il template base per creare uno script completo.
+ * @param {string} editedScriptCode - Il codice (potenzialmente parziale) dall'editor.
+ * @returns {string} - Il codice completo e funzionante da salvare.
+ */
+export const prepareCodeForSaving = (editedScriptCode) => {
+  // Se non è una FSM standard, è uno script custom. Lo salviamo così com'è.
+  if (!isStandardFSM(editedScriptCode)) {
+    return editedScriptCode;
+  }
+
+  try {
+    // `compileAI` è la nostra funzione di "merge". Riconosce un oggetto
+    // con `states` ma senza `run` e lo fonde con DefaultAIBase.
+    const fullAiObject = compileAI(editedScriptCode);
+
+    // `stringifyAI` converte l'oggetto completo in una stringa di codice formattata.
+    // A differenza di `prepareCodeForEditor`, qui passiamo l'oggetto completo
+    // per includere anche il motore della FSM.
+    return stringifyAI(fullAiObject);
+  } catch (e) {
+    console.error(
+      "Errore durante la preparazione del codice per il salvataggio:",
+      e
+    );
+    return editedScriptCode; // Fallback: salva il codice così com'è per non perdere il lavoro.
+  }
+};
+
+import * as dagre from "dagre";
+
+export const GLOBAL_TRANSITIONS_NODE_ID = "__global_transitions__";
+
+export const generateAICodeFromVisualModel = (visualModel) => {
+  if (!visualModel || !visualModel.nodes) {
+    return "({})";
+  }
+
+  const { nodes, edges } = visualModel;
+
+  // Inizializza la struttura base dell'oggetto AI
+  const aiObject = {
+    standardFSM: true,
+    config: {}, // La config non è gestita visualmente, la lasciamo vuota
+    states: {},
+    emergencyTransitions: [],
+    tacticalTransitions: [],
+  };
+
+  // 1. Popola gli stati dall'array di nodi
+  nodes.forEach((node) => {
+    // Ignora il nodo speciale per le transizioni globali
+    if (node.id === GLOBAL_TRANSITIONS_NODE_ID) {
+      return;
+    }
+
+    // Ricostruisce l'oggetto state, escludendo le proprietà usate solo per il rendering (come 'label')
+    const { label, ...stateLogic } = node.data;
+
+    // Assicura che l'array delle transizioni sia inizializzato
+    if (!stateLogic.transitions) {
+      stateLogic.transitions = [];
+    }
+
+    aiObject.states[node.id] = stateLogic;
   });
 
-  // --- Calcolo del Layout con Dagre ---
-  const dagreGraph = new dagre.graphlib.Graph();
-  dagreGraph.setGraph({ rankdir: "LR", nodesep: 60, ranksep: 150 }); // Layout da Sinistra a Destra (Left-to-Right)
-  dagreGraph.setDefaultEdgeLabel(() => ({}));
+  // 2. Smista gli archi (edges) nei rispettivi array di transizioni
+  edges.forEach((edge) => {
+    // Separa le proprietà della UI (`type`) e le vecchie `name` e `to`
+    // dal resto dei dati della transizione (es. `condition`).
+    const {
+      type,
+      name: oldName,
+      to: oldTo,
+      target: oldTarget,
+      ...restOfData
+    } = edge.data;
 
-  // Dimensioni approssimative di un nodo per il calcolo del layout
-  const NODE_WIDTH = 256; // Corrisponde a w-64 in StateNode.jsx
-  const NODE_HEIGHT = 110; // Altezza approssimativa
+    const transitionObject = {
+      ...restOfData, // Mantiene le proprietà importanti come `condition`
+      name: edge.label,
+      target: edge.target,
+    };
 
-  // Aggiungi nodi e archi al grafo di Dagre
-  stateNames.forEach((stateName) => {
-    const sourceId = nameToIdMap.get(stateName);
-    dagreGraph.setNode(sourceId, { width: NODE_WIDTH, height: NODE_HEIGHT });
-
-    const stateData = aiObject.states[stateName];
-    if (stateData.transitions) {
-      stateData.transitions.forEach((transition) => {
-        const targetId = nameToIdMap.get(transition.target);
-        if (sourceId && targetId) {
-          dagreGraph.setEdge(sourceId, targetId);
-        }
-      });
+    if (type === "emergency") {
+      aiObject.emergencyTransitions.push(transitionObject);
+    } else if (type === "tactical") {
+      aiObject.tacticalTransitions.push(transitionObject);
+    } else if (aiObject.states[edge.source]) {
+      aiObject.states[edge.source].transitions.push(transitionObject);
     }
   });
 
-  dagre.layout(dagreGraph);
-  // --- Fine Calcolo Layout ---
+  // 3. Usa la funzione esistente per convertire l'oggetto AI in una stringa di codice formattata
+  return stringifyAI(aiObject);
+};
 
-  // 1. Crea i nodi per ogni stato
+export const generateVisualModelFromAIObject = (aiObject) => {
+  if (!aiObject || !aiObject.states) {
+    return { nodes: [], edges: [] };
+  }
+
+  const nodes = [];
+  const edges = [];
+  const stateNames = Object.keys(aiObject.states);
+
+  // Aggiunge un nodo "globale" se esistono transizioni di emergenza o tattiche.
+  // Questo nodo funge da sorgente per gli archi che possono partire da qualsiasi stato.
+  const hasGlobalTransitions =
+    (aiObject.emergencyTransitions &&
+      aiObject.emergencyTransitions.length > 0) ||
+    (aiObject.tacticalTransitions && aiObject.tacticalTransitions.length > 0);
+
+  if (hasGlobalTransitions) {
+    nodes.push({
+      id: GLOBAL_TRANSITIONS_NODE_ID,
+      type: "globalNode", // Tipo di nodo custom per lo stile
+      data: { label: "Da Qualsiasi Stato" },
+      position: { x: 0, y: 0 }, // La posizione verrà calcolata da dagre
+    });
+  }
+
+  // Aggiunge i nodi per ogni stato
   stateNames.forEach((stateName) => {
-    const stateData = aiObject.states[stateName];
-    const nodeId = nameToIdMap.get(stateName);
-    const nodePosition = dagreGraph.node(nodeId);
+    const originalStateData = aiObject.states[stateName];
+    // Separa esplicitamente le transizioni dal resto dei dati dello stato.
+    // Questo è il passaggio chiave per evitare di "inquinare" i dati del nodo.
+    const { transitions, ...stateLogic } = originalStateData;
+
+    // Crea un oggetto "sicuro" per la UI, convertendo solo le funzioni di primo livello
+    // (onEnter, onExecute, onExit) in stringhe di testo.
+    // L'array `transitions` viene volutamente escluso e non finirà nei dati del nodo.
+    const safeData = {
+      ...stateLogic,
+      onEnter: stateLogic.onEnter?.toString() || "",
+      onExecute: stateLogic.onExecute?.toString() || "",
+      onExit: stateLogic.onExit?.toString() || "",
+    };
 
     nodes.push({
-      id: nodeId,
+      id: stateName,
       type: "stateNode",
-      position: {
-        x: nodePosition.x - NODE_WIDTH / 2,
-        y: nodePosition.y - NODE_HEIGHT / 2,
-      },
-      data: {
-        name: stateName,
-        onEnter: stateData.onEnter?.toString() || "",
-        onExecute: stateData.onExecute?.toString() || "",
-        onExit: stateData.onExit?.toString() || "",
-      },
+      // Assicura che `name` e `label` siano sempre presenti per risolvere i bug di rendering.
+      data: { label: stateName, name: stateName, ...safeData },
+      position: { x: 0, y: 0 },
     });
   });
 
-  // 2. Crea gli archi (transizioni locali) per ogni stato
+  // Aggiunge gli archi per le transizioni standard (da stato a stato)
   stateNames.forEach((stateName) => {
     const stateData = aiObject.states[stateName];
     if (stateData.transitions) {
       stateData.transitions.forEach((transition, i) => {
-        const sourceId = nameToIdMap.get(stateName);
-        const targetId = nameToIdMap.get(transition.target);
-
-        if (sourceId && targetId) {
-          edges.push({
-            id: `edge_${sourceId}_to_${targetId}_${i}`,
-            source: sourceId,
-            target: targetId,
-            label: transition.description || "",
-            data: {
-              condition: transition.condition?.toString() || "() => true",
-            },
-          });
-        }
+        // Estrae la funzione `condition` e il resto delle proprietà
+        const { condition, ...rest } = transition;
+        edges.push({
+          id: `e-${stateName}-${transition.target}-${i}`,
+          source: stateName,
+          target: transition.target,
+          label: transition.name || transition.description,
+          data: {
+            ...rest,
+            // Converte la funzione `condition` in una stringa
+            condition: condition ? condition.toString() : "() => true",
+            type: "standard",
+          },
+        });
       });
     }
   });
 
-  // 3. Crea le transizioni globali
-  if (aiObject.globalTransitions) {
-    aiObject.globalTransitions.forEach((transition, i) => {
-      globalTransitions.push({
-        id: `global_transition_${i}_${Date.now()}`,
+  // Aggiunge gli archi per le transizioni di EMERGENZA
+  if (aiObject.emergencyTransitions) {
+    aiObject.emergencyTransitions.forEach((transition, i) => {
+      // Estrae la funzione `condition` e il resto delle proprietà
+      const { condition, ...rest } = transition;
+      edges.push({
+        id: `e-emergency-${transition.target}-${i}`,
+        source: GLOBAL_TRANSITIONS_NODE_ID,
         target: transition.target,
-        label: transition.description || "",
+        label: transition.name || transition.description,
         data: {
-          condition: transition.condition?.toString() || "() => true",
-        },
+          ...rest,
+          // Converte la funzione `condition` in una stringa
+          condition: condition ? condition.toString() : "() => true",
+          type: "emergency",
+        }, // Tipo per lo stile
       });
     });
   }
 
-  return { nodes, edges, globalTransitions };
+  // Aggiunge gli archi per le transizioni TATTICHE
+  if (aiObject.tacticalTransitions) {
+    aiObject.tacticalTransitions.forEach((transition, i) => {
+      // Estrae la funzione `condition` e il resto delle proprietà
+      const { condition, ...rest } = transition;
+      edges.push({
+        id: `e-tactical-${transition.target}-${i}`,
+        source: GLOBAL_TRANSITIONS_NODE_ID,
+        target: transition.target,
+        label: transition.name || transition.description,
+        data: {
+          ...rest,
+          // Converte la funzione `condition` in una stringa
+          condition: condition ? condition.toString() : "() => true",
+          type: "tactical",
+        }, // Tipo per lo stile
+      });
+    });
+  }
+
+  // Layout automatico con Dagre
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({ rankdir: "TB", nodesep: 20, ranksep: 80 });
+  g.setDefaultEdgeLabel(() => ({}));
+
+  nodes.forEach((node) => {
+    g.setNode(node.id, { label: node.data.label, width: 180, height: 120 });
+  });
+
+  edges.forEach((edge) => {
+    g.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(g);
+
+  const layoutedNodes = nodes.map((node) => {
+    const nodeWithPosition = g.node(node.id);
+    if (!nodeWithPosition) return node; // Nodo non trovato, forse un errore
+    return {
+      ...node,
+      position: {
+        x: nodeWithPosition.x - nodeWithPosition.width / 2,
+        y: nodeWithPosition.y - nodeWithPosition.height / 2,
+      },
+    };
+  });
+
+  return { nodes: layoutedNodes, edges };
 };
 
 /**
@@ -287,49 +379,55 @@ export const generateVisualModelFromAIObject = (aiObject) => {
  * @param {string} indent - La stringa di indentazione corrente.
  * @returns {string}
  */
-function stringifyRecursive(value, indent) {
-  const nextIndent = indent + "  ";
+function stringifyRecursive(value, indent = "") {
+  if (value === null) {
+    return "null";
+  }
 
-  // Gestione dei tipi primitivi e delle funzioni non in oggetti
-  if (value === null) return "null";
-  if (typeof value !== "object") {
-    if (typeof value === "function") {
-      // Assicura che l'indentazione sia corretta per funzioni multiriga
-      return value.toString().replace(/\n/g, `\n${indent}`);
-    }
+  const type = typeof value;
+
+  if (type === "function") {
+    return value.toString().replace(/\n/g, `\n${indent}`);
+  }
+
+  if (type !== "object") {
     return JSON.stringify(value);
   }
 
-  // Gestione degli Array
+  const nextIndent = indent + "  ";
+
   if (Array.isArray(value)) {
     if (value.length === 0) return "[]";
-    const arrayParts = value.map(
+    const items = value.map(
       (item) => `${nextIndent}${stringifyRecursive(item, nextIndent)}`
     );
-    return `[\n${arrayParts.join(",\n")}\n${indent}]`;
+    return `[\n${items.join(",\n")}\n${indent}]`;
   }
 
-  // Gestione degli Oggetti
+  // È un oggetto semplice
   const keys = Object.keys(value);
   if (keys.length === 0) return "{}";
 
-  const parts = [];
-  for (const key of keys) {
-    const propValue = value[key];
+  const validIdentifierRegex = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
+  const parts = keys
+    .map((key) => {
+      const propValue = value[key];
+      if (propValue === undefined) return null; // Salta le proprietà undefined
 
-    if (typeof propValue === "function") {
-      const funcStr = propValue.toString().replace(/\n/g, `\n${nextIndent}`);
-      // Gestisce la differenza tra `myMethod() {}` e `myFunc: function() {}`
-      if (funcStr.startsWith("function") || funcStr.startsWith("(")) {
-        parts.push(`${nextIndent}${key}: ${funcStr}`);
-      } else {
-        parts.push(`${nextIndent}${funcStr}`);
-      }
-    } else {
+      const keyStr = validIdentifierRegex.test(key) ? key : JSON.stringify(key);
       const valueStr = stringifyRecursive(propValue, nextIndent);
-      parts.push(`${nextIndent}"${key}": ${valueStr}`);
-    }
-  }
+
+      // Gestisce la sintassi dei metodi come `myMethod() {}` dove la chiave è parte della stringa del valore
+      if (
+        typeof propValue === "function" &&
+        !/^(function|\()/.test(propValue.toString())
+      ) {
+        return `${nextIndent}${valueStr}`;
+      }
+
+      return `${nextIndent}${keyStr}: ${valueStr}`;
+    })
+    .filter((part) => part !== null);
 
   return `{\n${parts.join(",\n")}\n${indent}}`;
 }

@@ -14,8 +14,10 @@ import {
   generateVisualModelFromAIObject,
   generateAICodeFromVisualModel,
   stringifyAI,
+  isStandardFSM,
+  prepareCodeForEditor,
+  prepareCodeForSaving,
 } from "../../game/ai/compiler";
-import DefaultAIBase from "../../game/ai/DefaultAIBase.js";
 
 const AIEditorModal = ({
   isOpen,
@@ -26,9 +28,7 @@ const AIEditorModal = ({
   scripts,
   activeScript,
   code,
-  onCodeChange,
-  visualModel,
-  onVisualModelChange,
+  onCodeChange: onCodeChangeProp,
   compileError,
   onSelectScript,
   onDeleteScript,
@@ -45,22 +45,52 @@ const AIEditorModal = ({
     onOpen: onSettingsOpen,
     onClose: onSettingsClose,
   } = useDisclosure();
+
+  // Stato interno per gestire il codice nell'editor e il flag FSM
+  const [internalCode, setInternalCode] = useState("");
+  const [isFsm, setIsFsm] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [activeView, setActiveView] = useState("code");
+  const [internalVisualModel, setInternalVisualModel] = useState(null);
   const [visualParseError, setVisualParseError] = useState(null);
 
-  // Resetta lo stato "dirty" quando si cambia script o si chiude la modale,
-  // per evitare che un avviso di "modifiche non salvate" persista erroneamente.
   useEffect(() => {
-    setIsDirty(false);
-    setActiveView("code"); // Torna sempre alla vista codice
-    setVisualParseError(null);
-  }, [activeScript, isOpen]);
+    // Quando la prop 'code' esterna cambia (es. cambio script),
+    // la modale si aggiorna.
+    if (code) {
+      // 1. Determina se è una FSM standard
+      const isFsmScript = isStandardFSM(code);
+      setIsFsm(isFsmScript);
 
-  // Funzione da passare al pannello dell'editor per segnalare una modifica.
-  const handleDirty = useCallback(() => {
+      // 2. "Pulisce" il codice se è una FSM, altrimenti lo lascia inalterato.
+      const cleanCode = prepareCodeForEditor(code);
+      setInternalCode(cleanCode);
+
+      // 3. Resetta lo stato dirty e la vista
+      setIsDirty(false);
+      setActiveView("code");
+      setInternalVisualModel(null);
+      setVisualParseError(null);
+    }
+  }, [code, activeScript, isOpen]);
+
+  const handleCodeChange = (newCode) => {
+    setInternalCode(newCode);
     setIsDirty(true);
-  }, []);
+    onCodeChangeProp(newCode); // Notifica il genitore se necessario
+  };
+
+  const handleVisualModelChange = (newModel) => {
+    setInternalVisualModel(newModel);
+    try {
+      // Genera il codice "pulito" dal modello visuale.
+      const newCode = generateAICodeFromVisualModel(newModel);
+      setInternalCode(newCode);
+      setIsDirty(true);
+    } catch (e) {
+      addToast(`Errore nella generazione del codice: ${e.message}`, "danger");
+    }
+  };
 
   const handleBotSettingsButtonClick = () => {
     onSettingsOpen();
@@ -70,36 +100,18 @@ const AIEditorModal = ({
   };
 
   const handleSaveClick = useCallback(async () => {
-    let codeToSave = code;
-    if (activeView === "visual") {
-      try {
-        // 1. Genera il codice parziale dal modello visuale.
-        const partialCode = generateAICodeFromVisualModel(visualModel);
-
-        // 2. Valuta il codice parziale per ottenere un oggetto.
-        // Avvolgiamo il codice tra parentesi per assicurarci che un oggetto letterale
-        // venga interpretato come un'espressione, risolvendo l'errore "Unexpected token '{'".
-        // Questa modifica rende la funzione robusta, funzionando sia che partialCode
-        // contenga già le parentesi, sia che non le contenga.
-        const partialAiObject = new Function(`return (${partialCode})`)();
-        // 3. Esegui il "merge" con DefaultAIBase per creare l'oggetto completo.
-        const finalAiObject = { ...DefaultAIBase, ...partialAiObject };
-
-        // 4. Riconverti l'oggetto completo e normalizzato in una stringa.
-        codeToSave = stringifyAI(finalAiObject);
-      } catch (e) {
-        addToast(
-          `Errore nella generazione del codice: ${e.message}`,
-          "danger"
-        );
-        return; // Interrompe il processo di salvataggio
-      }
-    }
+    // Usa il codice interno, che è quello che l'utente sta vedendo e modificando.
+    // `prepareCodeForSaving` si occuperà di fare il merge con il motore FSM se necessario.
+    const codeToSave = prepareCodeForSaving(internalCode);
 
     const { success } = await onSaveOnly(codeToSave);
     if (success) {
-      setIsDirty(false); // Resetta lo stato dirty dopo un salvataggio riuscito
-      addToast("Script salvato con successo!", "success");
+      setIsDirty(false);
+      addToast("Script salvato.", "success");
+      // Dopo il salvataggio, il codice "pulito" nell'editor potrebbe non corrispondere
+      // più al codice completo appena salvato. Ricaricando lo script, forziamo
+      // una risincronizzazione, mostrando la versione pulita del codice appena salvato.
+      onSelectScript(activeScript);
     } else {
       addToast("Salvataggio fallito. Controlla gli errori.", "danger");
     }
@@ -107,27 +119,32 @@ const AIEditorModal = ({
     onSaveOnly,
     addToast,
     setIsDirty,
-    code,
-    visualModel,
-    activeView,
+    internalCode,
+    onSelectScript,
+    activeScript,
   ]);
 
   const handleUpdateClick = useCallback(async () => {
     if (isDirty) {
-      addToast("Salva le modifiche prima di applicarle.", "warning");
-      return;
+      const { success } = await onSaveOnly(prepareCodeForSaving(internalCode));
+      if (!success) {
+        addToast("Salvataggio fallito. Impossibile applicare.", "danger");
+        return;
+      }
+      setIsDirty(false);
+      addToast("Script salvato e applicato.", "success");
     }
 
     // La logica di "Applica" usa sempre il codice sorgente corrente,
     // che è già stato normalizzato e salvato.
-    const { success } = await onUpdate(code);
+    const { success } = await onUpdate(prepareCodeForSaving(internalCode));
     if (success) {
       addToast("Script applicato con successo! Riavvio partita...", "success");
       onClose();
     } else {
       addToast("Applicazione fallita. Controlla gli errori.", "danger");
     }
-  }, [onUpdate, addToast, onClose, isDirty, code]);
+  }, [onUpdate, onSaveOnly, addToast, onClose, isDirty, internalCode]);
 
   const handleSaveSettings = (settings) => {
     if (activeScript) {
@@ -144,17 +161,19 @@ const AIEditorModal = ({
     if (targetView === "visual") {
       setVisualParseError(null);
       try {
-        const aiObject = compileAI(code);
+        const aiObject = compileAI(internalCode);
         if (!aiObject || typeof aiObject.states !== "object") {
           throw new Error(
             "Il codice non è una macchina a stati valida (manca la proprietà 'states' o non è un oggetto)."
           );
         }
         const newVisualModel = generateVisualModelFromAIObject(aiObject);
-        onVisualModelChange(newVisualModel);
+        setInternalVisualModel(newVisualModel);
         setActiveView("visual");
       } catch (e) {
-        setVisualParseError(`Impossibile generare la vista visuale: ${e.message}`);
+        setVisualParseError(
+          `Impossibile generare la vista visuale: ${e.message}`
+        );
       }
     } else {
       setActiveView(targetView);
@@ -173,16 +192,15 @@ const AIEditorModal = ({
           <AIEditorPanel
             scripts={scripts}
             activeScript={activeScript}
-            code={code}
-            onCodeChange={onCodeChange}
-            visualModel={visualModel}
-            onVisualModelChange={onVisualModelChange}
+            code={internalCode}
+            onCodeChange={handleCodeChange}
+            visualModel={internalVisualModel}
+            onVisualModelChange={handleVisualModelChange}
             compileError={compileError}
             onSelectScript={onSelectScript}
             onDeleteScript={onDeleteScript}
             onCreateNewScript={onCreateNewScript}
             isLoading={isLoading}
-            onDirty={handleDirty}
             activeView={activeView}
             onSwitchView={handleAttemptSwitchView}
             visualParseError={visualParseError}
@@ -252,9 +270,7 @@ AIEditorModal.propTypes = {
   scripts: PropTypes.array.isRequired,
   activeScript: PropTypes.object,
   code: PropTypes.string.isRequired,
-  onCodeChange: PropTypes.func.isRequired,
-  visualModel: PropTypes.object,
-  onVisualModelChange: PropTypes.func,
+  onCodeChange: PropTypes.func.isRequired, // Rinominato in onCodeChangeProp internamente
   compileError: PropTypes.string,
   onSelectScript: PropTypes.func.isRequired,
   onDeleteScript: PropTypes.func.isRequired,

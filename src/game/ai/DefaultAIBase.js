@@ -3,6 +3,11 @@
  */
 const DefaultAIBase = {
   // =================================================================
+  // TIPO DI SCRIPT (NON MODIFICARE)
+  // =================================================================
+  standardFSM: true, // Indica che questo script usa il motore FSM di default
+
+  // =================================================================
   // CONFIGURAZIONE IA
   // =================================================================
   config: {
@@ -36,27 +41,20 @@ const DefaultAIBase = {
     evasionGracePeriod: 120, // Tick di "invulnerabilità" dopo un'evasione
     cornerPadding: 50, // Distanza dai bordi per i punti di ricarica
     kitingLoopThreshold: 2, // Soglia per rilevare il loop di kiting
+    stateGracePeriod: 10, // Tick minimi di permanenza in un nuovo stato per evitare sfarfallio
   },
 
   // =================================================================
-  // TRANSIZIONI GLOBALI (Massima Priorità)
+  // TRANSIZIONI DI EMERGENZA (Priorità Massima, non possono essere bloccate)
   // =================================================================
-  globalTransitions: [
+  emergencyTransitions: [
     {
       target: "UNSTUCKING",
       condition: (api, memory, context, events) =>
         events.some(
           (e) => e.type === "ACTION_STOPPED" && e.reason === "COLLISION"
         ),
-      description: "Collisione con un muro, sbloccarsi è la priorità assoluta.",
-    },
-    {
-      target: "EVADING_AIM",
-      condition: (api, memory) =>
-        api.isLockedOnByEnemy() &&
-        !["EVADING_AIM", "UNSTUCKING", "EVADING"].includes(memory.current),
-      description:
-        "Nemico sta mirando, manovra evasiva proattiva per evitare il colpo.",
+      description: "Collisione, priorità assoluta.",
     },
     {
       target: "EVADING",
@@ -65,15 +63,23 @@ const DefaultAIBase = {
         memory.evasionGraceTicks <= 0,
       description: "Colpiti da un proiettile, evasione ha la priorità.",
     },
+  ],
+
+  // =================================================================
+  // TRANSIZIONI TATTICHE (Priorità Media, possono essere bloccate da stati protetti)
+  // =================================================================
+  tacticalTransitions: [
+    {
+      target: "EVADING_AIM",
+      condition: (api, memory) => api.isLockedOnByEnemy(),
+      description:
+        "Nemico sta mirando, manovra evasiva proattiva per evitare il colpo.",
+    },
     {
       target: "KITING",
       condition: function (api, memory, context) {
         return (
-          context.enemy &&
-          context.enemy.distance < this.config.kitingDistance &&
-          !["KITING", "UNSTUCKING", "EVADING", "FLANKING"].includes(
-            memory.current
-          )
+          context.enemy && context.enemy.distance < this.config.kitingDistance
         );
       },
       description: "Nemico troppo vicino, iniziare il kiting.",
@@ -81,18 +87,15 @@ const DefaultAIBase = {
     {
       target: "RECHARGING",
       condition: function (api, memory, context) {
-        // Aggiungiamo una condizione di sicurezza: non ricaricare se il nemico è troppo vicino.
-        // La sopravvivenza ha la priorità sulla ricarica.
-        const isEnemyTooClose =
-          context.enemy && context.enemy.distance < this.config.kitingDistance;
-
-        return (
-          context.batteryPercent < this.config.rechargeEnterThreshold &&
-          memory.current !== "RECHARGING" &&
-          !isEnemyTooClose
-        );
+        // La gestione dello sfarfallio è ora globale, non serve più il cooldown manuale.
+        return context.batteryPercent < this.config.rechargeEnterThreshold;
       },
       description: "Batteria scarica, cercare una stazione di ricarica.",
+    },
+    {
+      target: "ATTACKING",
+      condition: (api, memory, context) => context.enemy,
+      description: "Nemico rilevato, ingaggiare l'attacco.",
     },
   ],
   // =================================================================
@@ -327,8 +330,8 @@ const DefaultAIBase = {
           );
           // Resetta il contatore e forza una manovra evasiva più complessa.
           api.updateMemory({ kitingAttemptCounter: 0 });
-          this.setCurrentState("EVADING", api, context);
-          return; // Interrompe l'esecuzione di onEnter per KITING
+          // this.setCurrentState("EVADING", api, context);
+          return "EVADING"; // Interrompe l'esecuzione di onEnter per KITING
         }
         // Incrementa il contatore di tentativi di kiting.
         api.updateMemory({
@@ -650,6 +653,10 @@ const DefaultAIBase = {
     // STATO RECHARGING
     // =================================================================
     RECHARGING: {
+      // NUOVA PROPRIETÀ: Questo stato può essere interrotto SOLO da queste transizioni di emergenza.
+      // Qualsiasi altra transizione tattica (come ATTACKING) verrà ignorata.
+      interruptibleBy: ["UNSTUCKING", "EVADING"],
+
       onEnter(api, memory) {
         api.log("Batteria scarica. Inizio procedura di ricarica.");
         // Resetta il flag per forzare la ricerca di un nuovo punto sicuro.
@@ -657,72 +664,34 @@ const DefaultAIBase = {
       },
       onExecute(api, memory, events, context) {
         // Se abbiamo completato un movimento, siamo arrivati a destinazione.
-        if (events.some((e) => e.type === "SEQUENCE_COMPLETED")) {
+        if (
+          memory.isMovingToRecharge &&
+          events.some((e) => e.type === "SEQUENCE_COMPLETED")
+        ) {
           api.log("Arrivato al punto di ricarica. Controllo sicurezza...");
           // Se, appena arrivati, vediamo un nemico, il posto non è sicuro.
           if (context.enemy) {
             api.log("Il posto non è sicuro! Cerco un altro punto.");
             api.updateMemory({ isMovingToRecharge: false });
-          } else {
-            api.log(
-              "Posto sicuro. Mi giro verso il centro e attendo la ricarica."
-            );
-            const arena = api.getArenaDimensions();
-            api.aimAt(arena.width / 2, arena.height / 2);
           }
           return; // Rimani in questo stato, la logica del prossimo tick deciderà.
-        }
-
-        // Se siamo in attesa in un punto (isMovingToRecharge=true, ma coda vuota),
-        // continuiamo a guardarci intorno.
-        if (memory.isMovingToRecharge && api.isQueueEmpty()) {
-          const arena = api.getArenaDimensions();
-          api.aimAt(arena.width / 2, arena.height / 2);
         }
 
         // Se dobbiamo trovare un posto dove andare (isMovingToRecharge=false e siamo inattivi).
         if (!memory.isMovingToRecharge && api.isQueueEmpty()) {
           api.log("Cerco un posto sicuro per ricaricare...");
-          const enemyPos = memory.lastKnownEnemyPosition;
-          const arena = api.getArenaDimensions();
-          const padding = this.config.cornerPadding;
-          const corners = [
-            { x: padding, y: padding },
-            { x: arena.width - padding, y: padding },
-            { x: padding, y: arena.height - padding },
-            { x: arena.width - padding, y: arena.height - padding },
-          ];
-
-          const walkableCorners = corners.filter((c) => api.isPositionValid(c));
-
-          if (walkableCorners.length > 0) {
-            let bestCorner = walkableCorners[0];
-            if (enemyPos) {
-              bestCorner = walkableCorners.reduce((a, b) =>
-                (a.x - enemyPos.x) ** 2 + (a.y - enemyPos.y) ** 2 >
-                (b.x - enemyPos.x) ** 2 + (b.y - enemyPos.y) ** 2
-                  ? a
-                  : b
-              );
-            } else {
-              bestCorner =
-                walkableCorners[
-                  Math.floor(Math.random() * walkableCorners.length)
-                ];
-            }
-            api.moveTo(bestCorner.x, bestCorner.y);
+          const safePoint = api.getRandomPoint(); // Semplificato per l'esempio
+          if (safePoint && api.moveTo(safePoint.x, safePoint.y)) {
+            api.updateMemory({ isMovingToRecharge: true });
           } else {
-            // Fallback se nessun angolo è valido.
-            for (let i = 0; i < 10; i++) {
-              const randomX = Math.random() * arena.width;
-              const randomY = Math.random() * arena.height;
-              if (api.isPositionValid({ x: randomX, y: randomY })) {
-                api.moveTo(randomX, randomY);
-                break;
-              }
-            }
+            // Se non riesco a muovermi, torno a cercare. Il periodo di grazia globale
+            // impedirà un nuovo tentativo immediato.
+            api.log(
+              "Impossibile trovare un percorso per ricaricare, torno a cercare..."
+            );
+            return "SEARCHING"; // Ritorna il nuovo stato
+            // this.setCurrentState("SEARCHING", api);
           }
-          api.updateMemory({ isMovingToRecharge: true });
         }
       },
       onExit(api, memory) {
@@ -762,7 +731,11 @@ const DefaultAIBase = {
 
       api.log(`Stato: ${oldState || "undefined"} -> ${newState}`);
       // Aggiorna lo stato precedente e lo stato corrente
-      api.updateMemory({ current: newState, lastState: oldState });
+      api.updateMemory({
+        current: newState,
+        lastState: oldState,
+        stateGraceTicks: this.config.stateGracePeriod,
+      });
 
       // Resetta il contatore di kiting se usciamo dal loop kiting/unstuck
       if (newState !== "KITING" && newState !== "UNSTUCKING") {
@@ -786,6 +759,9 @@ const DefaultAIBase = {
     if (typeof memory.current === "undefined") {
       api.updateMemory({
         lastKnownEnemyPosition: null,
+        // Nuovo contatore generico per i cooldown di stato
+        stateGraceTicks: 0,
+        // Contatore specifico per l'evasione, che può sovrapporsi
         isMovingToRecharge: false,
         evasionGraceTicks: 0, // Contatore per il periodo di grazia dell'evasione
         lastState: null,
@@ -797,6 +773,11 @@ const DefaultAIBase = {
         dodgeCooldown: 0, // Cooldown per la schivata reattiva
       });
       this.setCurrentState("SEARCHING", api);
+    }
+
+    // Decrementa il contatore generico di cooldown di stato.
+    if (memory.stateGraceTicks > 0) {
+      api.updateMemory({ stateGraceTicks: memory.stateGraceTicks - 1 });
     }
 
     // Decrementa il contatore del periodo di grazia per l'evasione ad ogni tick.
@@ -863,25 +844,115 @@ const DefaultAIBase = {
     const batteryPercent = (battery.energy / battery.maxEnergy) * 100;
 
     // --- NUOVO FLUSSO DI CONTROLLO ---
-    const context = { enemy, batteryPercent, config: this.config };
+    const currentStateName = memory.current;
+    const currentState = this.states[currentStateName];
+    const context = {
+      enemy,
+      batteryPercent,
+      config: this.config,
+      currentStateName,
+      currentState,
+    };
 
-    // 1. Controlla le transizioni GLOBALI in ordine di priorità
-    for (const transition of this.globalTransitions) {
-      if (transition.condition.call(this, api, memory, context, events)) {
-        this.setCurrentState(transition.target, api);
-        return; // Transizione avvenuta, fine del tick.
+    // 1. Controlla le transizioni di EMERGENZA (priorità massima, interrompono sempre)
+    if (this.emergencyTransitions) {
+      for (const transition of this.emergencyTransitions) {
+        var condition = transition.condition.call(
+          this,
+          api,
+          memory,
+          context,
+          events
+        );
+        if (condition == null || condition == undefined) {
+          api.log(
+            "Condizione di transizione di emergenza non valida:",
+            transition
+          );
+          continue;
+        } else {
+          if (condition) {
+            // *** LA CORREZIONE È QUI ***
+            if (transition.target !== currentStateName) {
+              this.setCurrentState(transition.target, api, context);
+              return; // Transizione avvenuta, fine del tick.
+            }
+          }
+        }
       }
     }
 
-    // ---
-    const currentStateName = memory.current;
-    const currentState = this.states[currentStateName];
+    // 2. Se siamo in un periodo di grazia, eseguiamo solo la logica dello stato corrente.
+    // Questo previene lo "sfarfallio" tra stati.
+    if (memory.stateGraceTicks > 0) {
+      if (currentState && currentState.onExecute) {
+        const nextStateName = currentState.onExecute.call(
+          this,
+          api,
+          memory,
+          events,
+          context
+        );
+        if (nextStateName && nextStateName !== currentStateName) {
+          this.setCurrentState(nextStateName, api, context);
+        }
+      }
+      return; // Fine del tick, siamo "bloccati" nello stato attuale
+    }
+
+    // 2. Controlla se lo stato attuale può essere interrotto.
+    // Se lo stato non definisce `interruptibleBy`, si assume che possa essere interrotto da qualsiasi transizione tattica.
+    const canBeInterruptedBy = currentState?.interruptibleBy || null;
+
+    // 3. Controlla le transizioni TATTICHE (priorità media)
+    if (this.tacticalTransitions) {
+      for (const transition of this.tacticalTransitions) {
+        // La transizione si attiva solo se lo stato attuale lo permette (o non ha preferenze)
+        if (
+          !canBeInterruptedBy ||
+          canBeInterruptedBy.includes(transition.target)
+        ) {
+          const condition = transition.condition.call(
+            this,
+            api,
+            memory,
+            context,
+            events
+          );
+          if (condition == null) {
+            api.log(
+              "Condizione di transizione tattica non valida:",
+              transition
+            );
+            continue;
+          }
+          if (condition && transition.target !== currentStateName) {
+            this.setCurrentState(transition.target, api, context);
+            return; // Transizione avvenuta, fine del tick.
+          }
+        }
+      }
+    }
 
     // 2. Se nessuna transizione globale è scattata, controlla le transizioni LOCALI dello stato corrente
     if (currentState && currentState.transitions) {
       for (const transition of currentState.transitions) {
-        if (transition.condition.call(this, api, memory, context, events)) {
-          this.setCurrentState(transition.target, api);
+        const condition = transition.condition.call(
+          this,
+          api,
+          memory,
+          context,
+          events
+        );
+        if (condition == null) {
+          api.log(
+            `Condizione di transizione locale non valida per lo stato '${currentStateName}':`,
+            transition
+          );
+          continue;
+        }
+        if (condition && transition.target !== currentStateName) {
+          this.setCurrentState(transition.target, api, context);
           return; // Transizione avvenuta, fine del tick.
         }
       }
@@ -898,7 +969,7 @@ const DefaultAIBase = {
         context
       );
       if (nextStateName && nextStateName !== currentStateName) {
-        this.setCurrentState(nextStateName, api);
+        this.setCurrentState(nextStateName, api, context);
         return; // Transizione avvenuta, fine del tick.
       }
     }

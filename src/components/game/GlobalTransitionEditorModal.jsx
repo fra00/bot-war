@@ -13,6 +13,7 @@ const GlobalTransitionEditorModal = ({
   transition,
   isOpen,
   onClose,
+  type, // 'emergency' or 'tactical'
   onSave,
   availableStates,
 }) => {
@@ -30,11 +31,13 @@ const GlobalTransitionEditorModal = ({
       );
     } else {
       // Defaults for a new transition
-      setLabel("Nuova transizione globale");
+      setLabel(
+        `Nuova transizione ${type === "emergency" ? "di emergenza" : "tattica"}`
+      );
       setTarget(availableStates.length > 0 ? availableStates[0].value : "");
       setCondition("(api, memory, context, events) => {\n  return false;\n}");
     }
-  }, [transition, isOpen, availableStates]);
+  }, [transition, isOpen, availableStates, type]);
 
   const handleSave = () => {
     const updatedTransition = {
@@ -45,7 +48,7 @@ const GlobalTransitionEditorModal = ({
         condition,
       },
     };
-    onSave(updatedTransition);
+    onSave(updatedTransition, type);
     onClose();
   };
 
@@ -72,7 +75,13 @@ const GlobalTransitionEditorModal = ({
       isOpen={isOpen}
       onClose={onClose}
       title={
-        transition ? "Modifica Transizione Globale" : "Crea Transizione Globale"
+        transition
+          ? `Modifica Transizione ${
+              type === "emergency" ? "di Emergenza" : "Tattica"
+            }`
+          : `Nuova Transizione ${
+              type === "emergency" ? "di Emergenza" : "Tattica"
+            }`
       }
       fullscreen={true}
     >
@@ -131,6 +140,7 @@ GlobalTransitionEditorModal.propTypes = {
   transition: PropTypes.object,
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
+  type: PropTypes.oneOf(["emergency", "tactical"]).isRequired,
   onSave: PropTypes.func.isRequired,
   availableStates: PropTypes.arrayOf(
     PropTypes.shape({

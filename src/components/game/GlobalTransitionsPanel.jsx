@@ -4,10 +4,16 @@ import Card from "../ui/Card";
 import CardHeader from "../ui/CardHeader";
 import Button from "../ui/Button";
 
-const GlobalTransitionsPanel = ({ transitions, onAdd, onEdit, onDelete }) => {
+const GlobalTransitionsPanel = ({
+  title,
+  transitions,
+  onAdd,
+  onEdit,
+  onDelete,
+}) => {
   return (
     <Card className="flex flex-col h-full w-80 flex-shrink-0">
-      <CardHeader>Transizioni Globali</CardHeader>
+      <CardHeader>{title}</CardHeader>
       <div className="flex-grow overflow-y-auto p-2 space-y-2">
         {transitions.length === 0 ? (
           <p className="text-sm text-gray-500 text-center p-4">
@@ -53,6 +59,7 @@ const GlobalTransitionsPanel = ({ transitions, onAdd, onEdit, onDelete }) => {
 };
 
 GlobalTransitionsPanel.propTypes = {
+  title: PropTypes.string.isRequired,
   transitions: PropTypes.arrayOf(PropTypes.object).isRequired,
   onAdd: PropTypes.func.isRequired,
   onEdit: PropTypes.func.isRequired,
