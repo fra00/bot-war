@@ -75,16 +75,19 @@ const AIEditorModal = ({
   }, [code, activeScript, isOpen]);
 
   const handleCodeChange = (newCode) => {
-    setInternalCode(newCode);
+    // Aggiorna lo stato interno direttamente con il codice dall'editor.
+    setInternalCode(newCode || "");
     setIsDirty(true);
-    onCodeChangeProp(newCode); // Notifica il genitore se necessario
+    // Rimuoviamo la notifica al genitore per interrompere il ciclo di re-render che causa il salto del cursore.
+    // onCodeChangeProp(newCode);
   };
 
   const handleVisualModelChange = (newModel) => {
     setInternalVisualModel(newModel);
     try {
-      // Genera il codice "pulito" dal modello visuale.
-      const newCode = generateAICodeFromVisualModel(newModel);
+      // Genera il codice dal modello visuale, usando il codice corrente
+      // come base per preservare le funzioni helper e altre proprietà custom.
+      const newCode = generateAICodeFromVisualModel(newModel, internalCode);
       setInternalCode(newCode);
       setIsDirty(true);
     } catch (e) {

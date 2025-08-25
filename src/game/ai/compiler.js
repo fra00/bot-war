@@ -1,4 +1,76 @@
 import DefaultAIBase from "./DefaultAIBase.js";
+import { baseFSM } from "./baseFSM.js";
+
+/**
+ * Funzione ricorsiva per stringificare un oggetto, gestendo correttamente
+ * oggetti, array, funzioni e primitivi in una stringa di codice formattata.
+ * @param {*} value - Il valore da stringificare.
+ * @param {string} indent - La stringa di indentazione corrente.
+ * @returns {string}
+ */
+function stringifyRecursive(value, indent = "") {
+  if (value === null) {
+    return "null";
+  }
+
+  const type = typeof value;
+
+  if (type === "function") {
+    return value.toString().replace(/\n/g, `\n${indent}`);
+  }
+
+  if (type !== "object") {
+    return JSON.stringify(value);
+  }
+
+  const nextIndent = indent + "  ";
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+    const items = value.map(
+      (item) => `${nextIndent}${stringifyRecursive(item, nextIndent)}`
+    );
+    return `[\n${items.join(",\n")}\n${indent}]`;
+  }
+
+  // È un oggetto semplice
+  const keys = Object.keys(value);
+  if (keys.length === 0) return "{}";
+
+  const validIdentifierRegex = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
+  const parts = keys
+    .map((key) => {
+      const propValue = value[key];
+      if (propValue === undefined) return null; // Salta le proprietà undefined
+
+      const keyStr = validIdentifierRegex.test(key) ? key : JSON.stringify(key);
+      const valueStr = stringifyRecursive(propValue, nextIndent);
+
+      // Gestisce la sintassi dei metodi come `myMethod() {}` dove la chiave è parte della stringa del valore
+      if (
+        typeof propValue === "function" &&
+        !/^(function|\()/.test(propValue.toString())
+      ) {
+        return `${nextIndent}${valueStr}`;
+      }
+
+      return `${nextIndent}${keyStr}: ${valueStr}`;
+    })
+    .filter((part) => part !== null);
+
+  return `{\n${parts.join(",\n")}\n${indent}}`;
+}
+
+/**
+ * Converte un oggetto AI in una stringa di codice sorgente che può essere valutata.
+ * Gestisce correttamente oggetti annidati e funzioni.
+ * @param {object} aiObject - L'oggetto AI da stringificare.
+ * @returns {string}
+ */
+export const stringifyAI = (aiObject) => {
+  // Le parentesi esterne sono cruciali per l'interpretazione come espressione oggetto.
+  return `(${stringifyRecursive(aiObject, "")})`;
+};
 
 /**
  * Tenta di "compilare" la stringa di codice in un oggetto AI valido.
@@ -102,30 +174,30 @@ export const isStandardFSM = (code) => {
  * @param {string} fullScriptCode - Il codice completo dello script.
  * @returns {string} - Il codice "pulito" da mostrare nell'editor.
  */
-export const prepareCodeForEditor = (fullScriptCode) => {
-  if (!isStandardFSM(fullScriptCode)) {
-    // Se non è una FSM standard, restituisce il codice originale.
-    return fullScriptCode;
+export const prepareCodeForEditor = (codeString) => {
+  if (!isStandardFSM(codeString)) {
+    return codeString; // Se non è una FSM, non toccare nulla.
   }
 
   try {
-    const factory = new Function(`return (${fullScriptCode})`);
-    const fullAiObject = factory();
+    // Analizza il codice dell'utente in un oggetto.
+    // Potrebbe contenere funzioni del motore da salvataggi precedenti.
+    const userAiObject = new Function(`return (${codeString})`)();
 
-    // Crea un nuovo oggetto contenente solo le parti modificabili dall'utente.
-    // Le altre proprietà (run, onEnter, onExecute, etc.) vengono omesse.
-    const editableParts = {
-      standardFSM: true,
-      config: fullAiObject.config,
-      emergencyTransitions: fullAiObject.emergencyTransitions,
-      tacticalTransitions: fullAiObject.tacticalTransitions,
-      states: fullAiObject.states,
-    };
+    // Crea una copia per evitare di modificare l'oggetto originale.
+    const objectToShow = { ...userAiObject };
 
-    return stringifyAI(editableParts);
+    // Rimuove esplicitamente tutte le chiavi che fanno parte del motore FSM di base.
+    // Questo garantisce che all'utente venga mostrato solo il suo codice di configurazione.
+    for (const key in baseFSM) {
+      delete objectToShow[key];
+    }
+
+    // Riconverte in stringa l'oggetto "ripulito" per l'editor.
+    return stringifyAI(objectToShow);
   } catch (e) {
     console.error("Errore durante la preparazione del codice per l'editor:", e);
-    return fullScriptCode;
+    return codeString; // In caso di errore, restituisce il codice originale.
   }
 };
 
@@ -163,23 +235,38 @@ import * as dagre from "dagre";
 
 export const GLOBAL_TRANSITIONS_NODE_ID = "__global_transitions__";
 
-export const generateAICodeFromVisualModel = (visualModel) => {
+export const generateAICodeFromVisualModel = (
+  visualModel,
+  originalCode = "({})"
+) => {
   if (!visualModel || !visualModel.nodes) {
     return "({})";
   }
 
+  // 1. Analizza il codice originale per ottenere l'oggetto base con tutte le proprietà personalizzate
+  let originalAIObject;
+  try {
+    originalAIObject = new Function(`return (${originalCode})`)();
+  } catch (e) {
+    console.error(
+      "Impossibile analizzare il codice AI originale, si riparte da zero.",
+      e
+    );
+    originalAIObject = {};
+  }
+
   const { nodes, edges } = visualModel;
 
-  // Inizializza la struttura base dell'oggetto AI
-  const aiObject = {
-    standardFSM: true,
-    config: {}, // La config non è gestita visualmente, la lasciamo vuota
-    states: {},
-    emergencyTransitions: [],
-    tacticalTransitions: [],
-  };
+  // 2. Inizia con l'oggetto originale per preservare le proprietà personalizzate (es. config, funzioni helper)
+  const aiObject = { ...originalAIObject };
 
-  // 1. Popola gli stati dall'array di nodi
+  // 3. Reimposta e ricostruisci le parti FSM dal modello visuale
+  aiObject.standardFSM = true;
+  aiObject.states = {};
+  aiObject.emergencyTransitions = [];
+  aiObject.tacticalTransitions = [];
+
+  // Popola gli stati dall'array di nodi
   nodes.forEach((node) => {
     // Ignora il nodo speciale per le transizioni globali
     if (node.id === GLOBAL_TRANSITIONS_NODE_ID) {
@@ -370,75 +457,4 @@ export const generateVisualModelFromAIObject = (aiObject) => {
   });
 
   return { nodes: layoutedNodes, edges };
-};
-
-/**
- * Funzione ricorsiva per stringificare un oggetto, gestendo correttamente
- * oggetti, array, funzioni e primitivi in una stringa di codice formattata.
- * @param {*} value - Il valore da stringificare.
- * @param {string} indent - La stringa di indentazione corrente.
- * @returns {string}
- */
-function stringifyRecursive(value, indent = "") {
-  if (value === null) {
-    return "null";
-  }
-
-  const type = typeof value;
-
-  if (type === "function") {
-    return value.toString().replace(/\n/g, `\n${indent}`);
-  }
-
-  if (type !== "object") {
-    return JSON.stringify(value);
-  }
-
-  const nextIndent = indent + "  ";
-
-  if (Array.isArray(value)) {
-    if (value.length === 0) return "[]";
-    const items = value.map(
-      (item) => `${nextIndent}${stringifyRecursive(item, nextIndent)}`
-    );
-    return `[\n${items.join(",\n")}\n${indent}]`;
-  }
-
-  // È un oggetto semplice
-  const keys = Object.keys(value);
-  if (keys.length === 0) return "{}";
-
-  const validIdentifierRegex = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
-  const parts = keys
-    .map((key) => {
-      const propValue = value[key];
-      if (propValue === undefined) return null; // Salta le proprietà undefined
-
-      const keyStr = validIdentifierRegex.test(key) ? key : JSON.stringify(key);
-      const valueStr = stringifyRecursive(propValue, nextIndent);
-
-      // Gestisce la sintassi dei metodi come `myMethod() {}` dove la chiave è parte della stringa del valore
-      if (
-        typeof propValue === "function" &&
-        !/^(function|\()/.test(propValue.toString())
-      ) {
-        return `${nextIndent}${valueStr}`;
-      }
-
-      return `${nextIndent}${keyStr}: ${valueStr}`;
-    })
-    .filter((part) => part !== null);
-
-  return `{\n${parts.join(",\n")}\n${indent}}`;
-}
-
-/**
- * Converte un oggetto AI in una stringa di codice sorgente che può essere valutata.
- * Gestisce correttamente oggetti annidati e funzioni.
- * @param {object} aiObject - L'oggetto AI da stringificare.
- * @returns {string}
- */
-export const stringifyAI = (aiObject) => {
-  // Le parentesi esterne sono cruciali per l'interpretazione come espressione oggetto.
-  return `(${stringifyRecursive(aiObject, "")})`;
 };
