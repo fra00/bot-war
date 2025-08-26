@@ -179,7 +179,9 @@ Aggiungi questo codice nelle sezioni appropriate del tuo scheletro.
 // Inserisci questa transizione nell'array `tacticalTransitions`
 {
   target: 'ATTACKING',
-  condition: (api, memory, context) => context.enemy,
+  condition: function (api, memory, context) {
+    return context.enemy;
+  },
   description: "Nemico rilevato, ingaggiare l'attacco.",
 },
 
@@ -231,7 +233,9 @@ ATTACKING: {
   transitions: [
     {
       target: 'SEARCHING',
-      condition: (api, memory, context) => !context.enemy,
+      condition: function (api, memory, context) {
+        return !context.enemy;
+      },
       description: "Passa a cercare se il nemico non è più visibile."
     }
   ]
@@ -273,7 +277,9 @@ EVADING: {
   transitions: [
     {
       target: 'SEARCHING',
-      condition: (api) => api.isQueueEmpty(),
+      condition: function (api) {
+        return api.isQueueEmpty();
+      },
       description: "Torna a cercare dopo aver completato la manovra evasiva."
     }
   ]
@@ -302,15 +308,17 @@ lowBatteryThreshold: 30, // Percentuale sotto cui considerare la batteria scaric
 tacticalTransitions: [
   {
     target: "FLEEING",
-    condition: (api, memory, context) =>
-      context.batteryPercent < context.config.lowBatteryThreshold,
+    condition: function (api, memory, context) {
+      return context.batteryPercent < context.config.lowBatteryThreshold;
+    },
     description: "Batteria scarica, ritirata strategica.",
   },
   {
     target: "ATTACKING",
-    condition: (api, memory, context) =>
-      context.enemy &&
-      context.batteryPercent >= context.config.lowBatteryThreshold,
+    condition: function (api, memory, context) {
+      return context.enemy &&
+        context.batteryPercent >= context.config.lowBatteryThreshold;
+    },
     description: "Nemico rilevato e batteria sufficiente, ingaggiare l'attacco.",
   },
 ],
@@ -334,7 +342,9 @@ FLEEING: {
   transitions: [
     {
       target: "SEARCHING",
-      condition: (api) => api.isQueueEmpty(),
+      condition: function (api) {
+        return api.isQueueEmpty();
+      },
       description: "Angolo raggiunto, inizio a ricaricare e a guardarmi intorno.",
     },
   ],
@@ -383,15 +393,19 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
   tacticalTransitions: [
     {
       target: "FLEEING",
-      condition: (api, memory, context) =>
-        context.batteryPercent < context.config.lowBatteryThreshold,
+      condition: function (api, memory, context) {
+        return context.batteryPercent < context.config.lowBatteryThreshold;
+      },
       description: "Batteria scarica, ritirata strategica.",
     },
     {
       target: "ATTACKING",
-      condition: (api, memory, context) =>
-        context.enemy &&
-        context.batteryPercent >= context.config.lowBatteryThreshold,
+      condition: function (api, memory, context) {
+        return (
+          context.enemy &&
+          context.batteryPercent >= context.config.lowBatteryThreshold
+        );
+      },
       description:
         "Nemico rilevato e batteria sufficiente, ingaggiare l'attacco.",
     },
@@ -432,7 +446,9 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
       transitions: [
         {
           target: "SEARCHING",
-          condition: (api, memory, context) => !context.enemy,
+          condition: function (api, memory, context) {
+            return !context.enemy;
+          },
           description: "Passa a cercare se il nemico non è più visibile.",
         },
       ],
@@ -455,7 +471,9 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
       transitions: [
         {
           target: "SEARCHING",
-          condition: (api) => api.isQueueEmpty(),
+          condition: function (api) {
+            return api.isQueueEmpty();
+          },
           description:
             "Angolo raggiunto, inizio a ricaricare e a guardarmi intorno.",
         },
@@ -470,7 +488,9 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
       transitions: [
         {
           target: "SEARCHING",
-          condition: (api) => api.isQueueEmpty(),
+          condition: function (api) {
+            return api.isQueueEmpty();
+          },
           description:
             "Torna a cercare dopo aver completato la manovra evasiva.",
         },

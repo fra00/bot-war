@@ -277,7 +277,7 @@ const GameUI = ({
             className="w-full"
             size="large"
           >
-            Guida LLM
+            Prompt Pronto per il tuo LLM!
           </Button>
           <Button
             onClick={() => {

@@ -1,4 +1,11 @@
-﻿### **Prompt Finale e Definitivo v19 (Architettura Finale Integrata)**
+﻿---
+- **Copia e incolla il seguente prompt nel tuo LLM per generare il tuo primo bot.**
+- Modifica la **sezione 8** per spiegare le regole del tuo bot.
+- Genera un nuovo Base Script dell'editor e incolla il testo generato dal tuo LLM
+- Ora puoi provare il tuo bot nell'arena
+---
+
+### **Prompt Finale e Definitivo v19 (Architettura Finale Integrata)**
 
 ### **Indice del Prompt**
 
@@ -222,7 +229,7 @@ Il tuo compito è **generare un singolo oggetto JavaScript che segua questa stru
 });
 ```
 
-### **SPECIFICHE DEL BOT** (Che bot creare)
+### **SEZIONE 8: SPECIFICHE DEL BOT** (Che bot creare)
 
 **Applica tutto il know-how delle sezioni 1-7 per realizzare quanto specificato qui**
 
