@@ -226,9 +226,11 @@ const DefaultAIBase = {
         {
           target: "FLANKING",
           condition: function (api, memory, context) {
-            context.enemy &&
+            return (
+              context.enemy &&
               api.isQueueEmpty() &&
-              !api.isLineOfSightClear(context.enemy);
+              !api.isLineOfSightClear(context.enemy)
+            );
           },
           description:
             "Passa a fiancheggiare se la linea di tiro è bloccata e non si sta già muovendo.",
