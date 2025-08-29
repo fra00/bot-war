@@ -163,7 +163,14 @@ const GameUI = ({
       {/* Layout principale a due colonne (fisso) con grid di Tailwind */}
       <div className="grid grid-cols-12 gap-4">
         {/* Colonna sinistra: Arena (occupa 3 colonne) */}
-        <div className="col-span-8">
+        <div className="col-span-3">
+          <GameInfoPanel
+            gameState={gameState}
+            index={0}
+            isMultiplayer={isMultiplayer}
+          />
+        </div>
+        <div className="col-span-6">
           <GameView
             gameState={gameState}
             viewMode={viewMode}
@@ -171,8 +178,12 @@ const GameUI = ({
           />
         </div>
         {/* Colonna destra: Info Bots (occupa 1 colonna) */}
-        <div className="col-span-4">
-          <GameInfoPanel gameState={gameState} isMultiplayer={isMultiplayer} />
+        <div className="col-span-3">
+          <GameInfoPanel
+            gameState={gameState}
+            index={1}
+            isMultiplayer={isMultiplayer}
+          />
         </div>
       </div>
 
