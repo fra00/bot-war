@@ -6,7 +6,7 @@ import FirestoreService from "../../services/FirestoreService";
 import GameManager from "../game/GameManager";
 import Toolbar from "../ui/Toolbar";
 import Button from "../ui/Button";
-import Arena from "../game/Arena";
+import GameView from "../game/GameView";
 import GameInfoPanel from "../game/GameInfoPanel";
 import GameOverModal from "../game/GameOverModal";
 import useDisclosure from "../ui/useDisclosure";
@@ -29,6 +29,8 @@ const MultiplayerArena = ({ matchData, onNavigate }) => {
   } = useDisclosure();
   const statsUpdatedRef = useRef(false);
   const { addToast } = useToast();
+  // Gestione viewMode locale come in GameUI
+  const [viewMode, setViewMode] = React.useState("2D");
 
   // Compila le IA al montaggio del componente
   useEffect(() => {
@@ -83,6 +85,21 @@ const MultiplayerArena = ({ matchData, onNavigate }) => {
   return (
     <>
       <Toolbar title="Partita Multiplayer">
+        <div className="flex items-center gap-2 mr-4">
+          <span className="text-sm font-medium text-gray-300">Visuale:</span>
+          <Button
+            onClick={() => setViewMode("2D")}
+            variant={viewMode === "2D" ? "primary" : "secondary"}
+          >
+            2D
+          </Button>
+          <Button
+            onClick={() => setViewMode("3D")}
+            variant={viewMode === "3D" ? "primary" : "secondary"}
+          >
+            3D
+          </Button>
+        </div>
         <Button onClick={() => onNavigate("main-menu")} variant="secondary">
           Abbandona Partita
         </Button>
@@ -109,7 +126,11 @@ const MultiplayerArena = ({ matchData, onNavigate }) => {
             // Effetto per la navigazione automatica dopo il salvataggio delle statistiche
             useEffect(() => {
               // Naviga solo quando la partita è finita, il salvataggio non è in corso e le statistiche sono state aggiornate
-              if (gameState?.status === 'finished' && !isSavingStats && statsUpdatedRef.current) {
+              if (
+                gameState?.status === "finished" &&
+                !isSavingStats &&
+                statsUpdatedRef.current
+              ) {
                 // Aggiungiamo un piccolo ritardo per dare tempo all'utente di leggere il toast di successo
                 setTimeout(() => onNavigate("multiplayer-lobby"), 1500);
               }
@@ -118,10 +139,14 @@ const MultiplayerArena = ({ matchData, onNavigate }) => {
             useEffect(() => {
               // Estrai gli ID per stabilizzare le dipendenze dell'effetto
               const playerBotId = matchData?.playerBot?.id;
-              const opponentBotId = matchData?.opponentBot?.id;              
-              
+              const opponentBotId = matchData?.opponentBot?.id;
+
               const updateStats = async () => {
-                if (gameState?.status !== "finished" || !user || statsUpdatedRef.current) {
+                if (
+                  gameState?.status !== "finished" ||
+                  !user ||
+                  statsUpdatedRef.current
+                ) {
                   return;
                 }
                 statsUpdatedRef.current = true; // Segna come avviato
@@ -142,44 +167,69 @@ const MultiplayerArena = ({ matchData, onNavigate }) => {
 
                   // Esegui entrambi gli aggiornamenti in parallelo
                   await Promise.all([
-                    FirestoreService.updateBotStats(playerBotId, playerResult, matchType),
-                    FirestoreService.updateBotStats(opponentBotId, opponentResult, matchType)
+                    FirestoreService.updateBotStats(
+                      playerBotId,
+                      playerResult,
+                      matchType
+                    ),
+                    FirestoreService.updateBotStats(
+                      opponentBotId,
+                      opponentResult,
+                      matchType
+                    ),
                   ]);
 
                   addToast("Statistiche della partita salvate!", "success");
-
                 } catch (err) {
                   console.error("Failed to update match stats:", err);
-                  addToast("Errore nel salvataggio delle statistiche.", "danger");
+                  addToast(
+                    "Errore nel salvataggio delle statistiche.",
+                    "danger"
+                  );
                 } finally {
                   setIsSavingStats(false);
                 }
               };
 
               updateStats();
-
             }, [
-              gameState?.status, 
-              user, 
-              matchData?.playerBot?.id, 
-              matchData?.opponentBot?.id, 
+              gameState?.status,
+              user,
+              matchData?.playerBot?.id,
+              matchData?.opponentBot?.id,
               gameState?.winner,
-              addToast
+              addToast,
             ]);
 
             // Effetto per aprire la modale di fine partita
             useEffect(() => {
-              if (gameState && gameState.status === "finished") onGameOverOpen();
+              if (gameState && gameState.status === "finished")
+                onGameOverOpen();
             }, [gameState, onGameOverOpen]);
 
             if (!gameState) {
               return (
                 <div className="grid grid-cols-12 gap-4">
-                  <div className="col-span-8">
-                    <Arena gameState={null} />
+                  <div className="col-span-3">
+                    <GameInfoPanel
+                      gameState={{}}
+                      index={0}
+                      isMultiplayer={true}
+                    />
                   </div>
-                  <div className="col-span-4">
-                    <GameInfoPanel gameState={{}} />
+                  <div className="col-span-6">
+                    <GameView
+                      gameState={null}
+                      viewMode={viewMode}
+                      onViewModeChange={setViewMode}
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <GameInfoPanel
+                      gameState={{}}
+                      index={1}
+                      isMultiplayer={true}
+                    />
                   </div>
                 </div>
               );
@@ -190,27 +240,52 @@ const MultiplayerArena = ({ matchData, onNavigate }) => {
             if (enrichedGameState.robots) {
               enrichedGameState.bots = gameState.robots.map((bot) => ({
                 ...bot,
-                name: bot.id === "player" ? matchData.playerBot.name : matchData.opponentBot.name,
+                name:
+                  bot.id === "player"
+                    ? matchData.playerBot.name
+                    : matchData.opponentBot.name,
               }));
             }
-            if (enrichedGameState.status === "finished" && enrichedGameState.bots) {
-              enrichedGameState.winner = enrichedGameState.bots.find((bot) => bot.hullHp > 0) || null;
+            if (
+              enrichedGameState.status === "finished" &&
+              enrichedGameState.bots
+            ) {
+              enrichedGameState.winner =
+                enrichedGameState.bots.find((bot) => bot.hullHp > 0) || null;
             }
 
             return (
               <>
                 <div className="grid grid-cols-12 gap-4">
-                  <div className="col-span-8">
-                    <Arena gameState={enrichedGameState} />
+                  {/* Colonna sinistra: Info Player */}
+                  <div className="col-span-3">
+                    <GameInfoPanel
+                      gameState={enrichedGameState}
+                      index={0}
+                      isMultiplayer={true}
+                    />
                   </div>
-                  <div className="col-span-4">
-                    <GameInfoPanel gameState={enrichedGameState} isMultiplayer={true} />
+                  {/* Arena al centro, ora GameView */}
+                  <div className="col-span-6">
+                    <GameView
+                      gameState={enrichedGameState}
+                      viewMode={viewMode}
+                      onViewModeChange={setViewMode}
+                    />
+                  </div>
+                  {/* Colonna destra: Info Opponent */}
+                  <div className="col-span-3">
+                    <GameInfoPanel
+                      gameState={enrichedGameState}
+                      index={1}
+                      isMultiplayer={true}
+                    />
                   </div>
                 </div>
                 <GameOverModal
                   isOpen={isGameOver}
                   gameState={enrichedGameState}
-                  onRestart={handleAcknowledgeEnd} // Entrambi i pulsanti ora chiudono solo la modale
+                  onRestart={handleAcknowledgeEnd}
                   onClose={handleAcknowledgeEnd}
                   isSaving={isSavingStats}
                 />

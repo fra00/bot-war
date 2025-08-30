@@ -247,7 +247,7 @@ const GameInfoPanel = ({ gameState, index, isMultiplayer }) => {
     );
   }, [logSource, addToast, renderLogContent]);
 
-  if (currentBot === null) {
+  if (!currentBot) {
     return (
       <div className="flex flex-col h-full gap-4">
         <Box className="flex gap-4">
