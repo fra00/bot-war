@@ -12,19 +12,19 @@ Iniziamo con lo scheletro della nostra IA. Questo codice definisce un'architettu
 
 I concetti chiave sono:
 
-- `config`: Un posto dove mettere le costanti per una facile configurazione.
+- `constants`: Un posto dove mettere le costanti per una facile configurazione.
 - `emergencyTransitions`: Hanno la **priorità assoluta** e servono per gestire eventi critici come essere colpiti. Vengono controllate ad ogni tick, prima di ogni altra cosa.
 - `tacticalTransitions`: Gestiscono le **decisioni strategiche** come attaccare o ritirarsi. Hanno una priorità media.
 - `states`: Qui definiamo i comportamenti specifici di ogni stato.
 
-Il motore della FSM (`run` e `setCurrentState`) è già scritto per te e non va modificato. Il nostro compito sarà riempire le sezioni `config`, le transizioni e gli stati.
+Il motore della FSM (`run` e `setCurrentState`) è già scritto per te e non va modificato. Il nostro compito sarà riempire le sezioni `constants`, le transizioni e gli stati.
 
 ```javascript
 ({
   // =================================================================
   // CONFIGURAZIONE
   // =================================================================
-  config: {
+  constants: {
     patrolSpeed: 70,
     aimTolerance: 5,
     evasionGracePeriod: 120, // Tick di "invulnerabilità" dopo un'evasione
@@ -110,7 +110,7 @@ Il motore della FSM (`run` e `setCurrentState`) è già scritto per te e non va 
     const context = {
       enemy,
       batteryPercent,
-      config: this.config,
+      constants: this.constants,
       currentStateName,
       currentState,
     };
@@ -179,7 +179,7 @@ Aggiungi questo codice nelle sezioni appropriate del tuo scheletro.
 // Inserisci questa transizione nell'array `tacticalTransitions`
 {
   target: 'ATTACKING',
-  condition: function (api, memory, context) {
+  condition: function (api, readOnlyMemory, context) {
     return context.enemy;
   },
   description: "Nemico rilevato, ingaggiare l'attacco.",
@@ -187,14 +187,14 @@ Aggiungi questo codice nelle sezioni appropriate del tuo scheletro.
 
 // Inserisci questo stato nell'oggetto `states`
 SEARCHING: {
-  onEnter: (api, memory) => {
+  onEnter: (api, readOnlyMemory) => {
     api.log("Inizio pattugliamento...");
   },
-  onExecute: function (api, memory, events) {
+  onExecute: function (api, readOnlyMemory, events) {
     if (api.isQueueEmpty()) {
       const randomPoint = api.getRandomPoint();
       if (randomPoint) {
-        api.moveTo(randomPoint.x, randomPoint.y, this.config.patrolSpeed);
+        api.moveTo(randomPoint.x, randomPoint.y, this.constants.patrolSpeed);
       }
     }
   },
@@ -216,7 +216,7 @@ Aggiungi questo oggetto all'interno della mappa `states`:
 ```javascript
 // Inserisci questo stato nell'oggetto `states`
 ATTACKING: {
-  onExecute: function (api, memory, events, context) {
+  onExecute: function (api, readOnlyMemory, events, context) {
     const { enemy } = context;
     if (!enemy) return;
 
@@ -224,7 +224,7 @@ ATTACKING: {
     api.aimAt(predictedPos.x, predictedPos.y);
 
     if (
-      Math.abs(enemy.angle) < this.config.aimTolerance &&
+      Math.abs(enemy.angle) < this.constants.aimTolerance &&
       api.isLineOfSightClear(enemy)
     ) {
       api.fire();
@@ -233,7 +233,7 @@ ATTACKING: {
   transitions: [
     {
       target: 'SEARCHING',
-      condition: function (api, memory, context) {
+      condition: function (api, readOnlyMemory, context) {
         return !context.enemy;
       },
       description: "Passa a cercare se il nemico non è più visibile."
@@ -258,10 +258,10 @@ Aggiungi questo codice nelle sezioni appropriate:
 // Inserisci questa transizione nell'array `emergencyTransitions`
 {
   target: "EVADING",
-  condition: function (api, memory, context, events) {
+  condition: function (api, readOnlyMemory, context, events) {
     return (
       events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
-      memory.evasionGraceTicks <= 0
+      readOnlyMemory.evasionGraceTicks <= 0
     );
   },
   description: "Colpiti da un proiettile, evasione ha la priorità.",
@@ -269,9 +269,9 @@ Aggiungi questo codice nelle sezioni appropriate:
 
 // Inserisci questo stato nell'oggetto `states`
 EVADING: {
-  onEnter: function (api, memory) {
+  onEnter: function (api, readOnlyMemory) {
     api.log("Colpito! Eseguo manovra evasiva con strafe...");
-    api.updateMemory({ evasionGraceTicks: this.config.evasionGracePeriod });
+    api.updateMemory({ evasionGraceTicks: this.constants.evasionGracePeriod });
     api.strafe(Math.random() < 0.5 ? 'left' : 'right');
   },
   transitions: [
@@ -301,23 +301,23 @@ Qui entra in gioco `interruptibleBy`. È una proprietà che possiamo aggiungere 
 Modifica il tuo codice con questi frammenti:
 
 ```javascript
-// Inserisci questo in `config`
+// Inserisci questo in `constants`
 lowBatteryThreshold: 30, // Percentuale sotto cui considerare la batteria scarica
 
 // SOSTITUISCI l'intero array `tacticalTransitions` con questo
 tacticalTransitions: [
   {
     target: "FLEEING",
-    condition: function (api, memory, context) {
-      return context.batteryPercent < context.config.lowBatteryThreshold;
+    condition: function (api, readOnlyMemory, context) {
+      return context.batteryPercent < context.constants.lowBatteryThreshold;
     },
     description: "Batteria scarica, ritirata strategica.",
   },
   {
     target: "ATTACKING",
-    condition: function (api, memory, context) {
+    condition: function (api, readOnlyMemory, context) {
       return context.enemy &&
-        context.batteryPercent >= context.config.lowBatteryThreshold;
+        context.batteryPercent >= context.constants.lowBatteryThreshold;
     },
     description: "Nemico rilevato e batteria sufficiente, ingaggiare l'attacco.",
   },
@@ -333,9 +333,9 @@ FLEEING: {
       api.moveTo(corner.x, corner.y);
     }
   },
-  onExecute: function (api, memory, events, context) {
+  onExecute: function (api, readOnlyMemory, events, context) {
     // Se durante la fuga la batteria si ricarica, possiamo tornare a cercare
-    if (context.batteryPercent > context.config.lowBatteryThreshold + 10) {
+    if (context.batteryPercent > context.constants.lowBatteryThreshold + 10) {
       return "SEARCHING";
     }
   },
@@ -364,7 +364,7 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
   // =================================================================
   // CONFIGURAZIONE
   // =================================================================
-  config: {
+  constants: {
     patrolSpeed: 70,
     aimTolerance: 5,
     evasionGracePeriod: 120, // Tick di "invulnerabilità" dopo un'evasione
@@ -377,10 +377,10 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
   emergencyTransitions: [
     {
       target: "EVADING",
-      condition: function (api, memory, context, events) {
+      condition: function (api, readOnlyMemory, context, events) {
         return (
           events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
-          memory.evasionGraceTicks <= 0
+          readOnlyMemory.evasionGraceTicks <= 0
         );
       },
       description: "Colpiti da un proiettile, evasione ha la priorità.",
@@ -393,17 +393,17 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
   tacticalTransitions: [
     {
       target: "FLEEING",
-      condition: function (api, memory, context) {
-        return context.batteryPercent < context.config.lowBatteryThreshold;
+      condition: function (api, readOnlyMemory, context) {
+        return context.batteryPercent < context.constants.lowBatteryThreshold;
       },
       description: "Batteria scarica, ritirata strategica.",
     },
     {
       target: "ATTACKING",
-      condition: function (api, memory, context) {
+      condition: function (api, readOnlyMemory, context) {
         return (
           context.enemy &&
-          context.batteryPercent >= context.config.lowBatteryThreshold
+          context.batteryPercent >= context.constants.lowBatteryThreshold
         );
       },
       description:
@@ -416,20 +416,24 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
   // =================================================================
   states: {
     SEARCHING: {
-      onEnter: (api, memory) => {
+      onEnter: (api, readOnlyMemory) => {
         api.log("Inizio pattugliamento...");
       },
-      onExecute: function (api, memory, events) {
+      onExecute: function (api, readOnlyMemory, events) {
         if (api.isQueueEmpty()) {
           const randomPoint = api.getRandomPoint();
           if (randomPoint) {
-            api.moveTo(randomPoint.x, randomPoint.y, this.config.patrolSpeed);
+            api.moveTo(
+              randomPoint.x,
+              randomPoint.y,
+              this.constants.patrolSpeed
+            );
           }
         }
       },
     },
     ATTACKING: {
-      onExecute: function (api, memory, events, context) {
+      onExecute: function (api, readOnlyMemory, events, context) {
         const { enemy } = context;
         if (!enemy) return;
 
@@ -437,7 +441,7 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
         api.aimAt(predictedPos.x, predictedPos.y);
 
         if (
-          Math.abs(enemy.angle) < this.config.aimTolerance &&
+          Math.abs(enemy.angle) < this.constants.aimTolerance &&
           api.isLineOfSightClear(enemy)
         ) {
           api.fire();
@@ -446,7 +450,7 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
       transitions: [
         {
           target: "SEARCHING",
-          condition: function (api, memory, context) {
+          condition: function (api, readOnlyMemory, context) {
             return !context.enemy;
           },
           description: "Passa a cercare se il nemico non è più visibile.",
@@ -462,9 +466,12 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
           api.moveTo(corner.x, corner.y);
         }
       },
-      onExecute: function (api, memory, events, context) {
+      onExecute: function (api, readOnlyMemory, events, context) {
         // Se durante la fuga la batteria si ricarica, possiamo tornare a cercare
-        if (context.batteryPercent > context.config.lowBatteryThreshold + 10) {
+        if (
+          context.batteryPercent >
+          context.constants.lowBatteryThreshold + 10
+        ) {
           return "SEARCHING";
         }
       },
@@ -480,9 +487,11 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
       ],
     },
     EVADING: {
-      onEnter: function (api, memory) {
+      onEnter: function (api, readOnlyMemory) {
         api.log("Colpito! Eseguo manovra evasiva con strafe...");
-        api.updateMemory({ evasionGraceTicks: this.config.evasionGracePeriod });
+        api.updateMemory({
+          evasionGraceTicks: this.constants.evasionGracePeriod,
+        });
         api.strafe(Math.random() < 0.5 ? "left" : "right");
       },
       transitions: [
@@ -557,7 +566,7 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
     const context = {
       enemy,
       batteryPercent,
-      config: this.config,
+      constants: this.constants,
       currentStateName,
       currentState,
     };

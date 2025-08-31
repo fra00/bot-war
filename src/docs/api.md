@@ -43,14 +43,14 @@ Ad ogni tick, il motore dell'IA segue una gerarchia di priorità per decidere co
 
 Ogni stato è un oggetto che può contenere:
 
-- **`onEnter(api, memory, context)`**: Eseguito **una sola volta** all'ingresso. Ideale per avviare un'azione (es. `api.move()`).
-- **`onExecute(api, memory, events, context)`**: Eseguito **ad ogni tick**. Contiene le azioni continue dello stato (es. `api.aimAt()`).
-- **`onExit(api, memory)`**: Eseguito **una sola volta** all'uscita. Utile per la pulizia.
+- **`onEnter(api, readOnlyMemory, context)`**: Eseguito **una sola volta** all'ingresso. Ideale per avviare un'azione (es. `api.move()`).
+- **`onExecute(api, readOnlyMemory, events, context)`**: Eseguito **ad ogni tick**. Contiene le azioni continue dello stato (es. `api.aimAt()`).
+- **`onExit(api, readOnlyMemory)`**: Eseguito **una sola volta** all'uscita. Utile per la pulizia.
 - **`transitions` (Array)**: Un array di oggetti che definisce le possibili uscite dallo stato, ordinate per priorità. Ogni oggetto ha la forma:
   ```javascript
   {
     target: 'NOME_STATO_DESTINAZIONE',
-    condition: (api, memory, context, events) => { /* ... logica ... */ return true; },
+    condition: (api, readOnlyMemory, context, events) => { /* ... logica ... */ return true; },
     description: 'Descrizione testuale della transizione'
   }
   ```
@@ -60,13 +60,13 @@ Ogni stato è un oggetto che può contenere:
 ```javascript
 // all'interno di states: { ... }
 SEARCHING: {
-  onEnter: (api, memory) => {
+  onEnter: (api, readOnlyMemory) => {
     api.log("Inizio pattugliamento...");
   },
-  onExecute: (api, memory, events, context) => {
+  onExecute: (api, readOnlyMemory, events, context) => {
     // Se un movimento è terminato e stavamo inseguendo, puliamo la memoria.
     if (
-      memory.lastKnownEnemyPosition &&
+      readOnlyMemory.lastKnownEnemyPosition &&
       events.some(
         (e) =>
           e.type === "SEQUENCE_COMPLETED" ||
@@ -78,8 +78,8 @@ SEARCHING: {
 
     // Se il bot è inattivo, decide la prossima mossa.
     if (api.isQueueEmpty()) {
-      if (memory.lastKnownEnemyPosition) {
-        api.moveTo(memory.lastKnownEnemyPosition.x, memory.lastKnownEnemyPosition.y);
+      if (readOnlyMemory.lastKnownEnemyPosition) {
+        api.moveTo(readOnlyMemory.lastKnownEnemyPosition.x, readOnlyMemory.lastKnownEnemyPosition.y);
       } else {
             // Usa getRandomPoint per assicurarti che la destinazione sia valida
             const randomPoint = api.getRandomPoint();
@@ -92,7 +92,7 @@ SEARCHING: {
   transitions: [
     {
       target: 'ATTACKING',
-      condition: (api, memory, context) => context.enemy,
+      condition: (api, readOnlyMemory, context) => context.enemy,
       description: "Passa ad attaccare se un nemico è visibile."
     }
   ]
@@ -535,9 +535,9 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
   globalTransitions: [
     {
       target: "EVADING",
-      condition: (api, memory, context, events) =>
+      condition: (api, readOnlyMemory, context, events) =>
         events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
-        memory.evasionGraceTicks <= 0,
+        readOnlyMemory.evasionGraceTicks <= 0,
       description: "Colpiti da un proiettile, evasione ha la priorità.",
     },
     // Aggiungi qui altre transizioni globali (es. per collisioni, batteria, etc.)
@@ -548,12 +548,12 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
   // =================================================================
   states: {
     SEARCHING: {
-      onEnter: (api, memory) => {
+      onEnter: (api, readOnlyMemory) => {
         api.log("Inizio pattugliamento...");
       },
-      onExecute: (api, memory, events, context) => {
+      onExecute: (api, readOnlyMemory, events, context) => {
         if (
-          memory.lastKnownEnemyPosition &&
+          readOnlyMemory.lastKnownEnemyPosition &&
           events.some(
             (e) =>
               e.type === "SEQUENCE_COMPLETED" ||
@@ -563,10 +563,10 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
           api.updateMemory({ lastKnownEnemyPosition: null });
         }
         if (api.isQueueEmpty()) {
-          if (memory.lastKnownEnemyPosition) {
+          if (readOnlyMemory.lastKnownEnemyPosition) {
             api.moveTo(
-              memory.lastKnownEnemyPosition.x,
-              memory.lastKnownEnemyPosition.y
+              readOnlyMemory.lastKnownEnemyPosition.x,
+              readOnlyMemory.lastKnownEnemyPosition.y
             );
           } else {
             // Usa getRandomPoint per assicurarti che la destinazione sia valida
@@ -580,7 +580,7 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
       transitions: [
         {
           target: "ATTACKING",
-          condition: (api, memory, context) => context.enemy,
+          condition: (api, readOnlyMemory, context) => context.enemy,
           description: "Passa ad attaccare se un nemico è visibile.",
         },
       ],
@@ -831,10 +831,10 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
   // La mappa degli stati definisce la logica per ogni stato dell'IA.
   states: {
     SEARCHING: {
-      onEnter: (api, memory) => {
+      onEnter: (api, readOnlyMemory) => {
         api.log("Inizio pattugliamento...");
       },
-      onExecute: (api, memory, events) => {
+      onExecute: (api, readOnlyMemory, events) => {
         // Se vediamo un nemico, passiamo allo stato di attacco
         if (api.scan()) {
           return "ATTACKING";
@@ -845,7 +845,7 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
           api.moveTo(Math.random() * arena.width, Math.random() * arena.height);
         }
       },
-      onExit: (api, memory) => {
+      onExit: (api, readOnlyMemory) => {
         // La pulizia delle azioni (stop) è gestita centralmente.
       },
     },
