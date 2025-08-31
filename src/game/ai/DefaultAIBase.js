@@ -12,7 +12,7 @@ const DefaultAIBase = {
   // =================================================================
   // CONFIGURAZIONE IA
   // =================================================================
-  config: {
+  constants: {
     // Distanze
     engagementDistance: 250, // Distanza ottimale per attaccare
     kitingDistance: 150, // Distanza sotto la quale iniziare il kiting
@@ -52,7 +52,7 @@ const DefaultAIBase = {
   emergencyTransitions: [
     {
       target: "UNSTUCKING",
-      condition: function (api, memory, context, events) {
+      condition: function (api, readOnlyMemory, context, events) {
         return events.some(
           (e) => e.type === "ACTION_STOPPED" && e.reason === "COLLISION"
         );
@@ -61,10 +61,10 @@ const DefaultAIBase = {
     },
     {
       target: "EVADING",
-      condition: function (api, memory, context, events) {
+      condition: function (api, readOnlyMemory, context, events) {
         return (
           events.some((e) => e.type === "HIT_BY_PROJECTILE") &&
-          memory.evasionGraceTicks <= 0
+          readOnlyMemory.evasionGraceTicks <= 0
         );
       },
       description: "Colpiti da un proiettile, evasione ha la priorità.",
@@ -77,7 +77,7 @@ const DefaultAIBase = {
   tacticalTransitions: [
     {
       target: "EVADING_AIM",
-      condition: function (api, memory) {
+      condition: function (api, readOnlyMemory) {
         return api.isLockedOnByEnemy();
       },
       description:
@@ -85,24 +85,27 @@ const DefaultAIBase = {
     },
     {
       target: "KITING",
-      condition: function (api, memory, context) {
+      condition: function (api, readOnlyMemory, context) {
         return (
-          !!context.enemy && context.enemy.distance < this.config.kitingDistance
+          !!context.enemy &&
+          context.enemy.distance < context.constants.kitingDistance
         );
       },
       description: "Nemico troppo vicino, iniziare il kiting.",
     },
     {
       target: "RECHARGING",
-      condition: function (api, memory, context) {
+      condition: function (api, readOnlyMemory, context) {
         // La gestione dello sfarfallio è ora globale, non serve più il cooldown manuale.
-        return context.batteryPercent < this.config.rechargeEnterThreshold;
+        return (
+          context.batteryPercent < context.constants.rechargeEnterThreshold
+        );
       },
       description: "Batteria scarica, cercare una stazione di ricarica.",
     },
     {
       target: "ATTACKING",
-      condition: function (api, memory, context) {
+      condition: function (api, readOnlyMemory, context) {
         return !!context.enemy;
       },
       description: "Nemico rilevato, ingaggiare l'attacco.",
@@ -113,16 +116,16 @@ const DefaultAIBase = {
     // STATO SEARCHING
     // =================================================================
     SEARCHING: {
-      onEnter(api, memory) {
+      onEnter(api, readOnlyMemory, context) {
         api.log("Inizio pattugliamento...");
       },
-      onExecute(api, memory, events, context) {
+      onExecute(api, readOnlyMemory, events, context) {
         // La logica di transizione è stata spostata.
         // Questa funzione ora gestisce solo le azioni continue o di "mantenimento".
 
         // Se un movimento è terminato e stavamo inseguendo, puliamo la memoria.
         if (
-          memory.lastKnownEnemyPosition &&
+          readOnlyMemory.lastKnownEnemyPosition &&
           events.some(
             (e) =>
               e.type === "SEQUENCE_COMPLETED" ||
@@ -135,12 +138,12 @@ const DefaultAIBase = {
         // Se il bot è inattivo, decide la prossima mossa.
         if (api.isQueueEmpty()) {
           // Priorità 1: Caccia all'ultima posizione nota.
-          if (memory.lastKnownEnemyPosition) {
+          if (readOnlyMemory.lastKnownEnemyPosition) {
             api.log("Inseguo il nemico all'ultima posizione nota...");
             const moveSuccessful = api.moveTo(
-              memory.lastKnownEnemyPosition.x,
-              memory.lastKnownEnemyPosition.y,
-              this.config.patrolSpeed
+              readOnlyMemory.lastKnownEnemyPosition.x,
+              readOnlyMemory.lastKnownEnemyPosition.y,
+              context.constants.patrolSpeed
             );
             if (!moveSuccessful) {
               api.updateMemory({ lastKnownEnemyPosition: null });
@@ -152,12 +155,16 @@ const DefaultAIBase = {
             // evitando di scegliere destinazioni dentro gli ostacoli.
             const randomPoint = api.getRandomPoint();
             if (randomPoint) {
-              api.moveTo(randomPoint.x, randomPoint.y, this.config.patrolSpeed);
+              api.moveTo(
+                randomPoint.x,
+                randomPoint.y,
+                context.constants.patrolSpeed
+              );
             }
           }
         }
       },
-      onExit(api, memory) {
+      onExit(api, readOnlyMemory) {
         // Questo metodo è intenzionalmente vuoto.
         // La chiamata a `api.stop()` è ora centralizzata in `setCurrentState`
         // per garantire una pulizia uniforme durante ogni transizione.
@@ -165,7 +172,7 @@ const DefaultAIBase = {
       transitions: [
         {
           target: "ATTACKING",
-          condition: function (api, memory, context) {
+          condition: function (api, readOnlyMemory, context) {
             return !!context.enemy;
           },
           description: "Passa ad attaccare se un nemico è visibile.",
@@ -177,10 +184,10 @@ const DefaultAIBase = {
     // STATO ATTACKING
     // =================================================================
     ATTACKING: {
-      onEnter(api, memory) {
+      onEnter(api, readOnlyMemory, context) {
         api.log("Nemico ingaggiato! Valuto la situazione...");
       },
-      onExecute(api, memory, events, context) {
+      onExecute(api, readOnlyMemory, events, context) {
         // La logica di transizione è stata spostata.
         // Questa funzione ora gestisce solo le azioni continue dello stato.
         const { enemy } = context;
@@ -192,12 +199,17 @@ const DefaultAIBase = {
         });
 
         // Mira predittiva: calcola dove sarà il nemico e mira lì.
-        const predictedPos = this._predictTargetPosition(enemy, api, memory);
+        const predictedPos = this._predictTargetPosition(
+          enemy,
+          api,
+          readOnlyMemory,
+          context
+        );
         api.aimAt(predictedPos.x, predictedPos.y);
 
         // Spara se la mira è buona e la linea di tiro è libera
         if (
-          Math.abs(enemy.angle) < this.config.aimTolerance &&
+          Math.abs(enemy.angle) < context.constants.aimTolerance &&
           api.isLineOfSightClear(enemy)
         ) {
           api.fire({ trackMiss: true });
@@ -207,25 +219,26 @@ const DefaultAIBase = {
         if (api.isQueueEmpty()) {
           if (
             enemy.distance >
-            this.config.engagementDistance + this.config.engagementBuffer
+            context.constants.engagementDistance +
+              context.constants.engagementBuffer
           ) {
             api.log("Nemico troppo lontano, mi avvicino...");
-            api.move(this.config.approachDistance);
+            api.move(context.constants.approachDistance);
           }
         }
       },
-      onExit(api, memory) {},
+      onExit(api, readOnlyMemory) {},
       transitions: [
         {
           target: "SEARCHING",
-          condition: function (api, memory, context) {
+          condition: function (api, readOnlyMemory, context) {
             return !context.enemy;
           },
           description: "Passa a cercare se il nemico non è più visibile.",
         },
         {
           target: "FLANKING",
-          condition: function (api, memory, context) {
+          condition: function (api, readOnlyMemory, context) {
             return (
               context.enemy &&
               api.isQueueEmpty() &&
@@ -242,15 +255,16 @@ const DefaultAIBase = {
     // STATO KITING
     // =================================================================
     KITING: {
-      onEnter(api, memory, context) {
+      onEnter(api, readOnlyMemory, context) {
         api.log("Nemico troppo vicino! Valuto manovra di kiting...");
         // Rilevamento e gestione del loop KITING -> UNSTUCKING
         if (
-          memory.lastState === "UNSTUCKING" &&
-          memory.kitingAttemptCounter >= this.config.kitingLoopThreshold
+          readOnlyMemory.lastState === "UNSTUCKING" &&
+          readOnlyMemory.kitingAttemptCounter >=
+            context.constants.kitingLoopThreshold
         ) {
           api.log(
-            `Loop di Kiting-Unstuck rilevato (${memory.kitingAttemptCounter} tentativi). Cambio strategia in EVADING.`
+            `Loop di Kiting-Unstuck rilevato (${readOnlyMemory.kitingAttemptCounter} tentativi). Cambio strategia in EVADING.`
           );
           // Resetta il contatore e forza una manovra evasiva più complessa.
           api.updateMemory({ kitingAttemptCounter: 0 });
@@ -259,17 +273,22 @@ const DefaultAIBase = {
         }
         // Incrementa il contatore di tentativi di kiting.
         api.updateMemory({
-          kitingAttemptCounter: memory.kitingAttemptCounter + 1,
+          kitingAttemptCounter: readOnlyMemory.kitingAttemptCounter + 1,
         });
       },
-      onExecute(api, memory, events, context) {
+      onExecute(api, readOnlyMemory, events, context) {
         // La logica di transizione è stata spostata.
         // Questa funzione ora gestisce solo le azioni continue dello stato.
         const { enemy } = context;
         if (!enemy) return; // Guardia di sicurezza
 
         // Mira predittiva anche durante il kiting
-        const predictedPos = this._predictTargetPosition(enemy, api, memory);
+        const predictedPos = this._predictTargetPosition(
+          enemy,
+          api,
+          readOnlyMemory,
+          context
+        );
         api.aimAt(predictedPos.x, predictedPos.y);
 
         api.fire({ trackMiss: true });
@@ -278,7 +297,7 @@ const DefaultAIBase = {
           // Se il nemico è alle nostre spalle, avanziamo per allontanarci.
           if (Math.abs(enemy.angle) > 90) {
             api.log("Nemico alle spalle, avanzo per allontanarmi.");
-            const moveDistance = Math.abs(this.config.kitingMoveDistance);
+            const moveDistance = Math.abs(context.constants.kitingMoveDistance);
             if (api.isObstacleAhead(moveDistance)) {
               api.log(
                 "Spazio per avanzare bloccato, cerco una nuova posizione."
@@ -293,7 +312,7 @@ const DefaultAIBase = {
           } else {
             // Il nemico è di fronte, eseguiamo il kiting standard (arretriamo).
             api.log("Nemico di fronte, arretro (kiting).");
-            const moveDistance = this.config.kitingMoveDistance; // Valore negativo
+            const moveDistance = context.constants.kitingMoveDistance; // Valore negativo
             if (api.isObstacleAhead(moveDistance)) {
               api.log(
                 "Spazio per arretrare bloccato, cerco una nuova posizione."
@@ -308,17 +327,18 @@ const DefaultAIBase = {
           }
         }
       },
-      onExit(api, memory) {
+      onExit(api, readOnlyMemory) {
         // La pulizia dello stop è gestita centralmente.
       },
       transitions: [
         {
           target: "ATTACKING",
-          condition: function (api, memory, context) {
+          condition: function (api, readOnlyMemory, context) {
             return (
               context.enemy &&
               context.enemy.distance >
-                this.config.kitingDistance + this.config.kitingBuffer
+                context.constants.kitingDistance +
+                  context.constants.kitingBuffer
             );
           },
           description:
@@ -326,14 +346,14 @@ const DefaultAIBase = {
         },
         {
           target: "SEARCHING",
-          condition: function (api, memory, context) {
+          condition: function (api, readOnlyMemory, context) {
             return !context.enemy;
           },
           description: "Passa a cercare se il nemico non è più visibile.",
         },
         {
           target: "KITING",
-          condition: function (api, memory, context, events) {
+          condition: function (api, readOnlyMemory, context, events) {
             return events.some(
               (e) =>
                 (e.type === "ACTION_STOPPED" &&
@@ -355,10 +375,10 @@ const DefaultAIBase = {
       // può essere interrotta solo da eventi di emergenza.
       interruptibleBy: ["UNSTUCKING", "EVADING"],
 
-      onEnter(api, memory) {
+      onEnter(api, readOnlyMemory, context) {
         api.log("Inizio manovra di fiancheggiamento...");
       },
-      onExecute(api, memory, events, context) {
+      onExecute(api, readOnlyMemory, events, context) {
         // Esecuzione: se inattivi, calcola e avvia la manovra.
         if (api.isQueueEmpty()) {
           const { enemy } = context;
@@ -376,8 +396,10 @@ const DefaultAIBase = {
           // Calcola un punto sul fianco del nemico (orbita) invece che un punto
           // laterale rispetto alla posizione corrente del bot (strafe).
           // Questo è più efficace per aggirare gli ostacoli.
-          const targetX = enemy.x + (perp_dx / len) * this.config.flankDistance;
-          const targetY = enemy.y + (perp_dy / len) * this.config.flankDistance;
+          const targetX =
+            enemy.x + (perp_dx / len) * context.constants.flankDistance;
+          const targetY =
+            enemy.y + (perp_dy / len) * context.constants.flankDistance;
 
           const clampedX = Math.max(0, Math.min(arena.width, targetX));
           const clampedY = Math.max(0, Math.min(arena.height, targetY));
@@ -391,7 +413,7 @@ const DefaultAIBase = {
           }
         }
       },
-      onExit(api, memory) {},
+      onExit(api, readOnlyMemory) {},
       transitions: [
         // {
         //   target: "EVADING",
@@ -401,7 +423,7 @@ const DefaultAIBase = {
         // },
         {
           target: "SEARCHING",
-          condition: function (api, memory, context, events) {
+          condition: function (api, readOnlyMemory, context, events) {
             events.some(
               (e) =>
                 e.type === "SEQUENCE_COMPLETED" ||
@@ -418,25 +440,27 @@ const DefaultAIBase = {
     // STATO EVADING
     // =================================================================
     EVADING: {
-      onEnter(api, memory) {
+      onEnter(api, readOnlyMemory, context) {
         api.log("Colpito! Inizio manovra evasiva...");
         // La chiamata a stop() è ora gestita da setCurrentState,
         // quindi qui ci concentriamo solo sulla logica specifica dello stato.
-        api.updateMemory({ evasionGraceTicks: this.config.evasionGracePeriod });
+        api.updateMemory({
+          evasionGraceTicks: context.config.evasionGracePeriod,
+        });
       },
-      onExecute(api, memory, events, context) {
+      onExecute(api, readOnlyMemory, events, context) {
         // Esecuzione: se inattivi, inizia una nuova manovra.
         if (api.isQueueEmpty()) {
           // La logica di transizione è stata spostata.
           const obstacles = api.scanObstacles();
-          const enemyPos = memory.lastKnownEnemyPosition;
+          const enemyPos = readOnlyMemory.lastKnownEnemyPosition;
           let coverFoundAndValid = false;
 
           // Priorità 1: Cerca copertura dietro un ostacolo vicino.
           if (
             obstacles.length > 0 &&
             enemyPos &&
-            obstacles[0].distance < this.config.maxCoverDistance
+            obstacles[0].distance < context.constants.maxCoverDistance
           ) {
             const cover = obstacles[0];
             const vec = {
@@ -449,11 +473,11 @@ const DefaultAIBase = {
               x:
                 cover.x +
                 cover.width / 2 +
-                norm.x * this.config.coverSeekDistance,
+                norm.x * context.constants.coverSeekDistance,
               y:
                 cover.y +
                 cover.height / 2 +
-                norm.y * this.config.coverSeekDistance,
+                norm.y * context.constants.coverSeekDistance,
             };
 
             if (
@@ -469,11 +493,11 @@ const DefaultAIBase = {
             for (let i = 0; i < 5; i++) {
               const turnDirection = Math.random() < 0.5 ? 1 : -1;
               const randomAngle =
-                (this.config.evasionAngleBase +
-                  Math.random() * this.config.evasionAngleRandomness) *
+                (context.constants.evasionAngleBase +
+                  Math.random() * context.constants.evasionAngleRandomness) *
                 turnDirection;
               const randomDistance =
-                this.config.approachDistance + Math.random() * 50;
+                context.constants.approachDistance + Math.random() * 50;
               const angleInRad =
                 (api.getState().rotation + randomAngle) * (Math.PI / 180);
               const destX =
@@ -491,14 +515,14 @@ const DefaultAIBase = {
           }
         }
       },
-      onExit(api, memory) {
+      onExit(api, readOnlyMemory) {
         api.log("Manovra evasiva terminata.");
         api.updateMemory({ evasionGraceTicks: 0 }); // Resetta il periodo di grazia.
       },
       transitions: [
         {
           target: "SEARCHING",
-          condition: function (api, memory, context, events) {
+          condition: function (api, readOnlyMemory, context, events) {
             events.some(
               (e) =>
                 e.type === "SEQUENCE_COMPLETED" ||
@@ -514,10 +538,10 @@ const DefaultAIBase = {
     // STATO EVADING_AIM (Evasione Proattiva)
     // =================================================================
     EVADING_AIM: {
-      onEnter(api) {
+      onEnter(api, readOnlyMemory, context) {
         api.log("Il nemico mi sta puntando! Manovra evasiva...");
       },
-      onExecute(api, memory, events, context) {
+      onExecute(api, readOnlyMemory, events, context) {
         // Se siamo inattivi, eseguiamo una manovra di "strafe" laterale.
         if (api.isQueueEmpty()) {
           const strafeDirection = Math.random() < 0.5 ? "left" : "right";
@@ -530,14 +554,14 @@ const DefaultAIBase = {
       transitions: [
         {
           target: "ATTACKING",
-          condition: function (api, memory, context) {
+          condition: function (api, readOnlyMemory, context) {
             return !api.isLockedOnByEnemy() && !!context.enemy;
           },
           description: "Il nemico ha smesso di mirare, torno all'attacco.",
         },
         {
           target: "SEARCHING",
-          condition: function (api, memory, context) {
+          condition: function (api, readOnlyMemory, context) {
             return !api.isLockedOnByEnemy();
           },
           description: "Il nemico ha smesso di mirare, torno a cercare.",
@@ -549,34 +573,34 @@ const DefaultAIBase = {
     // STATO UNSTUCKING
     // =================================================================
     UNSTUCKING: {
-      onEnter(api, memory) {
+      onEnter(api, readOnlyMemory, context) {
         api.log("Collisione rilevata! Eseguo manovra per sbloccarmi.");
 
         // Esegue una manovra per liberarsi: arretra e gira.
         const randomAngle =
-          (Math.random() < 0.5 ? 1 : -1) * this.config.unstuckAngleRange +
-          (Math.random() * this.config.unstuckAngleRandomness -
-            this.config.unstuckAngleRandomness / 2);
+          (Math.random() < 0.5 ? 1 : -1) * context.constants.unstuckAngleRange +
+          (Math.random() * context.constants.unstuckAngleRandomness -
+            context.constants.unstuckAngleRandomness / 2);
         api.sequence([
           {
             type: "START_MOVE",
-            payload: { distance: this.config.unstuckDistance },
+            payload: { distance: context.constants.unstuckDistance },
           },
           { type: "START_ROTATE", payload: { angle: randomAngle } },
         ]);
       },
-      onExecute(api, memory, events, context) {
+      onExecute(api, readOnlyMemory, events, context) {
         if (api.isQueueEmpty()) {
           return "SEARCHING"; // Ritorna il nuovo stato
         }
       },
-      onExit(api, memory) {
+      onExit(api, readOnlyMemory) {
         api.log("Manovra di sblocco completata.");
       },
       transitions: [
         {
           target: "SEARCHING",
-          condition: function (api, memory, context, events) {
+          condition: function (api, readOnlyMemory, context, events) {
             var finished = events.some(
               (e) =>
                 e.type === "SEQUENCE_COMPLETED" ||
@@ -600,15 +624,15 @@ const DefaultAIBase = {
       // Qualsiasi altra transizione tattica (come ATTACKING) verrà ignorata.
       interruptibleBy: ["UNSTUCKING", "EVADING"],
 
-      onEnter(api, memory) {
+      onEnter(api, readOnlyMemory, context) {
         api.log("Batteria scarica. Inizio procedura di ricarica.");
         // Resetta il flag per forzare la ricerca di un nuovo punto sicuro.
         api.updateMemory({ isMovingToRecharge: false });
       },
-      onExecute(api, memory, events, context) {
+      onExecute(api, readOnlyMemory, events, context) {
         // Se abbiamo completato un movimento, siamo arrivati a destinazione.
         if (
-          memory.isMovingToRecharge &&
+          readOnlyMemory.isMovingToRecharge &&
           events.some((e) => e.type === "SEQUENCE_COMPLETED")
         ) {
           api.log("Arrivato al punto di ricarica. Controllo sicurezza...");
@@ -621,7 +645,7 @@ const DefaultAIBase = {
         }
 
         // Se dobbiamo trovare un posto dove andare (isMovingToRecharge=false e siamo inattivi).
-        if (!memory.isMovingToRecharge && api.isQueueEmpty()) {
+        if (!readOnlyMemory.isMovingToRecharge && api.isQueueEmpty()) {
           api.log("Cerco un posto sicuro per ricaricare...");
           const safePoint = api.getRandomPoint(); // Semplificato per l'esempio
           if (safePoint && api.moveTo(safePoint.x, safePoint.y)) {
@@ -637,7 +661,7 @@ const DefaultAIBase = {
           }
         }
       },
-      onExit(api, memory) {
+      onExit(api, readOnlyMemory) {
         api.log("Fine procedura di ricarica.");
         // Pulisci lo stato specifico della ricarica.
         api.updateMemory({ isMovingToRecharge: false });
@@ -645,9 +669,8 @@ const DefaultAIBase = {
       transitions: [
         {
           target: "SEARCHING",
-          condition: function (api, memory, context) {
-            return context.batteryPercent >= this.config.rechargeExitThreshold;
-          },
+          condition: (api, readOnlyMemory, context) =>
+            context.batteryPercent >= context.constants.rechargeExitThreshold,
           description: "Batteria carica, torna a cercare.",
         },
       ],

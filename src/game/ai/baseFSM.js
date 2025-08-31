@@ -119,7 +119,7 @@ export const baseFSM = {
       api.updateMemory({
         current: newState,
         lastState: oldState,
-        stateGraceTicks: this.config.stateGracePeriod,
+        stateGraceTicks: this.constants.stateGracePeriod,
       });
 
       // Resetta il contatore di kiting se usciamo dal loop kiting/unstuck
@@ -217,16 +217,25 @@ export const baseFSM = {
     const context = {
       enemy,
       batteryPercent,
-      config: this.config,
+      constants: this.constants,
       currentStateName,
       currentState,
     };
 
     if (this.emergencyTransitions) {
       for (const transition of this.emergencyTransitions) {
-        var condition = transition.condition.call(this, api, memory, context, events);
+        var condition = transition.condition.call(
+          this,
+          api,
+          memory,
+          context,
+          events
+        );
         if (condition == null) {
-          api.log("Condizione di transizione di emergenza non valida:", transition);
+          api.log(
+            "Condizione di transizione di emergenza non valida:",
+            transition
+          );
           continue;
         }
         if (condition && transition.target !== currentStateName) {
@@ -238,7 +247,13 @@ export const baseFSM = {
 
     if (memory.stateGraceTicks > 0) {
       if (currentState && currentState.onExecute) {
-        const nextStateName = currentState.onExecute.call(this, api, memory, events, context);
+        const nextStateName = currentState.onExecute.call(
+          this,
+          api,
+          memory,
+          events,
+          context
+        );
         if (nextStateName && nextStateName !== currentStateName) {
           this.setCurrentState(nextStateName, api, context);
         }
@@ -250,10 +265,22 @@ export const baseFSM = {
 
     if (this.tacticalTransitions) {
       for (const transition of this.tacticalTransitions) {
-        if (!canBeInterruptedBy || canBeInterruptedBy.includes(transition.target)) {
-          const condition = transition.condition.call(this, api, memory, context, events);
+        if (
+          !canBeInterruptedBy ||
+          canBeInterruptedBy.includes(transition.target)
+        ) {
+          const condition = transition.condition.call(
+            this,
+            api,
+            memory,
+            context,
+            events
+          );
           if (condition == null) {
-            api.log("Condizione di transizione tattica non valida:", transition);
+            api.log(
+              "Condizione di transizione tattica non valida:",
+              transition
+            );
             continue;
           }
           if (condition && transition.target !== currentStateName) {
@@ -266,9 +293,18 @@ export const baseFSM = {
 
     if (currentState && currentState.transitions) {
       for (const transition of currentState.transitions) {
-        const condition = transition.condition.call(this, api, memory, context, events);
+        const condition = transition.condition.call(
+          this,
+          api,
+          memory,
+          context,
+          events
+        );
         if (condition == null) {
-          api.log(`Condizione di transizione locale non valida per lo stato '${currentStateName}':`, transition);
+          api.log(
+            `Condizione di transizione locale non valida per lo stato '${currentStateName}':`,
+            transition
+          );
           continue;
         }
         if (condition && transition.target !== currentStateName) {
@@ -279,7 +315,13 @@ export const baseFSM = {
     }
 
     if (currentState && currentState.onExecute) {
-      const nextStateName = currentState.onExecute.call(this, api, memory, events, context);
+      const nextStateName = currentState.onExecute.call(
+        this,
+        api,
+        memory,
+        events,
+        context
+      );
       if (nextStateName && nextStateName !== currentStateName) {
         this.setCurrentState(nextStateName, api, context);
         return;
