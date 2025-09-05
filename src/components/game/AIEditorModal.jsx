@@ -178,6 +178,8 @@ const AIEditorModal = ({
           `Impossibile generare la vista visuale: ${e.message}`
         );
       }
+    } else if (targetView === "blockly") {
+      setActiveView("blockly");
     } else {
       setActiveView(targetView);
     }

@@ -108,3 +108,28 @@ button:focus-visible {
   transform-origin: center;
   animation: bot-explosion 500ms ease-out forwards;
 }
+
+.blocklyToolbox {
+  background: #23272f !important;
+  color: #eee !important;
+}
+.blocklyTreeRow {
+  background: #23272f !important;
+  color: #eee !important;
+}
+.blocklyTreeRow:hover {
+  background: #2c313a !important;
+}
+.blocklyTreeLabel {
+  color: #eee !important;
+}
+
+/*
+  FIX: Forza i widget di Blockly (menu a discesa, tooltip, etc.)
+  ad essere sempre in primo piano, risolvendo conflitti di z-index
+  con altri componenti UI come Monaco Editor o pannelli custom.
+*/
+
+.blocklyDropDownDiv {
+  z-index: 5000 !important;
+}

@@ -15,6 +15,7 @@
     "@monaco-editor/react": "^4.7.0",
     "@react-three/drei": "^10.6.1",
     "@react-three/fiber": "^9.3.0",
+    "blockly": "^12.3.0",
     "collisions": "^2.0.13",
     "dagre": "^0.8.5",
     "dompurify": "^3.2.6",

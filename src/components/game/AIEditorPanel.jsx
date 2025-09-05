@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import * as Blockly from "blockly/core";
 import PropTypes from "prop-types";
 import Button from "../ui/Button";
 import Alert from "../ui/Alert";
@@ -7,6 +8,8 @@ import CardHeader from "../ui/CardHeader";
 import Input from "../ui/Input";
 import CodeEditor from "./CodeEditor";
 import VisualEditor from "./VisualEditor"; // Importa il nuovo componente
+import BlocklyEditor from "../Editor/BlocklyEditor";
+import { useRef } from "react";
 import DefaultAIBase from "../../game/ai/DefaultAIBase.js";
 import initialPlayerCode from "../../game/ai/PlayerAI";
 import Spinner from "../ui/Spinner";
@@ -44,11 +47,57 @@ const AIEditorPanel = ({
     onOpen: onVisualEditorFullscreenOpen,
     onClose: onVisualEditorFullscreenClose,
   } = useDisclosure();
+  // Gestione modale fullscreen per Blockly
+  const {
+    isOpen: isBlocklyFullscreen,
+    onOpen: onBlocklyFullscreenOpen,
+    onClose: onBlocklyFullscreenClose,
+  } = useDisclosure();
+  // Gestione modale per import/export Blockly
+  const {
+    isOpen: isExportModalOpen,
+    onOpen: onExportModalOpen,
+    onClose: onExportModalClose,
+  } = useDisclosure();
+  const {
+    isOpen: isImportModalOpen,
+    onOpen: onImportModalOpen,
+    onClose: onImportModalClose,
+  } = useDisclosure();
+
+  const [exportedJson, setExportedJson] = useState("");
+  const [importJson, setImportJson] = useState("");
+  const [importError, setImportError] = useState("");
+  const [copyExportSuccess, setCopyExportSuccess] = useState(false);
+
+  // Gestione modale per il codice generato
+  const {
+    isOpen: isCodeModalOpen,
+    onOpen: onCodeModalOpen,
+    onClose: onCodeModalClose,
+  } = useDisclosure();
+
+  const [generatedCode, setGeneratedCode] = useState("");
+  const [copyCodeSuccess, setCopyCodeSuccess] = useState(false);
 
   // Stato locale per determinare se lo script è una FSM standard.
   // Questo risolve il bug logico centralizzando il controllo qui,
   // derivandolo direttamente dal codice ricevuto come prop.
   const [isFsm, setIsFsm] = useState(false);
+
+  useEffect(() => {
+    // Ridimensiona l'area di lavoro di Blockly quando si entra/esce dalla modalità a schermo intero
+    if (
+      activeView === "blockly" &&
+      blocklyRef.current?.getWorkspace // Assicurati che BlocklyEditor esponga questo metodo
+    ) {
+      const workspace = blocklyRef.current.getWorkspace();
+      // Un piccolo ritardo per consentire al DOM di aggiornarsi
+      setTimeout(() => {
+        Blockly.svgResize(workspace);
+      }, 50);
+    }
+  }, [isBlocklyFullscreen, activeView]);
 
   useEffect(() => {
     // Ogni volta che il codice cambia, ricalcoliamo se è una FSM.
@@ -91,6 +140,62 @@ const AIEditorPanel = ({
       </div>
     );
   }
+  const blocklyRef = useRef();
+  const handleGenerateCode = () => {
+    if (blocklyRef.current && blocklyRef.current.getGeneratedCode) {
+      const code = blocklyRef.current.getGeneratedCode();
+      setGeneratedCode(code);
+      setCopyCodeSuccess(false);
+      onCodeModalOpen();
+    }
+  };
+
+  const handleExport = () => {
+    // Corretto: Utilizzo getWorkspaceJson come hai indicato.
+    if (blocklyRef.current && blocklyRef.current.getWorkspaceJson) {
+      const state = blocklyRef.current.getWorkspaceJson();
+      setExportedJson(JSON.stringify(state, null, 2));
+      setCopyExportSuccess(false);
+      onExportModalOpen();
+    } else {
+      console.error(
+        "L'editor Blockly non espone il metodo 'getWorkspaceJson'."
+      );
+    }
+  };
+
+  const handleConfirmImport = () => {
+    // Corretto: Per importare, è necessario un metodo che accetti il JSON e lo carichi.
+    // Assumo che esista un metodo `loadWorkspaceJson` sul ref.
+    if (blocklyRef.current && blocklyRef.current.loadWorkspaceJson) {
+      try {
+        setImportError("");
+        const json = JSON.parse(importJson);
+        blocklyRef.current.loadWorkspaceJson(json);
+        onImportModalClose();
+      } catch (e) {
+        setImportError(
+          "JSON non valido o incompatibile. Controlla la console per i dettagli."
+        );
+        console.error("Blockly import error:", e);
+      }
+    }
+  };
+
+  const handleCopyExportedJson = () => {
+    navigator.clipboard.writeText(exportedJson).then(() => {
+      setCopyExportSuccess(true);
+      setTimeout(() => setCopyExportSuccess(false), 2000);
+    });
+  };
+
+  const handleCopyGeneratedCode = () => {
+    navigator.clipboard.writeText(generatedCode).then(() => {
+      setCopyCodeSuccess(true);
+      setTimeout(() => setCopyCodeSuccess(false), 2000);
+    });
+  };
+
   return (
     <div className="grid grid-cols-12 gap-4 h-full overflow-hidden">
       {/* Colonna Sinistra: Lista Script */}
@@ -189,12 +294,12 @@ const AIEditorPanel = ({
 
       {/* Colonna Destra: Editor e Controlli */}
       <div className="col-span-9 flex flex-col h-full">
-        {/* Selettore Vista Codice/Visuale */}
+        {/* Selettore Vista Codice/Visuale/Blockly */}
         <div className="flex mb-2">
           <Button
             onClick={() => onSwitchView("code")}
             variant={activeView === "code" ? "primary" : "ghost"}
-            className={`rounded-r-none ${
+            className={`rounded-none ${
               activeView === "code" ? "bg-blue-600" : ""
             }`}
           >
@@ -204,9 +309,9 @@ const AIEditorPanel = ({
             onClick={() => onSwitchView("visual")}
             disabled={!isFsm}
             variant={activeView === "visual" ? "primary" : "ghost"}
-            className={`rounded-l-none ${
-              activeView === "visual" ? "rounded-r-none" : ""
-            } ${activeView === "visual" ? "bg-blue-600" : ""}`}
+            className={`rounded-none ${
+              activeView === "visual" ? "bg-blue-600" : ""
+            }`}
             title={
               !isFsm
                 ? "La vista visuale è disponibile solo per i Base Script"
@@ -219,6 +324,16 @@ const AIEditorPanel = ({
                 (Solo Base Script)
               </span>
             )}
+          </Button>
+          <Button
+            onClick={() => onSwitchView("blockly")}
+            variant={activeView === "blockly" ? "primary" : "ghost"}
+            className={`rounded-none ${
+              activeView === "blockly" ? "bg-blue-600" : ""
+            }`}
+            title="Editor Blockly (prototipo)"
+          >
+            Blockly
           </Button>
           {activeView === "visual" && (
             <Button
@@ -266,6 +381,71 @@ const AIEditorPanel = ({
               onHelpOpen={onHelpOpen}
             />
           )}
+          {activeView === "blockly" && (
+            <div className="flex flex-col h-full">
+              <div className="flex gap-2 mb-2">
+                <Button onClick={handleGenerateCode} variant="primary">
+                  Genera codice
+                </Button>
+                <Button onClick={handleExport} variant="secondary">
+                  Esporta
+                </Button>
+                <Button
+                  onClick={() => {
+                    setImportJson("");
+                    setImportError("");
+                    onImportModalOpen();
+                  }}
+                  variant="secondary"
+                >
+                  Importa
+                </Button>
+                <Button
+                  onClick={onBlocklyFullscreenOpen}
+                  variant="secondary"
+                  className="px-2"
+                  title="Schermo intero"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5"
+                    />
+                  </svg>
+                </Button>
+              </div>
+              <div
+                className={`flex-grow transition-all duration-300 ease-in-out ${
+                  isBlocklyFullscreen
+                    ? "fixed inset-0 z-50 bg-gray-800 p-4 flex flex-col"
+                    : "relative border border-gray-700 rounded-md overflow-hidden"
+                }`}
+              >
+                <BlocklyEditor
+                  ref={blocklyRef}
+                  // onOpenFullscreen non è più necessario qui
+                />
+                {isBlocklyFullscreen && (
+                  <div className="flex-shrink-0 pt-4 text-right">
+                    <Button
+                      onClick={onBlocklyFullscreenClose}
+                      variant="primary"
+                    >
+                      Chiudi Schermo Intero
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex-shrink-0 mt-4">
           {compileError && (
@@ -303,6 +483,85 @@ const AIEditorPanel = ({
               Chiudi
             </Button>
           </CardFooter>
+        </div>
+      </Modal>
+
+      {/* Modale per Esportare i blocchi */}
+      <Modal
+        isOpen={isExportModalOpen}
+        onClose={onExportModalClose}
+        title="Esporta Struttura Blocchi"
+      >
+        <div className="flex flex-col gap-4">
+          <p>
+            Copia il testo sottostante per salvare la tua struttura a blocchi.
+          </p>
+          <textarea
+            readOnly
+            className="w-full h-64 p-2 font-mono text-sm bg-gray-900 border border-gray-700 rounded-md"
+            value={exportedJson}
+          />
+          <div className="flex justify-end gap-2">
+            <Button onClick={handleCopyExportedJson} variant="secondary">
+              {copyExportSuccess ? "Copiato!" : "Copia"}
+            </Button>
+            <Button onClick={onExportModalClose} variant="primary">
+              Chiudi
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modale per Importare i blocchi */}
+      <Modal
+        isOpen={isImportModalOpen}
+        onClose={onImportModalClose}
+        title="Importa Struttura Blocchi"
+      >
+        <div className="flex flex-col gap-4">
+          <p>
+            Incolla qui la struttura a blocchi che vuoi caricare. L'area di
+            lavoro corrente verrà sovrascritta.
+          </p>
+          <textarea
+            className="w-full h-64 p-2 font-mono text-sm bg-gray-900 border border-gray-700 rounded-md"
+            value={importJson}
+            onChange={(e) => setImportJson(e.target.value)}
+            placeholder="Incolla qui il JSON esportato..."
+          />
+          {importError && <Alert variant="danger">{importError}</Alert>}
+          <div className="flex justify-end gap-2">
+            <Button onClick={onImportModalClose} variant="secondary">
+              Annulla
+            </Button>
+            <Button onClick={handleConfirmImport} variant="primary">
+              Importa
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modale per Visualizzare il Codice Generato */}
+      <Modal
+        isOpen={isCodeModalOpen}
+        onClose={onCodeModalClose}
+        title="Codice Generato"
+      >
+        <div className="flex flex-col gap-4">
+          <p>Questo è il codice JavaScript generato dalla tua IA.</p>
+          <textarea
+            readOnly
+            className="w-full h-64 p-2 font-mono text-sm bg-gray-900 border border-gray-700 rounded-md"
+            value={generatedCode}
+          />
+          <div className="flex justify-end gap-2">
+            <Button onClick={handleCopyGeneratedCode} variant="secondary">
+              {copyCodeSuccess ? "Copiato!" : "Copia"}
+            </Button>
+            <Button onClick={onCodeModalClose} variant="primary">
+              Chiudi
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>
