@@ -65,6 +65,14 @@ const AIEditorModal = ({
   // da parte dell'utente, per evitare di perdere il modello Blockly.
   const [pendingAction, setPendingAction] = useState(null);
 
+  // Un modello Blockly è considerato "non vuoto" se contiene almeno un blocco.
+  // Questo previene l'avviso per script nuovi o per quelli in cui Blockly è stato cancellato.
+  const isBlocklyWorkspaceNonEmpty =
+    blocklyModel &&
+    blocklyModel.blocks &&
+    Array.isArray(blocklyModel.blocks.blocks) &&
+    blocklyModel.blocks.blocks.length > 0;
+
   const [visualParseError, setVisualParseError] = useState(null);
 
   useEffect(() => {
@@ -91,7 +99,7 @@ const AIEditorModal = ({
    * per la sovrascrittura del modello Blockly.
    */
   const checkAndPerformAction = (action) => {
-    if (activeScript?.blocklyModel && activeView !== "blockly") {
+    if (isBlocklyWorkspaceNonEmpty && activeView !== "blockly") {
       setPendingAction(() => action); // Salva l'azione da eseguire dopo la conferma
       onWarningModalOpen();
     } else {
@@ -244,7 +252,7 @@ const AIEditorModal = ({
         </div>
         <CardFooter>
           <div className="flex-grow flex items-center gap-4">
-            {activeScript?.blocklyModel &&
+            {isBlocklyWorkspaceNonEmpty &&
               (activeView === "code" || activeView === "visual") && (
                 <div className="text-sm text-yellow-400 flex items-center gap-2">
                   <span role="img" aria-label="Attenzione">
