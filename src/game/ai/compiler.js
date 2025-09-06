@@ -2,6 +2,20 @@ import DefaultAIBase from "./DefaultAIBase.js";
 import { baseFSM } from "./baseFSM.js";
 
 /**
+ * Un semplice wrapper per indicare che una stringa deve essere trattata come codice sorgente
+ * e non deve essere racchiusa tra virgolette durante la stringificazione.
+ */
+class RawCode {
+  constructor(value) {
+    this.value = value || ""; // Assicura che il valore non sia mai null/undefined
+    this.__isRawCode = true; // Aggiunge una proprietà unica per l'identificazione
+  }
+  toString() {
+    return this.value;
+  }
+}
+
+/**
  * Funzione ricorsiva per stringificare un oggetto, gestendo correttamente
  * oggetti, array, funzioni e primitivi in una stringa di codice formattata.
  * @param {*} value - Il valore da stringificare.
@@ -9,6 +23,11 @@ import { baseFSM } from "./baseFSM.js";
  * @returns {string}
  */
 function stringifyRecursive(value, indent = "") {
+  if (value && value.__isRawCode === true) {
+    // Se è un oggetto con la nostra "brand", restituisci il suo valore senza virgolette.
+    return value.toString().replace(/\n/g, `\n${indent}`);
+  }
+
   if (value === null) {
     return "null";
   }
@@ -273,15 +292,28 @@ export const generateAICodeFromVisualModel = (
       return;
     }
 
-    // Ricostruisce l'oggetto state, escludendo le proprietà usate solo per il rendering (come 'label')
-    const { label, ...stateLogic } = node.data;
+    // Estrae le proprietà che devono essere trattate come codice grezzo
+    const { label, onEnter, onExecute, onExit, ...restOfStateData } = node.data;
 
-    // Assicura che l'array delle transizioni sia inizializzato
-    if (!stateLogic.transitions) {
-      stateLogic.transitions = [];
+    // Ricostruisce l'oggetto state, usando RawCode per le funzioni
+    try {
+      var stateString = `
+      return {
+        ${onEnter},
+        ${onExecute},
+        ${onExit}
+      }`;
+      var statesObj = new Function(stateString)();
+    } catch (e) {
+      console.error("Errore nel parsing delle funzioni di stato:", e);
+      var statesObj = {};
     }
 
-    aiObject.states[node.id] = stateLogic;
+    aiObject.states[node.id] = {
+      ...restOfStateData,
+      ...statesObj,
+      transitions: [], // Verrà popolato dopo
+    };
   });
 
   // 2. Smista gli archi (edges) nei rispettivi array di transizioni
@@ -293,13 +325,15 @@ export const generateAICodeFromVisualModel = (
       name: oldName,
       to: oldTo,
       target: oldTarget,
-      ...restOfData
+      condition,
+      ...restOfEdgeData
     } = edge.data;
 
     const transitionObject = {
-      ...restOfData, // Mantiene le proprietà importanti come `condition`
+      ...restOfEdgeData,
       name: edge.label,
       target: edge.target,
+      condition: new RawCode(condition), // Usa RawCode per la condizione
     };
 
     if (type === "emergency") {
