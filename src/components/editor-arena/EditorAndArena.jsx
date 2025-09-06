@@ -93,6 +93,7 @@ const EditorAndArena = ({ onNavigateBack }) => {
     handleUpdateAI,
     handleSaveOnly,
     handleUpdateBotSettings,
+    handleClearBlocklyModel,
   } = useAIScripts();
 
   const {
@@ -407,6 +408,7 @@ const EditorAndArena = ({ onNavigateBack }) => {
                 onSaveOnly={handleSaveOnly}
                 onUpdateSettings={handleUpdateBotSettingsWithTutorial}
                 // Props per la nuova modale di selezione avversario
+                onClearBlocklyModel={handleClearBlocklyModel}
                 isOpponentModalOpen={isOpponentModalOpen}
                 onOpponentModalOpen={onOpponentModalOpen}
                 onOpponentModalClose={onOpponentModalClose}

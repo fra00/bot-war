@@ -17,6 +17,7 @@ import useDisclosure from "../ui/useDisclosure";
 import Modal from "../ui/Modal";
 import CardFooter from "../ui/CardFooter";
 import { stringifyAI, isStandardFSM } from "../../game/ai/compiler.js";
+import { baseBlocklyWorkspace } from "../../game/blockly/baseBlocklyWorkspace.js";
 
 /**
  * Un pannello che contiene l'editor di codice Monaco per l'IA del giocatore,
@@ -151,6 +152,23 @@ const AIEditorPanel = ({
       setGeneratedCode(code);
       setCopyCodeSuccess(false);
       onCodeModalOpen();
+    }
+  };
+
+  const handleLoadBaseBlockly = () => {
+    if (blocklyRef.current && blocklyRef.current.loadWorkspaceJson) {
+      // Non è più necessario chiedere conferma qui, dato che l'editor diventerà "dirty"
+      // e l'utente dovrà comunque salvare esplicitamente.
+      blocklyRef.current.loadWorkspaceJson(baseBlocklyWorkspace);
+
+      // Notifica manualmente il cambiamento del modello Blockly.
+      // Questo è il passaggio che mancava.
+      onBlocklyModelChange(baseBlocklyWorkspace);
+
+      // Genera il codice corrispondente dal nuovo workspace e notifica il cambiamento.
+      // Questo abiliterà il pulsante "Salva Modifiche".
+      const newCode = blocklyRef.current.getGeneratedCode();
+      onCodeChange(newCode);
     }
   };
 
@@ -388,6 +406,9 @@ const AIEditorPanel = ({
           {activeView === "blockly" && (
             <div className="flex flex-col h-full">
               <div className="flex gap-2 mb-2">
+                <Button onClick={handleLoadBaseBlockly} variant="primary">
+                  Carica Base
+                </Button>
                 <Button onClick={handleGenerateCode} variant="secondary">
                   Anteprima codice
                 </Button>

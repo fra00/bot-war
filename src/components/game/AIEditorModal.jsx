@@ -39,6 +39,7 @@ const AIEditorModal = ({
   onUpdateSettings,
   onVisualModelChange,
   isLoading,
+  onClearBlocklyModel,
   onBotSettingsOpen,
   onVisualEditorGuideOpen,
 }) => {
@@ -49,12 +50,21 @@ const AIEditorModal = ({
     onOpen: onSettingsOpen,
     onClose: onSettingsClose,
   } = useDisclosure();
+  const {
+    isOpen: isWarningModalOpen,
+    onOpen: onWarningModalOpen,
+    onClose: onWarningModalClose,
+  } = useDisclosure();
 
   // Stato interno per gestire il codice nell'editor e il flag FSM
   const [internalCode, setInternalCode] = useState("");
   const [isFsm, setIsFsm] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [activeView, setActiveView] = useState("code");
+  // Stato per memorizzare un'azione (es. modifica del codice) in attesa di conferma
+  // da parte dell'utente, per evitare di perdere il modello Blockly.
+  const [pendingAction, setPendingAction] = useState(null);
+
   const [visualParseError, setVisualParseError] = useState(null);
 
   useEffect(() => {
@@ -76,25 +86,47 @@ const AIEditorModal = ({
     }
   }, [activeScript, isOpen]); // Rimosso 'code' per evitare reset durante la digitazione
 
+  /**
+   * Esegue un'azione solo dopo aver verificato se è necessario un avviso
+   * per la sovrascrittura del modello Blockly.
+   */
+  const checkAndPerformAction = (action) => {
+    if (activeScript?.blocklyModel && activeView !== "blockly") {
+      setPendingAction(() => action); // Salva l'azione da eseguire dopo la conferma
+      onWarningModalOpen();
+    } else {
+      action(); // Esegui subito se non ci sono rischi
+    }
+  };
+
   const handleCodeChange = (newCode) => {
-    // Aggiorna lo stato interno direttamente con il codice dall'editor.
-    setInternalCode(newCode || "");
-    setIsDirty(true);
-    // Notifica il genitore del cambiamento. Il useEffect non dipende più da 'code', quindi non ci saranno salti.
-    onCodeChangeProp(newCode);
+    checkAndPerformAction(() => {
+      setInternalCode(newCode || "");
+      setIsDirty(true);
+      onCodeChangeProp(newCode);
+    });
   };
 
   const handleVisualModelChange = (newModel) => {
-    onVisualModelChange(newModel); // Notifica il genitore
-    try {
-      // Genera il codice dal modello visuale, usando il codice corrente
-      // come base per preservare le funzioni helper e altre proprietà custom.
-      const newCode = generateAICodeFromVisualModel(newModel, internalCode);
-      setInternalCode(newCode);
-      onCodeChangeProp(newCode); // Notifica anche la modifica del codice
-      setIsDirty(true);
-    } catch (e) {
-      addToast(`Errore nella generazione del codice: ${e.message}`, "danger");
+    checkAndPerformAction(() => {
+      onVisualModelChange(newModel); // Notifica il genitore
+      try {
+        const newCode = generateAICodeFromVisualModel(newModel, internalCode);
+        setInternalCode(newCode);
+        onCodeChangeProp(newCode); // Notifica anche la modifica del codice
+        setIsDirty(true);
+      } catch (e) {
+        addToast(`Errore nella generazione del codice: ${e.message}`, "danger");
+      }
+    });
+  };
+
+  const handleConfirmWarning = () => {
+    if (pendingAction) {
+      onClearBlocklyModel(activeScript.id);
+      pendingAction();
+      setPendingAction(null);
+      onWarningModalClose();
     }
   };
 
@@ -211,9 +243,21 @@ const AIEditorModal = ({
           />
         </div>
         <CardFooter>
-          <div className="flex-grow">
+          <div className="flex-grow flex items-center gap-4">
+            {activeScript?.blocklyModel &&
+              (activeView === "code" || activeView === "visual") && (
+                <div className="text-sm text-yellow-400 flex items-center gap-2">
+                  <span role="img" aria-label="Attenzione">
+                    ⚠️
+                  </span>
+                  <span>
+                    Script Blockly: usa l'editor a blocchi per evitare
+                    conflitti.
+                  </span>
+                </div>
+              )}
             {gameStateStatus === "running" && (
-              <span className="text-sm text-yellow-400">
+              <span className="text-sm text-gray-400">
                 (La partita in corso verrà terminata per applicare le modifiche)
               </span>
             )}
@@ -260,6 +304,32 @@ const AIEditorModal = ({
         bot={activeScript}
         onSave={handleSaveSettings}
       />
+      <Modal
+        isOpen={isWarningModalOpen}
+        onClose={onWarningModalClose}
+        title="⚠️ Attenzione: Modello Blockly Rilevato"
+      >
+        <div className="p-4 space-y-4">
+          <p>
+            Questo script è stato creato o modificato con l'editor a blocchi
+            (Blockly).
+          </p>
+          <p>
+            Modificandolo con l'editor testuale o visuale, la struttura a
+            blocchi andrà persa e non potrai più usare l'editor Blockly per
+            questo script.
+          </p>
+          <p className="font-semibold">Vuoi procedere comunque?</p>
+        </div>
+        <CardFooter>
+          <Button onClick={onWarningModalClose} variant="secondary">
+            Annulla
+          </Button>
+          <Button onClick={handleConfirmWarning} variant="danger">
+            Sì, procedi e rimuovi i blocchi
+          </Button>
+        </CardFooter>
+      </Modal>
     </Modal>
   );
 };
@@ -284,6 +354,7 @@ AIEditorModal.propTypes = {
   onUpdateSettings: PropTypes.func.isRequired,
   onVisualModelChange: PropTypes.func.isRequired,
   isLoading: PropTypes.bool,
+  onClearBlocklyModel: PropTypes.func.isRequired,
   onBotSettingsOpen: PropTypes.func,
   onVisualEditorGuideOpen: PropTypes.func,
 };

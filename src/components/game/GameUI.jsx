@@ -54,6 +54,7 @@ const GameUI = ({
   onUpdateSettings,
   isLoading,
   onNavigateBack,
+  onClearBlocklyModel,
   user,
   onLogout,
   isLogoutModalOpen,
@@ -209,6 +210,7 @@ const GameUI = ({
         onCreateNewScript={onCreateNewScript}
         onUpdateSettings={onUpdateSettings}
         isLoading={isLoading}
+        onClearBlocklyModel={onClearBlocklyModel}
         onBotSettingsOpen={onBotSettingsOpen}
         onVisualEditorGuideOpen={onVisualEditorGuideOpen}
       />
@@ -376,6 +378,7 @@ GameUI.propTypes = {
   onClearOpponentCompileError: PropTypes.func.isRequired,
   onUpdateSettings: PropTypes.func.isRequired,
   isLoading: PropTypes.bool,
+  onClearBlocklyModel: PropTypes.func.isRequired,
   /** Funzione per tornare al menu principale. */
   onNavigateBack: PropTypes.func.isRequired,
   /** L'oggetto utente autenticato. */

@@ -484,6 +484,31 @@ export function useAIScripts() {
     setOpponentCompileError(null);
   }, []);
 
+  const handleClearBlocklyModel = useCallback(
+    async (scriptId) => {
+      const updatePayload = { blocklyModel: null };
+      if (user) {
+        await FirestoreService.updateBot(scriptId, updatePayload);
+      } else {
+        const scriptToUpdate = scripts.find((s) => s.id === scriptId);
+        if (scriptToUpdate) {
+          const updatedScript = { ...scriptToUpdate, blocklyModel: null };
+          AIScriptService.saveScript(updatedScript);
+        }
+      }
+      // Aggiorna lo stato locale
+      const updatedScript = {
+        ...activeScript,
+        ...updatePayload,
+      };
+      setBlocklyModel(null);
+      setActiveScript(updatedScript);
+      setScripts((prev) =>
+        prev.map((s) => (s.id === scriptId ? updatedScript : s))
+      );
+    },
+    [user, scripts, activeScript]
+  );
   return {
     scripts,
     activeScript,
@@ -508,5 +533,6 @@ export function useAIScripts() {
     // Gestori per l'avversario
     handleSelectOpponentScript,
     handleClearOpponentCompileError,
+    handleClearBlocklyModel,
   };
 }
