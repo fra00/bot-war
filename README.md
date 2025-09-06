@@ -32,7 +32,7 @@ Il ciclo di gioco è semplice ma coinvolgente:
 
 Bot War offre un set di strumenti potenti e flessibili per dare vita alle tue creazioni.
 
-### Due Modalità per Creare la Tua IA
+### Tre Modalità per Creare la Tua IA
 
 Che tu sia un programmatore esperto o un principiante, abbiamo lo strumento giusto per te.
 
@@ -40,24 +40,34 @@ Che tu sia un programmatore esperto o un principiante, abbiamo lo strumento gius
   <img src="public/visual_editor.png" alt="Editor Visuale a Nodi" width="700"/>
 </p>
 
-*   **Editor Visuale a Nodi**: Progetta l'intelligenza del tuo bot in modo intuitivo con il nostro editor visuale. Rappresenta la logica come una **macchina a stati finiti (FSM)**, collegando stati e transizioni. È il modo perfetto per visualizzare il flusso decisionale e iniziare senza scrivere una riga di codice.
+- **Editor Visuale a Nodi**: Progetta l'intelligenza del tuo bot in modo intuitivo con il nostro editor visuale. Rappresenta la logica come una **macchina a stati finiti (FSM)**, collegando stati e transizioni. È il modo perfetto per visualizzare il flusso decisionale e iniziare senza scrivere una riga di codice.
+
+<p align="center">
+  <img src="public/block_editor.png" alt="Editor a Blocchi Blockly" width="700"/>
+</p>
+
+- **Editor a Blocchi (Blockly)**: Costruisci la logica del tuo bot in modo visuale e strutturato usando blocchi che si incastrano tra loro. È un ottimo modo per imparare i concetti di programmazione e creare IA complesse senza preoccuparsi della sintassi.
 
 <p align="center">
   <img src="public/editor.png" alt="Editor di Codice Professionale" width="700"/>
 </p>
 
-*   **Editor di Codice Professionale**: Per il massimo controllo, tuffati nel nostro editor basato su **Monaco** (il motore di VS Code). Scrivi JavaScript per definire ogni dettaglio del comportamento del tuo bot, dall'evasione dei proiettili alla gestione dell'energia.
+- **Editor di Codice Professionale**: Per il massimo controllo, tuffati nel nostro editor basato su **Monaco** (il motore di VS Code). Scrivi JavaScript per definire ogni dettaglio del comportamento del tuo bot, dall'evasione dei proiettili alla gestione dell'energia.
 
 ### Multiplayer Online
+
 Pensi che il tuo bot sia il migliore? Mettilo alla prova! Abilita il tuo script per il multiplayer, sfida le creazioni di altri giocatori in partite classificate e scala la classifica globale.
 
 ### API Potente e Intuitiva
+
 Il tuo bot ha accesso a una ricca API per interagire con il mondo di gioco: `api.scan()`, `api.fire()`, `api.moveTo(x, y)`, `api.getRandomPoint()`, `api.getMemory()`, `api.getEvents()` e molto altro.
 
 ### Parti da una Base Solida
+
 Ogni nuovo giocatore parte con `DefaultAIBase`, un'intelligenza artificiale di base ben commentata e strutturata come una **macchina a stati finiti (FSM)**, un ottimo punto di partenza per le tue personalizzazioni.
 
 ### Feedback Istantaneo e Debug
+
 Ogni bot ha una propria console di log. Usa `api.log()` nel tuo codice per tracciare le decisioni del tuo bot in tempo reale e migliorare la tua strategia.
 
 ---
@@ -66,10 +76,10 @@ Ogni bot ha una propria console di log. Usa `api.log()` nel tuo codice per tracc
 
 Bot War è costruito con un moderno stack tecnologico:
 
--   **React** per la creazione di un'interfaccia utente reattiva e componibile.
--   **Vite** come build tool per un'esperienza di sviluppo fulminea.
--   **TailwindCSS** per uno styling rapido e consistente.
--   La logica del gioco è scritta in **JavaScript puro** e disaccoppiata dalla UI, il che la rende robusta e testabile.
+- **React** per la creazione di un'interfaccia utente reattiva e componibile.
+- **Vite** come build tool per un'esperienza di sviluppo fulminea.
+- **TailwindCSS** per uno styling rapido e consistente.
+- La logica del gioco è scritta in **JavaScript puro** e disaccoppiata dalla UI, il che la rende robusta e testabile.
 
 ## Getting Started (Sviluppo Locale)
 

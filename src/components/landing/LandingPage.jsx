@@ -69,14 +69,14 @@ const LandingPage = ({ onStartGame }) => {
         <section>
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              Due Modalità per Creare la Tua IA
+              Tre Modalità per Creare la Tua IA
             </h2>
             <p className="mt-4 max-w-2xl mx-auto text-lg leading-8 text-gray-300">
               Che tu sia un veterano della programmazione o un principiante,
               abbiamo lo strumento giusto per te.
             </p>
           </div>
-          <div className="grid md:grid-cols-2 gap-10 items-center">
+          <div className="grid md:grid-cols-3 gap-10 items-start">
             <div className="order-2 md:order-1">
               <h3 className="text-2xl font-bold text-cyan-400">
                 Editor Visuale a Nodi
@@ -96,16 +96,25 @@ const LandingPage = ({ onStartGame }) => {
                 className="rounded-lg shadow-xl"
               />
             </div>
-          </div>
-          <div className="grid md:grid-cols-2 gap-10 items-center mt-16">
-            <div>
+            <div className="order-3">
+              <h3 className="text-2xl font-bold text-cyan-400">
+                Editor a Blocchi (Blockly)
+              </h3>
+              <p className="mt-4 text-gray-300">
+                Costruisci la logica del tuo bot in modo visuale e strutturato
+                usando blocchi che si incastrano tra loro. È un ottimo modo per
+                imparare i concetti di programmazione e creare IA complesse
+                senza preoccuparsi della sintassi.
+              </p>
+            </div>
+            <div className="order-4">
               <img
-                src="/editor.png"
-                alt="Editor di codice professionale"
+                src="/block_editor.png"
+                alt="Editor a blocchi Blockly"
                 className="rounded-lg shadow-xl"
               />
             </div>
-            <div>
+            <div className="order-5">
               <h3 className="text-2xl font-bold text-cyan-400">
                 Editor di Codice Professionale
               </h3>
@@ -116,6 +125,13 @@ const LandingPage = ({ onStartGame }) => {
                 bot, dall'evasione dei proiettili alla gestione dell'energia.
                 L'unico limite è la tua immaginazione.
               </p>
+            </div>
+            <div className="order-6">
+              <img
+                src="/editor.png"
+                alt="Editor di codice professionale"
+                className="rounded-lg shadow-xl"
+              />
             </div>
           </div>
         </section>
