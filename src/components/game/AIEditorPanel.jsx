@@ -325,7 +325,7 @@ const AIEditorPanel = ({
               activeView === "code" ? "bg-blue-600" : ""
             }`}
           >
-            Codice
+            Edito di Testo
           </Button>
           <Button
             onClick={() => onSwitchView("visual")}
@@ -340,7 +340,7 @@ const AIEditorPanel = ({
                 : ""
             }
           >
-            Visuale{" "}
+            Edito Visuale (Flow){" "}
             {!isFsm && (
               <span className="ml-1 text-xs text-gray-500">
                 (Solo Base Script)
@@ -355,7 +355,7 @@ const AIEditorPanel = ({
             }`}
             title="Editor Blockly (prototipo)"
           >
-            Blockly
+            Editor a Blocchi
           </Button>
           {activeView === "visual" && (
             <Button
