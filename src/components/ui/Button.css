@@ -34,7 +34,7 @@
 }
 
 .button.secondary:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--btn-secondary-hover-bg);
 }
 
 /* Aggiungere qui le altre varianti: danger, ghost, etc. */
@@ -49,6 +49,15 @@
   background-color: var(--btn-ghost-hover-bg);
 }
 
+.button.danger {
+  background-color: var(--btn-danger-bg);
+  color: var(--btn-danger-text);
+  border-color: var(--btn-danger-border);
+}
+
+.button.danger:hover {
+  filter: brightness(0.9);
+}
 
 /* Dimensioni */
 .button.small {
