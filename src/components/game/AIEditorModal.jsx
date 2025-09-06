@@ -29,11 +29,15 @@ const AIEditorModal = ({
   activeScript,
   code,
   onCodeChange: onCodeChangeProp,
+  visualModel,
+  blocklyModel,
+  onBlocklyModelChange,
   compileError,
   onSelectScript,
   onDeleteScript,
   onCreateNewScript,
   onUpdateSettings,
+  onVisualModelChange,
   isLoading,
   onBotSettingsOpen,
   onVisualEditorGuideOpen,
@@ -51,7 +55,6 @@ const AIEditorModal = ({
   const [isFsm, setIsFsm] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [activeView, setActiveView] = useState("code");
-  const [internalVisualModel, setInternalVisualModel] = useState(null);
   const [visualParseError, setVisualParseError] = useState(null);
 
   useEffect(() => {
@@ -69,26 +72,26 @@ const AIEditorModal = ({
       // 3. Resetta lo stato dirty e la vista
       setIsDirty(false);
       setActiveView("code");
-      setInternalVisualModel(null);
       setVisualParseError(null);
     }
-  }, [code, activeScript, isOpen]);
+  }, [activeScript, isOpen]); // Rimosso 'code' per evitare reset durante la digitazione
 
   const handleCodeChange = (newCode) => {
     // Aggiorna lo stato interno direttamente con il codice dall'editor.
     setInternalCode(newCode || "");
     setIsDirty(true);
-    // Rimuoviamo la notifica al genitore per interrompere il ciclo di re-render che causa il salto del cursore.
-    // onCodeChangeProp(newCode);
+    // Notifica il genitore del cambiamento. Il useEffect non dipende più da 'code', quindi non ci saranno salti.
+    onCodeChangeProp(newCode);
   };
 
   const handleVisualModelChange = (newModel) => {
-    setInternalVisualModel(newModel);
+    onVisualModelChange(newModel); // Notifica il genitore
     try {
       // Genera il codice dal modello visuale, usando il codice corrente
       // come base per preservare le funzioni helper e altre proprietà custom.
       const newCode = generateAICodeFromVisualModel(newModel, internalCode);
       setInternalCode(newCode);
+      onCodeChangeProp(newCode); // Notifica anche la modifica del codice
       setIsDirty(true);
     } catch (e) {
       addToast(`Errore nella generazione del codice: ${e.message}`, "danger");
@@ -103,18 +106,12 @@ const AIEditorModal = ({
   };
 
   const handleSaveClick = useCallback(async () => {
-    // Usa il codice interno, che è quello che l'utente sta vedendo e modificando.
-    // `prepareCodeForSaving` si occuperà di fare il merge con il motore FSM se necessario.
-    const codeToSave = prepareCodeForSaving(internalCode);
-
-    const { success } = await onSaveOnly(codeToSave);
+    // Passa la vista attiva alla funzione di salvataggio.
+    const { success } = await onSaveOnly(activeView);
     if (success) {
       setIsDirty(false);
       addToast("Script salvato.", "success");
-      // Dopo il salvataggio, il codice "pulito" nell'editor potrebbe non corrispondere
-      // più al codice completo appena salvato. Ricaricando lo script, forziamo
-      // una risincronizzazione, mostrando la versione pulita del codice appena salvato.
-      onSelectScript(activeScript);
+      onSelectScript(activeScript.id);
     } else {
       addToast("Salvataggio fallito. Controlla gli errori.", "danger");
     }
@@ -122,32 +119,31 @@ const AIEditorModal = ({
     onSaveOnly,
     addToast,
     setIsDirty,
-    internalCode,
     onSelectScript,
     activeScript,
+    activeView,
   ]);
 
   const handleUpdateClick = useCallback(async () => {
     if (isDirty) {
-      const { success } = await onSaveOnly(prepareCodeForSaving(internalCode));
+      // Salva prima di applicare, usando la logica centralizzata
+      const { success } = await onSaveOnly(activeView);
       if (!success) {
         addToast("Salvataggio fallito. Impossibile applicare.", "danger");
         return;
       }
-      setIsDirty(false);
-      addToast("Script salvato e applicato.", "success");
     }
 
     // La logica di "Applica" usa sempre il codice sorgente corrente,
-    // che è già stato normalizzato e salvato.
-    const { success } = await onUpdate(prepareCodeForSaving(internalCode));
+    // che `onUpdate` prenderà dal suo stato (useAIScripts).
+    const { success } = await onUpdate(activeView);
     if (success) {
       addToast("Script applicato con successo! Riavvio partita...", "success");
       onClose();
     } else {
       addToast("Applicazione fallita. Controlla gli errori.", "danger");
     }
-  }, [onUpdate, onSaveOnly, addToast, onClose, isDirty, internalCode]);
+  }, [onUpdate, onSaveOnly, addToast, onClose, isDirty, activeView]);
 
   const handleSaveSettings = (settings) => {
     if (activeScript) {
@@ -164,14 +160,14 @@ const AIEditorModal = ({
     if (targetView === "visual") {
       setVisualParseError(null);
       try {
-        const aiObject = compileAI(internalCode);
+        const aiObject = compileAI(code); // Usa il codice aggiornato dalle prop
         if (!aiObject || typeof aiObject.states !== "object") {
           throw new Error(
             "Il codice non è una macchina a stati valida (manca la proprietà 'states' o non è un oggetto)."
           );
         }
         const newVisualModel = generateVisualModelFromAIObject(aiObject);
-        setInternalVisualModel(newVisualModel);
+        onVisualModelChange(newVisualModel); // Aggiorna il genitore
         setActiveView("visual");
       } catch (e) {
         setVisualParseError(
@@ -199,7 +195,9 @@ const AIEditorModal = ({
             activeScript={activeScript}
             code={internalCode}
             onCodeChange={handleCodeChange}
-            visualModel={internalVisualModel}
+            visualModel={visualModel}
+            blocklyModel={blocklyModel}
+            onBlocklyModelChange={onBlocklyModelChange}
             onVisualModelChange={handleVisualModelChange}
             compileError={compileError}
             onSelectScript={onSelectScript}
@@ -276,11 +274,15 @@ AIEditorModal.propTypes = {
   activeScript: PropTypes.object,
   code: PropTypes.string.isRequired,
   onCodeChange: PropTypes.func.isRequired, // Rinominato in onCodeChangeProp internamente
+  visualModel: PropTypes.object,
+  blocklyModel: PropTypes.object,
+  onBlocklyModelChange: PropTypes.func,
   compileError: PropTypes.string,
   onSelectScript: PropTypes.func.isRequired,
   onDeleteScript: PropTypes.func.isRequired,
   onCreateNewScript: PropTypes.func.isRequired,
   onUpdateSettings: PropTypes.func.isRequired,
+  onVisualModelChange: PropTypes.func.isRequired,
   isLoading: PropTypes.bool,
   onBotSettingsOpen: PropTypes.func,
   onVisualEditorGuideOpen: PropTypes.func,

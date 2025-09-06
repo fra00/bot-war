@@ -39,6 +39,8 @@ const GameUI = ({
   onSelectScript,
   onDeleteScript,
   visualModel,
+  blocklyModel,
+  onBlocklyModelChange,
   onVisualModelChange,
   onCreateNewScript,
   onSaveOnly,
@@ -198,6 +200,8 @@ const GameUI = ({
         code={playerCode}
         onCodeChange={onCodeChange}
         visualModel={visualModel}
+        blocklyModel={blocklyModel}
+        onBlocklyModelChange={onBlocklyModelChange}
         onVisualModelChange={onVisualModelChange}
         compileError={compileError}
         onSelectScript={onSelectScript}
@@ -358,6 +362,8 @@ GameUI.propTypes = {
   onSelectScript: PropTypes.func.isRequired,
   onDeleteScript: PropTypes.func.isRequired,
   visualModel: PropTypes.object,
+  blocklyModel: PropTypes.object,
+  onBlocklyModelChange: PropTypes.func,
   onVisualModelChange: PropTypes.func,
   onCreateNewScript: PropTypes.func.isRequired,
   onSaveOnly: PropTypes.func.isRequired,

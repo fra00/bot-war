@@ -26,6 +26,8 @@ const AIEditorPanel = ({
   code,
   onCodeChange,
   visualModel,
+  blocklyModel,
+  onBlocklyModelChange,
   onVisualModelChange,
   compileError,
   scripts,
@@ -112,7 +114,8 @@ const AIEditorPanel = ({
   const handleConfirmCreate = () => {
     if (newScriptName.trim()) {
       let code;
-      const visualModel = null;
+      let visualModel = null;
+      let blocklyModel = null;
 
       if (creationMode === "base") {
         // Genera la stringa di codice completa a partire dall'oggetto Base.
@@ -121,7 +124,7 @@ const AIEditorPanel = ({
       } else {
         code = initialPlayerCode;
       }
-      onCreateNewScript(newScriptName.trim(), code, visualModel);
+      onCreateNewScript(newScriptName.trim(), code, visualModel, blocklyModel);
       setIsCreating(false);
       setNewScriptName("");
     }
@@ -431,7 +434,8 @@ const AIEditorPanel = ({
               >
                 <BlocklyEditor
                   ref={blocklyRef}
-                  // onOpenFullscreen non è più necessario qui
+                  initialWorkspace={blocklyModel}
+                  onWorkspaceChange={onBlocklyModelChange}
                 />
                 {isBlocklyFullscreen && (
                   <div className="flex-shrink-0 pt-4 text-right">
@@ -583,6 +587,8 @@ AIEditorPanel.propTypes = {
   code: PropTypes.string.isRequired,
   onCodeChange: PropTypes.func.isRequired,
   visualModel: PropTypes.object,
+  blocklyModel: PropTypes.object,
+  onBlocklyModelChange: PropTypes.func,
   onVisualModelChange: PropTypes.func,
   compileError: PropTypes.string,
   onSelectScript: PropTypes.func.isRequired,

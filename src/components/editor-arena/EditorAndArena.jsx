@@ -75,6 +75,7 @@ const EditorAndArena = ({ onNavigateBack }) => {
     activeScript,
     playerCode,
     visualModel,
+    blocklyModel,
     playerAI,
     compileError,
     opponentScriptId,
@@ -85,6 +86,7 @@ const EditorAndArena = ({ onNavigateBack }) => {
     isLoading,
     setPlayerCode,
     setVisualModel,
+    setBlocklyModel,
     handleSelectScript,
     handleDeleteScript,
     handleCreateNewScript,
@@ -141,20 +143,26 @@ const EditorAndArena = ({ onNavigateBack }) => {
     [handleCreateNewScript, isTutorialActive, currentStepIndex, nextStep]
   );
 
-  const handleApplyAIChanges = useCallback(async () => {
-    // Ora questa funzione si occupa solo di aggiornare l'IA.
-    // Il riavvio del gioco è gestito dall'useEffect che osserva `playerAI`.
-    const result = await handleUpdateAI(playerCode);
-    return result;
-  }, [handleUpdateAI, playerCode]);
+  const handleApplyAIChanges = useCallback(
+    async (activeView) => {
+      // Ora questa funzione si occupa solo di aggiornare l'IA.
+      // Il riavvio del gioco è gestito dall'useEffect che osserva `playerAI`.
+      const result = await handleUpdateAI(activeView);
+      return result;
+    },
+    [handleUpdateAI]
+  );
 
-  const handleApplyAIChangesWithTutorial = useCallback(async () => {
-    const result = await handleApplyAIChanges();
-    if (isTutorialActive && currentStepIndex === 8) {
-      nextStep();
-    }
-    return result;
-  }, [handleApplyAIChanges, isTutorialActive, currentStepIndex, nextStep]);
+  const handleApplyAIChangesWithTutorial = useCallback(
+    async (activeView) => {
+      const result = await handleApplyAIChanges(activeView);
+      if (isTutorialActive && currentStepIndex === 8) {
+        nextStep();
+      }
+      return result;
+    },
+    [handleApplyAIChanges, isTutorialActive, currentStepIndex, nextStep]
+  );
 
   const handleBotSettingsOpenWithTutorial = useCallback(() => {
     // Avanza quando l'utente clicca su "Impostazioni Bot" (step 5)
@@ -378,6 +386,8 @@ const EditorAndArena = ({ onNavigateBack }) => {
                 playerCode={playerCode}
                 onCodeChange={setPlayerCode}
                 visualModel={visualModel}
+                blocklyModel={blocklyModel}
+                onBlocklyModelChange={setBlocklyModel}
                 onVisualModelChange={setVisualModel}
                 onUpdate={handleApplyAIChangesWithTutorial}
                 compileError={compileError}
