@@ -8,7 +8,7 @@ import CardHeader from "../ui/CardHeader";
 import Input from "../ui/Input";
 import CodeEditor from "./CodeEditor";
 import VisualEditor from "./VisualEditor"; // Importa il nuovo componente
-import BlocklyEditor from "../Editor/BlocklyEditor";
+import BlocklyEditor from "../editor/BlocklyEditor";
 import { useRef } from "react";
 import DefaultAIBase from "../../game/ai/DefaultAIBase.js";
 import initialPlayerCode from "../../game/ai/PlayerAI";
