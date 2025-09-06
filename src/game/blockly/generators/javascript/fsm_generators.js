@@ -28,7 +28,7 @@ export const fsmGenerators = {
     let currentBlock = block.getInputTargetBlock("GLOBAL_TRANSITIONS");
 
     while (currentBlock) {
-      const code = generator.blockToCode(currentBlock);
+      const code = generator.blockToCode(currentBlock, true);
       if (code) {
         if (currentBlock.type === "fsm_tactical_transition") {
           tacticalTransitions.push(code);
@@ -43,14 +43,16 @@ export const fsmGenerators = {
       ${statesCode.trim().replace(/,\s*$/, "")}
     }`;
 
+    var tacticalCode = tacticalTransitions.map((c) => c.trim()).join(",\n");
+    var emergencyCode = emergencyTransitions.map((c) => c.trim()).join(",\n");
     const code = `return {
   initialState: ${initialState},
   states: ${statesObject},
   tacticalTransitions: [
-${tacticalTransitions.join(",\n")}
+${tacticalCode}
   ],
   emergencyTransitions: [
-${emergencyTransitions.join(",\n")}
+${emergencyCode}
   ]
 };`;
     return code;

@@ -14,8 +14,27 @@ import { toolbox } from "../../game/blockly/toolbox";
 // Esegui l'inizializzazione una sola volta per registrare i blocchi custom
 initializeBlockly();
 
+/**
+ * Formatta il codice generato da Blockly.
+ * Se il codice è una singola istruzione 'return', la trasforma in un'espressione
+ * letterale di oggetto avvolta tra parentesi, che è il formato atteso dal compilatore.
+ * @param {string} code Il codice grezzo generato da Blockly.
+ * @returns {string} Il codice formattato.
+ */
+function formatBlocklyCode(code) {
+  const trimmedCode = code.trim();
+  if (trimmedCode.startsWith("return ")) {
+    let expression = trimmedCode.substring(7); // Rimuove "return "
+    if (expression.endsWith(";")) {
+      expression = expression.slice(0, -1); // Rimuove il punto e virgola finale
+    }
+    return `(${expression.trim()})`;
+  }
+  return code;
+}
+
 const BlocklyEditor = forwardRef(
-  ({ initialWorkspace, onWorkspaceChange }, ref) => {
+  ({ initialWorkspace, onWorkspaceChange, onCodeChange }, ref) => {
     const blocklyDiv = useRef(null);
     const workspaceRef = useRef(null);
 
@@ -31,7 +50,10 @@ const BlocklyEditor = forwardRef(
       },
       getGeneratedCode: () => {
         if (workspaceRef.current) {
-          return javascriptGenerator.workspaceToCode(workspaceRef.current);
+          const rawCode = javascriptGenerator.workspaceToCode(
+            workspaceRef.current
+          );
+          return formatBlocklyCode(rawCode);
         }
         return "";
       },
@@ -77,11 +99,15 @@ const BlocklyEditor = forwardRef(
 
         const json = Blockly.serialization.workspaces.save(workspace);
         onWorkspaceChange(json);
+        if (onCodeChange) {
+          const rawCode = javascriptGenerator.workspaceToCode(workspace);
+          onCodeChange(formatBlocklyCode(rawCode));
+        }
       };
 
       workspace.addChangeListener(handleChange);
       return () => workspace.removeChangeListener(handleChange);
-    }, [onWorkspaceChange]);
+    }, [onWorkspaceChange, onCodeChange]);
 
     // Carica lo stato iniziale quando la prop cambia
     useEffect(() => {

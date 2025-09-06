@@ -106,12 +106,12 @@ const AIEditorModal = ({
   };
 
   const handleSaveClick = useCallback(async () => {
-    // Passa la vista attiva alla funzione di salvataggio.
-    const { success } = await onSaveOnly(activeView);
-    if (success) {
+    const { success, updatedScript } = await onSaveOnly(activeView);
+    if (success && updatedScript) {
       setIsDirty(false);
       addToast("Script salvato.", "success");
-      onSelectScript(activeScript.id);
+      // La chiamata a onSelectScript è ridondante e causa la race condition.
+      // La funzione onSaveOnly è già responsabile di aggiornare lo stato.
     } else {
       addToast("Salvataggio fallito. Controlla gli errori.", "danger");
     }
@@ -119,9 +119,9 @@ const AIEditorModal = ({
     onSaveOnly,
     addToast,
     setIsDirty,
+    activeView,
     onSelectScript,
     activeScript,
-    activeView,
   ]);
 
   const handleUpdateClick = useCallback(async () => {

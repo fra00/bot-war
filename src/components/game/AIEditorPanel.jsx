@@ -67,11 +67,6 @@ const AIEditorPanel = ({
     onClose: onImportModalClose,
   } = useDisclosure();
 
-  const [exportedJson, setExportedJson] = useState("");
-  const [importJson, setImportJson] = useState("");
-  const [importError, setImportError] = useState("");
-  const [copyExportSuccess, setCopyExportSuccess] = useState(false);
-
   // Gestione modale per il codice generato
   const {
     isOpen: isCodeModalOpen,
@@ -81,6 +76,11 @@ const AIEditorPanel = ({
 
   const [generatedCode, setGeneratedCode] = useState("");
   const [copyCodeSuccess, setCopyCodeSuccess] = useState(false);
+
+  const [exportedJson, setExportedJson] = useState("");
+  const [importJson, setImportJson] = useState("");
+  const [importError, setImportError] = useState("");
+  const [copyExportSuccess, setCopyExportSuccess] = useState(false);
 
   // Stato locale per determinare se lo script è una FSM standard.
   // Questo risolve il bug logico centralizzando il controllo qui,
@@ -144,8 +144,9 @@ const AIEditorPanel = ({
     );
   }
   const blocklyRef = useRef();
+
   const handleGenerateCode = () => {
-    if (blocklyRef.current && blocklyRef.current.getGeneratedCode) {
+    if (blocklyRef.current?.getGeneratedCode) {
       const code = blocklyRef.current.getGeneratedCode();
       setGeneratedCode(code);
       setCopyCodeSuccess(false);
@@ -387,8 +388,8 @@ const AIEditorPanel = ({
           {activeView === "blockly" && (
             <div className="flex flex-col h-full">
               <div className="flex gap-2 mb-2">
-                <Button onClick={handleGenerateCode} variant="primary">
-                  Genera codice
+                <Button onClick={handleGenerateCode} variant="secondary">
+                  Anteprima codice
                 </Button>
                 <Button onClick={handleExport} variant="secondary">
                   Esporta
@@ -436,6 +437,7 @@ const AIEditorPanel = ({
                   ref={blocklyRef}
                   initialWorkspace={blocklyModel}
                   onWorkspaceChange={onBlocklyModelChange}
+                  onCodeChange={onCodeChange}
                 />
                 {isBlocklyFullscreen && (
                   <div className="flex-shrink-0 pt-4 text-right">
@@ -549,10 +551,13 @@ const AIEditorPanel = ({
       <Modal
         isOpen={isCodeModalOpen}
         onClose={onCodeModalClose}
-        title="Codice Generato"
+        title="Anteprima Codice Generato"
       >
         <div className="flex flex-col gap-4">
-          <p>Questo è il codice JavaScript generato dalla tua IA.</p>
+          <p>
+            Anteprima del codice JavaScript generato dai blocchi. Questo codice
+            viene aggiornato automaticamente nell'editor principale.
+          </p>
           <textarea
             readOnly
             className="w-full h-64 p-2 font-mono text-sm bg-gray-900 border border-gray-700 rounded-md"

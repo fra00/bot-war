@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import AIScriptService from "../services/AIScriptService";
 import FirestoreService from "../services/FirestoreService";
 import {
@@ -21,6 +21,20 @@ export function useAIScripts() {
   const [playerCode, setPlayerCode] = useState("");
   const [visualModel, setVisualModel] = useState(null);
   const [blocklyModel, setBlocklyModel] = useState(null);
+
+  // Usiamo un ref per mantenere una referenza sempre aggiornata allo stato volatile.
+  // Questo risolve i problemi di "stale closure" nelle callback di salvataggio,
+  // garantendo che usino sempre i dati più recenti.
+  const volatileStateRef = useRef();
+  useEffect(() => {
+    volatileStateRef.current = {
+      scripts,
+      activeScript,
+      playerCode,
+      visualModel,
+      blocklyModel,
+    };
+  }, [scripts, activeScript, playerCode, visualModel, blocklyModel]);
   const [playerAI, setPlayerAI] = useState(() => DefaultAI);
   const [compileError, setCompileError] = useState(null);
   const [isLoading, setIsLoading] = useState(true); // Stato per il caricamento
@@ -99,7 +113,10 @@ export function useAIScripts() {
 
   const handleSelectScript = useCallback(
     (scriptId) => {
-      const scriptToSelect = scripts.find((s) => s.id === scriptId);
+      // Legge dal ref per evitare di usare una lista di script "stale".
+      const scriptToSelect = volatileStateRef.current.scripts.find(
+        (s) => s.id === scriptId
+      );
       if (scriptToSelect) {
         setActiveScript(scriptToSelect);
         const codeToLoad = scriptToSelect.script || scriptToSelect.code;
@@ -118,12 +135,15 @@ export function useAIScripts() {
         }
       }
     },
-    [scripts, user]
+    [user] // Le dipendenze sono stabili
   );
 
   const handleDeleteScript = useCallback(
     async (scriptId) => {
-      if (scripts.length <= 1) {
+      const { scripts: currentScripts, activeScript: currentActiveScript } =
+        volatileStateRef.current;
+
+      if (currentScripts.length <= 1) {
         addToast("Non puoi eliminare l'ultimo script.", "warning");
         return;
       }
@@ -134,15 +154,15 @@ export function useAIScripts() {
         AIScriptService.deleteScript(scriptId);
       }
 
-      const remainingScripts = scripts.filter((s) => s.id !== scriptId);
+      const remainingScripts = currentScripts.filter((s) => s.id !== scriptId);
       setScripts(remainingScripts);
 
-      if (activeScript && activeScript.id === scriptId) {
+      if (currentActiveScript && currentActiveScript.id === scriptId) {
         handleSelectScript(remainingScripts[0].id);
       }
       addToast("Script eliminato.", "success");
     },
-    [scripts, activeScript, handleSelectScript, user, addToast]
+    [handleSelectScript, user, addToast]
   );
 
   const handleCreateNewScript = useCallback(
@@ -204,11 +224,18 @@ export function useAIScripts() {
 
   const handleSaveOnly = useCallback(
     async (activeView) => {
-      if (!activeScript) return { success: false };
+      const {
+        activeScript: currentActiveScript,
+        playerCode: currentPlayerCode,
+        visualModel: currentVisualModel,
+        blocklyModel: currentBlocklyModel,
+      } = volatileStateRef.current;
+
+      if (!currentActiveScript) return { success: false };
 
       try {
         // Tenta di compilare il codice per validarlo.
-        const codeToProcess = prepareCodeForSaving(playerCode);
+        const codeToProcess = prepareCodeForSaving(currentPlayerCode);
         const compiledObject = compileAI(codeToProcess);
         const finalCode = stringifyAI(compiledObject);
 
@@ -223,10 +250,13 @@ export function useAIScripts() {
         // Aggiorna i modelli solo se la vista attiva è quella corrispondente
         // per evitare di salvare dati stantii.
         if (activeView === "visual") {
-          updatePayload.visualModel = visualModel || { nodes: [], edges: [] };
+          updatePayload.visualModel = currentVisualModel || {
+            nodes: [],
+            edges: [],
+          };
         }
         if (activeView === "blockly") {
-          const modelToSave = blocklyModel || {
+          const modelToSave = currentBlocklyModel || {
             blocks: { languageVersion: 0, blocks: [] },
           };
           // Stringifichiamo il modello per un salvataggio sicuro su Firestore.
@@ -235,9 +265,12 @@ export function useAIScripts() {
         }
 
         if (user) {
-          await FirestoreService.updateBot(activeScript.id, updatePayload);
+          await FirestoreService.updateBot(
+            currentActiveScript.id,
+            updatePayload
+          );
         } else {
-          const scriptToSave = { ...activeScript, code: finalCode };
+          const scriptToSave = { ...currentActiveScript, code: finalCode };
           if (activeView === "visual") {
             scriptToSave.visualModel = updatePayload.visualModel;
           }
@@ -250,7 +283,7 @@ export function useAIScripts() {
 
         // Aggiorna lo stato locale in modo coerente
         const updatedScriptData = {
-          ...activeScript,
+          ...currentActiveScript,
           ...updatePayload,
         };
 
@@ -260,7 +293,15 @@ export function useAIScripts() {
           setVisualModel(updatePayload.visualModel);
         }
         if (activeView === "blockly") {
-          setBlocklyModel(updatePayload.blocklyModel);
+          // NON impostare il modello con la stringa! Lo stato deve rimanere un oggetto.
+          // Lo stato `blocklyModel` è già aggiornato tramite `onWorkspaceChange`.
+          // Questa riga serve solo a garantire che non sia null se era la prima modifica.
+          // CORREZIONE: Usa il valore più recente dal ref, non quello stantio dalla closure.
+          setBlocklyModel(
+            currentBlocklyModel || {
+              blocks: { languageVersion: 0, blocks: [] },
+            }
+          );
         }
         setScripts((prev) =>
           prev.map((s) =>
@@ -268,29 +309,29 @@ export function useAIScripts() {
           )
         );
         setCompileError(null); // Pulisci eventuali errori precedenti
-        return { success: true };
+        return { success: true, updatedScript: updatedScriptData };
       } catch (error) {
         // Se la compilazione fallisce, imposta il messaggio di errore e non salvare.
         setCompileError(`Errore di compilazione: ${error.message}`);
         return { success: false };
       }
     },
-    [
-      activeScript,
-      user,
-      playerCode,
-      visualModel,
-      blocklyModel,
-      addToast,
-      setPlayerCode,
-    ]
+    [user, addToast, setPlayerCode] // Dipendenze stabili
   );
 
   const handleUpdateAI = useCallback(
     async (activeView) => {
-      if (!activeScript) return { success: false };
+      const {
+        activeScript: currentActiveScript,
+        playerCode: currentPlayerCode,
+        visualModel: currentVisualModel,
+        blocklyModel: currentBlocklyModel,
+      } = volatileStateRef.current;
+
+      if (!currentActiveScript) return { success: false };
+
       try {
-        const codeToProcess = prepareCodeForSaving(playerCode);
+        const codeToProcess = prepareCodeForSaving(currentPlayerCode);
         const compiledObject = compileAI(codeToProcess);
         const finalCode = stringifyAI(compiledObject);
 
@@ -304,10 +345,13 @@ export function useAIScripts() {
 
         // Aggiorna i modelli solo se la vista attiva è quella corrispondente
         if (activeView === "visual") {
-          updatePayload.visualModel = visualModel || { nodes: [], edges: [] };
+          updatePayload.visualModel = currentVisualModel || {
+            nodes: [],
+            edges: [],
+          };
         }
         if (activeView === "blockly") {
-          const modelToSave = blocklyModel || {
+          const modelToSave = currentBlocklyModel || {
             blocks: { languageVersion: 0, blocks: [] },
           };
           // Stringifichiamo il modello per un salvataggio sicuro su Firestore.
@@ -316,9 +360,12 @@ export function useAIScripts() {
         }
 
         if (user) {
-          await FirestoreService.updateBot(activeScript.id, updatePayload);
+          await FirestoreService.updateBot(
+            currentActiveScript.id,
+            updatePayload
+          );
         } else {
-          const scriptToSave = { ...activeScript, code: finalCode };
+          const scriptToSave = { ...currentActiveScript, code: finalCode };
           if (activeView === "visual") {
             scriptToSave.visualModel = updatePayload.visualModel;
           }
@@ -330,7 +377,7 @@ export function useAIScripts() {
         }
 
         const updatedScriptData = {
-          ...activeScript,
+          ...currentActiveScript,
           ...updatePayload,
         };
 
@@ -342,7 +389,15 @@ export function useAIScripts() {
           setVisualModel(updatePayload.visualModel);
         }
         if (activeView === "blockly") {
-          setBlocklyModel(updatePayload.blocklyModel);
+          // NON impostare il modello con la stringa! Lo stato deve rimanere un oggetto.
+          // Lo stato `blocklyModel` è già aggiornato tramite `onWorkspaceChange`.
+          // Questa riga serve solo a garantire che non sia null se era la prima modifica.
+          // CORREZIONE: Usa il valore più recente dal ref, non quello stantio dalla closure.
+          setBlocklyModel(
+            currentBlocklyModel || {
+              blocks: { languageVersion: 0, blocks: [] },
+            }
+          );
         }
         setScripts((prev) =>
           prev.map((s) =>
@@ -350,21 +405,13 @@ export function useAIScripts() {
           )
         );
 
-        return { success: true };
+        return { success: true, updatedScript: updatedScriptData };
       } catch (error) {
         setCompileError(`Errore di compilazione: ${error.message}`);
         return { success: false };
       }
     },
-    [
-      activeScript,
-      user,
-      playerCode,
-      visualModel,
-      blocklyModel,
-      addToast,
-      setPlayerCode,
-    ]
+    [user, addToast, setPlayerCode] // Dipendenze stabili
   );
 
   const handleUpdateBotSettings = useCallback(
