@@ -171,6 +171,7 @@ const GameUI = ({
             gameState={gameState}
             index={0}
             isMultiplayer={isMultiplayer}
+            onEditorOpen={onEditorOpen}
           />
         </div>
         <div className="col-span-6">

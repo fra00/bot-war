@@ -17,6 +17,7 @@ const BotInfo = ({
   isLogActive,
   isMultiplayer,
   isRight,
+  onEditorOpen,
 }) => {
   // Applica il background solo all'immagine, non al contenuto
   const bgFilter = isRight
@@ -66,7 +67,16 @@ const BotInfo = ({
               </span>
             )}
           </div>
-          <div className="mt-1">
+          <div className="mt-1 flex items-center gap-2">
+            {!isRight && onEditorOpen && (
+              <Button
+                onClick={onEditorOpen}
+                size="small"
+                title="Apri editor AI"
+              >
+                Editor
+              </Button>
+            )}
             <Button
               onClick={() => onSelectLog(bot)}
               size="small"
@@ -152,6 +162,8 @@ BotInfo.propTypes = {
   onSelectLog: PropTypes.func.isRequired,
   isLogActive: PropTypes.bool.isRequired,
   isMultiplayer: PropTypes.bool,
+  isRight: PropTypes.bool,
+  onEditorOpen: PropTypes.func,
 };
 
 const BotInfoPlaceholder = ({ name, color }) => (
@@ -195,7 +207,7 @@ BotInfoPlaceholder.propTypes = {
   color: PropTypes.string.isRequired,
 };
 
-const GameInfoPanel = ({ gameState, index, isMultiplayer }) => {
+const GameInfoPanel = ({ gameState, index, isMultiplayer, onEditorOpen }) => {
   if (gameState?.bots == null || gameState.bots.length <= index) {
     return <div>Loading...</div>;
   }
@@ -273,6 +285,7 @@ const GameInfoPanel = ({ gameState, index, isMultiplayer }) => {
         isLogActive={logSource != null}
         isMultiplayer={isMultiplayer}
         isRight={index === 1}
+        onEditorOpen={onEditorOpen}
       />
       {logSource != null && (
         <Dialog
@@ -327,6 +340,7 @@ GameInfoPanel.propTypes = {
   }).isRequired,
   index: PropTypes.oneOf([0, 1]).isRequired,
   isMultiplayer: PropTypes.bool,
+  onEditorOpen: PropTypes.func,
 };
 
 GameInfoPanel.defaultProps = {
