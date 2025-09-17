@@ -124,10 +124,10 @@ const EditorAndArena = ({ onNavigateBack }) => {
 
   // Gestori di eventi "wrappati" per il tutorial
   const handleCreateNewScriptWithTutorial = useCallback(
-    (name, code, visualModel) => {
+    (name, code, visualModel, blocklyModel) => {
       if (typeof name === "string") {
         // L'utente ha confermato il nome, quindi creiamo lo script.
-        handleCreateNewScript(name, code, visualModel);
+        handleCreateNewScript(name, code, visualModel, blocklyModel);
         // Il tutorial è al passo 1 ("Dai un nome..."), quindi avanziamo.
         if (isTutorialActive && currentStepIndex === 3) {
           nextStep();
