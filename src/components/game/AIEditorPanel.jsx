@@ -48,8 +48,8 @@ const AIEditorPanel = ({
   onHelpOpen,
   isFsm,
 }) => {
-  const [isCreating, setIsCreating] = useState(false);
   const [newScriptName, setNewScriptName] = useState("");
+  const [creationStep, setCreationStep] = useState(1); // 1: scelta, 2: nome
   const [creationMode, setCreationMode] = useState("new");
   const {
     isOpen: isVisualEditorFullscreen,
@@ -72,6 +72,11 @@ const AIEditorPanel = ({
     isOpen: isImportModalOpen,
     onOpen: onImportModalOpen,
     onClose: onImportModalClose,
+  } = useDisclosure();
+  const {
+    isOpen: isCreationModalOpen,
+    onOpen: onCreationModalOpen,
+    onClose: onCreationModalClose,
   } = useDisclosure();
 
   // Gestione modale per il codice generato
@@ -129,9 +134,16 @@ const AIEditorPanel = ({
     }
   }, [isBlocklyFullscreen, activeView]);
 
+  const handleOpenCreationWizard = () => {
+    setCreationStep(1);
+    setNewScriptName("");
+    onCreationModalOpen();
+  };
+
   const handleInitiateCreate = (mode = "new") => {
-    setIsCreating(true);
     setCreationMode(mode);
+    // Invece di chiudere, vai al secondo passaggio del wizard
+    setCreationStep(2);
   };
 
   const handleConfirmCreate = () => {
@@ -144,18 +156,13 @@ const AIEditorPanel = ({
         // Genera la stringa di codice completa a partire dall'oggetto Base.
         // Questo è l'approccio corretto che sfrutta l'architettura che abbiamo costruito.
         code = stringifyAI(DefaultAIBase);
+        blocklyModel = baseBlocklyWorkspace;
       } else {
         code = initialPlayerCode;
       }
       onCreateNewScript(newScriptName.trim(), code, visualModel, blocklyModel);
-      setIsCreating(false);
-      setNewScriptName("");
+      onCreationModalClose(); // Chiudi la modale dopo la creazione
     }
-  };
-
-  const handleCancelCreate = () => {
-    setIsCreating(false);
-    setNewScriptName("");
   };
 
   if (isLoading) {
@@ -289,48 +296,11 @@ const AIEditorPanel = ({
             </ul>
           </div>
           <div className="p-2 border-t border-gray-700">
-            {isCreating ? (
-              <div className="space-y-2">
-                <Input
-                  id="new-script-name-input"
-                  placeholder="Nome del nuovo script"
-                  value={newScriptName}
-                  onChange={(e) => setNewScriptName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleConfirmCreate()}
-                  autoFocus
-                  data-tutorial-id="script-name-input"
-                />
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleCancelCreate}
-                    variant="secondary"
-                    className="w-full"
-                  >
-                    Annulla
-                  </Button>
-                  <Button onClick={handleConfirmCreate} className="w-full">
-                    Conferma
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <Button
-                  data-tutorial-id="new-bot-button"
-                  onClick={() => handleInitiateCreate("new")}
-                  className="w-1/2"
-                >
-                  Nuovo Script
-                </Button>
-                <Button
-                  onClick={() => handleInitiateCreate("base")}
-                  className="w-1/2"
-                  variant="secondary"
-                >
-                  Base Script
-                </Button>
-              </div>
-            )}
+            <div className="flex gap-2">
+              <Button onClick={handleOpenCreationWizard} className="w-full">
+                Crea Nuovo Script
+              </Button>
+            </div>
           </div>
         </Card>
       </div>
@@ -609,6 +579,108 @@ const AIEditorPanel = ({
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Wizard per la creazione di un nuovo script */}
+      <Modal
+        isOpen={isCreationModalOpen}
+        onClose={onCreationModalClose}
+        title="Crea un nuovo script"
+      >
+        {creationStep === 1 && (
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Opzione 1: Script Vuoto */}
+            <Card
+              className="p-6 text-center cursor-pointer hover:border-gray-500 transition-colors"
+              onClick={() => handleInitiateCreate("new")}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="mx-auto mb-3 h-10 w-10 text-gray-400"
+              >
+                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+              </svg>
+              <CardHeader>Inizia da zero</CardHeader>
+              <p className="text-sm text-gray-400">
+                Crea uno script JavaScript minimale. Ideale se vuoi costruire la
+                tua logica da zero, senza usare una macchina a stati
+                predefinita.
+              </p>
+            </Card>
+
+            {/* Opzione 2: Template FSM */}
+            <Card
+              className="p-6 text-center cursor-pointer hover:border-blue-500 transition-colors relative border-2 border-blue-600/50"
+              onClick={() => handleInitiateCreate("base")}
+            >
+              <div className="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-md">
+                Consigliato
+              </div>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="mx-auto mb-3 h-10 w-10 text-gray-400"
+              >
+                <rect x="3" y="3" width="6" height="6"></rect>
+                <rect x="15" y="15" width="6" height="6"></rect>
+                <path d="M9 18H6a3 3 0 0 1-3-3v-3"></path>
+                <path d="M15 6h3a3 3 0 0 1 3 3v3"></path>
+              </svg>
+              <CardHeader>Inizia da un Template</CardHeader>
+              <p className="text-sm text-gray-400">
+                Crea uno script basato su una macchina a stati (FSM) completa.
+                Abilita l'Editor Visuale e a Blocchi.
+              </p>
+            </Card>
+          </div>
+        )}
+
+        {creationStep === 2 && (
+          <div className="p-6 space-y-4">
+            <Input
+              id="new-script-name-input"
+              label="Nome dello script"
+              placeholder="Il mio Bot Fantastico"
+              value={newScriptName}
+              onChange={(e) => setNewScriptName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleConfirmCreate()}
+              autoFocus
+              data-tutorial-id="script-name-input"
+            />
+          </div>
+        )}
+
+        <CardFooter>
+          {creationStep === 1 && (
+            <Button onClick={onCreationModalClose} variant="secondary">
+              Annulla
+            </Button>
+          )}
+          {creationStep === 2 && (
+            <>
+              <Button onClick={() => setCreationStep(1)} variant="secondary">
+                Indietro
+              </Button>
+              <Button onClick={handleConfirmCreate}>Crea Script</Button>
+            </>
+          )}
+        </CardFooter>
       </Modal>
     </div>
   );
