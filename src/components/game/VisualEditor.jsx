@@ -295,7 +295,7 @@ const VisualEditor = ({
       data: {
         name: `NUOVO_STATO_${processedNodes.length + 1}`,
         onEnter: "onEnter(api, memory, context) {\n  \n}",
-        onExecute: "onExecute(api, memory, events, context) {\n  \n}",
+        onExecute: "onExecute(api, memory, context, events) {\n  \n}",
         onExit: "onExit(api, memory) {\n  \n}",
       },
     };

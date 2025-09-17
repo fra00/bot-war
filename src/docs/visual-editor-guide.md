@@ -27,10 +27,10 @@ Quando scrivi il codice per gli stati e le transizioni, hai accesso a diversi pa
 
 - **Stati (Nodi):**
   - `onEnter(api, memory, context)`
-  - `onExecute(api, memory, events, context)`
+  - `onExecute(api, memory, context, events)`
   - `onExit(api, memory)`
 - **Transizioni (Archi e Globali):**
-  - `condition(api, memory, context, events)`
+  - `condition(api, readOnlyMemory, context, events)`
 
 #### Dettaglio dei Parametri
 

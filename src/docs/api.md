@@ -44,7 +44,7 @@ Ad ogni tick, il motore dell'IA segue una gerarchia di priorità per decidere co
 Ogni stato è un oggetto che può contenere:
 
 - **`onEnter(api, readOnlyMemory, context)`**: Eseguito **una sola volta** all'ingresso. Ideale per avviare un'azione (es. `api.move()`).
-- **`onExecute(api, readOnlyMemory, events, context)`**: Eseguito **ad ogni tick**. Contiene le azioni continue dello stato (es. `api.aimAt()`).
+- **`onExecute(api, readOnlyMemory, context, events)`**: Eseguito **ad ogni tick**. Contiene le azioni continue dello stato (es. `api.aimAt()`).
 - **`onExit(api, readOnlyMemory)`**: Eseguito **una sola volta** all'uscita. Utile per la pulizia.
 - **`transitions` (Array)**: Un array di oggetti che definisce le possibili uscite dallo stato, ordinate per priorità. Ogni oggetto ha la forma:
   ```javascript
@@ -63,7 +63,7 @@ SEARCHING: {
   onEnter: (api, readOnlyMemory) => {
     api.log("Inizio pattugliamento...");
   },
-  onExecute: (api, readOnlyMemory, events, context) => {
+  onExecute: (api, readOnlyMemory, context, events) => {
     // Se un movimento è terminato e stavamo inseguendo, puliamo la memoria.
     if (
       readOnlyMemory.lastKnownEnemyPosition &&
@@ -521,7 +521,7 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
   // =================================================================
   // CONFIGURAZIONE IA
   // =================================================================
-  config: {
+  constants: {
     // Inserisci qui i tuoi parametri di configurazione
     engagementDistance: 250,
     kitingDistance: 150,
@@ -551,7 +551,7 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
       onEnter: (api, readOnlyMemory) => {
         api.log("Inizio pattugliamento...");
       },
-      onExecute: (api, readOnlyMemory, events, context) => {
+      onExecute: (api, readOnlyMemory, context, events) => {
         if (
           readOnlyMemory.lastKnownEnemyPosition &&
           events.some(
@@ -624,7 +624,7 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
     const enemy = api.scan();
     const battery = api.getBatteryState();
     const batteryPercent = (battery.energy / battery.maxEnergy) * 100;
-    const context = { enemy, batteryPercent, config: this.config };
+    const context = { enemy, batteryPercent, constants: this.constants };
 
     for (const transition of this.globalTransitions) {
       if (transition.condition.call(this, api, memory, context, events)) {
@@ -648,8 +648,8 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
         this,
         api,
         memory,
-        events,
-        context
+        context,
+        events
       );
       if (nextStateName && nextStateName !== memory.current) {
         this.setCurrentState(nextStateName, api, context);
@@ -902,7 +902,7 @@ Ecco uno scheletro di partenza che puoi copiare nell'editor:
     const currentState = this.states[memory.current];
     if (currentState?.onExecute) {
       const context = { batteryPercent };
-      const nextStateName = currentState.onExecute(api, memory, events, context);
+      const nextStateName = currentState.onExecute(api, memory, context, events);
       if (nextStateName && nextStateName !== memory.current) {
         this.setCurrentState(nextStateName, api);
       }

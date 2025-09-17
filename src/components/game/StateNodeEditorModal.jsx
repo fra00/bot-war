@@ -20,7 +20,7 @@ const StateNodeEditorModal = ({ node, isOpen, onClose, onSave }) => {
       setOnEnter(node.data.onEnter || "onEnter(api, memory, context) {\n  \n}");
       setOnExecute(
         node.data.onExecute ||
-          "onExecute(api, memory, events, context) {\n  \n}"
+          "onExecute(api, memory, context, events) {\n  \n}"
       );
       setOnExit(node.data.onExit || "onExit(api, memory) {\n  \n}");
     }
@@ -53,7 +53,7 @@ const StateNodeEditorModal = ({ node, isOpen, onClose, onSave }) => {
   const onExecuteLibs = useMemo(
     () => [
       {
-        content: generateAITypings(["api", "memory", "events", "context"]),
+        content: generateAITypings(["api", "memory", "context", "events"]),
         filePath: "file:///ai-typings/onExecute.d.ts",
       },
     ],

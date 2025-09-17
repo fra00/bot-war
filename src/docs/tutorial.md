@@ -187,14 +187,14 @@ Aggiungi questo codice nelle sezioni appropriate del tuo scheletro.
 
 // Inserisci questo stato nell'oggetto `states`
 SEARCHING: {
-  onEnter: (api, readOnlyMemory) => {
+  onEnter: function (api, readOnlyMemory, context) {
     api.log("Inizio pattugliamento...");
   },
-  onExecute: function (api, readOnlyMemory, events) {
+  onExecute: function (api, readOnlyMemory, context, events) {
     if (api.isQueueEmpty()) {
       const randomPoint = api.getRandomPoint();
       if (randomPoint) {
-        api.moveTo(randomPoint.x, randomPoint.y, this.constants.patrolSpeed);
+        api.moveTo(randomPoint.x, randomPoint.y, context.constants.patrolSpeed);
       }
     }
   },
@@ -224,7 +224,7 @@ ATTACKING: {
     api.aimAt(predictedPos.x, predictedPos.y);
 
     if (
-      Math.abs(enemy.angle) < this.constants.aimTolerance &&
+      Math.abs(enemy.angle) < context.constants.aimTolerance &&
       api.isLineOfSightClear(enemy)
     ) {
       api.fire();
@@ -269,9 +269,9 @@ Aggiungi questo codice nelle sezioni appropriate:
 
 // Inserisci questo stato nell'oggetto `states`
 EVADING: {
-  onEnter: function (api, readOnlyMemory) {
+  onEnter: function (api, readOnlyMemory, context) {
     api.log("Colpito! Eseguo manovra evasiva con strafe...");
-    api.updateMemory({ evasionGraceTicks: this.constants.evasionGracePeriod });
+    api.updateMemory({ evasionGraceTicks: context.constants.evasionGracePeriod });
     api.strafe(Math.random() < 0.5 ? 'left' : 'right');
   },
   transitions: [
@@ -326,14 +326,14 @@ tacticalTransitions: [
 // Aggiungi questo nuovo stato all'oggetto `states`
 FLEEING: {
   interruptibleBy: [], // Non può essere interrotto da transizioni tattiche
-  onEnter: function (api) {
+  onEnter: function (api, readOnlyMemory, context) {
     api.log("Batteria scarica! Inizio la ritirata verso un angolo.");
     const corner = api.getCorner();
     if (corner) {
       api.moveTo(corner.x, corner.y);
     }
   },
-  onExecute: function (api, readOnlyMemory, events, context) {
+  onExecute: function (api, readOnlyMemory, context, events) {
     // Se durante la fuga la batteria si ricarica, possiamo tornare a cercare
     if (context.batteryPercent > context.constants.lowBatteryThreshold + 10) {
       return "SEARCHING";
@@ -416,24 +416,24 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
   // =================================================================
   states: {
     SEARCHING: {
-      onEnter: (api, readOnlyMemory) => {
+      onEnter: function (api, readOnlyMemory, context) {
         api.log("Inizio pattugliamento...");
       },
-      onExecute: function (api, readOnlyMemory, events) {
+      onExecute: function (api, readOnlyMemory, context, events) {
         if (api.isQueueEmpty()) {
           const randomPoint = api.getRandomPoint();
           if (randomPoint) {
             api.moveTo(
               randomPoint.x,
               randomPoint.y,
-              this.constants.patrolSpeed
+              context.constants.patrolSpeed
             );
           }
         }
       },
     },
     ATTACKING: {
-      onExecute: function (api, readOnlyMemory, events, context) {
+      onExecute: function (api, readOnlyMemory, context, events) {
         const { enemy } = context;
         if (!enemy) return;
 
@@ -441,7 +441,7 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
         api.aimAt(predictedPos.x, predictedPos.y);
 
         if (
-          Math.abs(enemy.angle) < this.constants.aimTolerance &&
+          Math.abs(enemy.angle) < context.constants.aimTolerance &&
           api.isLineOfSightClear(enemy)
         ) {
           api.fire();
@@ -459,14 +459,14 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
     },
     FLEEING: {
       interruptibleBy: [], // Non può essere interrotto da transizioni tattiche
-      onEnter: function (api) {
+      onEnter: function (api, readOnlyMemory, context) {
         api.log("Batteria scarica! Inizio la ritirata verso un angolo.");
         const corner = api.getCorner();
         if (corner) {
           api.moveTo(corner.x, corner.y);
         }
       },
-      onExecute: function (api, readOnlyMemory, events, context) {
+      onExecute: function (api, readOnlyMemory, context, events) {
         // Se durante la fuga la batteria si ricarica, possiamo tornare a cercare
         if (
           context.batteryPercent >
@@ -487,10 +487,10 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
       ],
     },
     EVADING: {
-      onEnter: function (api, readOnlyMemory) {
+      onEnter: function (api, readOnlyMemory, context) {
         api.log("Colpito! Eseguo manovra evasiva con strafe...");
         api.updateMemory({
-          evasionGraceTicks: this.constants.evasionGracePeriod,
+          evasionGraceTicks: context.constants.evasionGracePeriod,
         });
         api.strafe(Math.random() < 0.5 ? "left" : "right");
       },
@@ -609,8 +609,8 @@ Ecco il codice completo che puoi copiare e incollare direttamente nell'editor pe
         this,
         api,
         memory,
-        events,
-        context
+        context,
+        events
       );
       if (nextStateName && nextStateName !== currentStateName) {
         this.setCurrentState(nextStateName, api, context);

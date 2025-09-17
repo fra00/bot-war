@@ -160,53 +160,53 @@ export const baseFSM = {
     if (memory.stateGraceTicks > 0) {
       api.updateMemory({ stateGraceTicks: memory.stateGraceTicks - 1 });
     }
-    if (memory.evasionGraceTicks > 0) {
-      api.updateMemory({
-        evasionGraceTicks: memory.evasionGraceTicks - 1,
-      });
-    }
-    if (memory.dodgeCooldown > 0) {
-      api.updateMemory({ dodgeCooldown: memory.dodgeCooldown - 1 });
-    }
+    // if (memory.evasionGraceTicks > 0) {
+    //   api.updateMemory({
+    //     evasionGraceTicks: memory.evasionGraceTicks - 1,
+    //   });
+    // }
+    // if (memory.dodgeCooldown > 0) {
+    //   api.updateMemory({ dodgeCooldown: memory.dodgeCooldown - 1 });
+    // }
 
-    if (this._handleReactiveDodge.call(this, api, memory)) {
-      return;
-    }
-    if (memory.dodgeCooldown > 0) {
-      return;
-    }
+    // if (this._handleReactiveDodge.call(this, api, memory)) {
+    //   return;
+    // }
+    // if (memory.dodgeCooldown > 0) {
+    //   return;
+    // }
 
     const events = api.getEvents();
 
-    const nearMissEvent = events.find((e) => e.type === "PROJECTILE_NEAR_MISS");
-    if (nearMissEvent) {
-      const currentMissDistance = nearMissEvent.distance;
-      let newAdjustment = memory.aimAdjustment;
+    // const nearMissEvent = events.find((e) => e.type === "PROJECTILE_NEAR_MISS");
+    // if (nearMissEvent) {
+    //   const currentMissDistance = nearMissEvent.distance;
+    //   let newAdjustment = memory.aimAdjustment;
 
-      if (currentMissDistance > memory.lastMissDistance) {
-        newAdjustment *= -0.5;
-        api.log(
-          `Correzione mira peggiorata (dist: ${currentMissDistance.toFixed(
-            2
-          )}). Inverto e dimezzo aggiustamento a ${newAdjustment.toFixed(3)}`
-        );
-      } else {
-        api.log(
-          `Correzione mira migliorata (dist: ${currentMissDistance.toFixed(
-            2
-          )}). Continuo nella stessa direzione.`
-        );
-      }
+    //   if (currentMissDistance > memory.lastMissDistance) {
+    //     newAdjustment *= -0.5;
+    //     api.log(
+    //       `Correzione mira peggiorata (dist: ${currentMissDistance.toFixed(
+    //         2
+    //       )}). Inverto e dimezzo aggiustamento a ${newAdjustment.toFixed(3)}`
+    //     );
+    //   } else {
+    //     api.log(
+    //       `Correzione mira migliorata (dist: ${currentMissDistance.toFixed(
+    //         2
+    //       )}). Continuo nella stessa direzione.`
+    //     );
+    //   }
 
-      let newLeadFactor = memory.aimLeadFactor + newAdjustment;
-      newLeadFactor = Math.max(0.5, Math.min(1.5, newLeadFactor));
+    //   let newLeadFactor = memory.aimLeadFactor + newAdjustment;
+    //   newLeadFactor = Math.max(0.5, Math.min(1.5, newLeadFactor));
 
-      api.updateMemory({
-        aimLeadFactor: newLeadFactor,
-        aimAdjustment: newAdjustment,
-        lastMissDistance: currentMissDistance,
-      });
-    }
+    //   api.updateMemory({
+    //     aimLeadFactor: newLeadFactor,
+    //     aimAdjustment: newAdjustment,
+    //     lastMissDistance: currentMissDistance,
+    //   });
+    // }
 
     const enemy = api.scan();
     const battery = api.getBatteryState();
@@ -251,8 +251,8 @@ export const baseFSM = {
           this,
           api,
           memory,
-          events,
-          context
+          context,
+          events
         );
         if (nextStateName && nextStateName !== currentStateName) {
           this.setCurrentState(nextStateName, api, context);
@@ -319,8 +319,8 @@ export const baseFSM = {
         this,
         api,
         memory,
-        events,
-        context
+        context,
+        events
       );
       if (nextStateName && nextStateName !== currentStateName) {
         this.setCurrentState(nextStateName, api, context);

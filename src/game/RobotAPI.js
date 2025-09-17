@@ -203,10 +203,12 @@ class RobotAPI {
     // Se non c'è bisogno di ruotare, non fare nulla.
     if (!aimCommand) return;
 
+    this.sequence([aimCommand]);
+
     // Rende il comando idempotente. Se il bot non sta già eseguendo questa esatta rotazione,
     // la avvia, interrompendo qualsiasi altra azione di movimento/rotazione.
     // Questo semplifica enormemente la logica dell'IA.
-    this._setAction("AIM_AT_CONTINUOUS", aimCommand.payload);
+    //this._setAction("AIM_AT_CONTINUOUS", aimCommand.payload);
   };
 
   sequence = (actions) => {

@@ -106,7 +106,7 @@ ${emergencyCode}
 
     const stateObject = `{
       onEnter: function(api, readOnlyMemory, context) { ${onEnterCode} },
-      onExecute: function(api, readOnlyMemory, events, context) { ${onExecuteCode} },
+      onExecute: function(api, readOnlyMemory, context, events) { ${onExecuteCode} },
       onExit: function(api, readOnlyMemory) { ${onExitCode} },
       interruptibleBy: ${interruptibleByArray},
       transitions: ${transitionsArray}
@@ -122,7 +122,7 @@ ${emergencyCode}
       generator.valueToCode(block, "CONDITION", Order.ATOMIC) || "false";
     const code = `{
       target: ${targetState},
-      condition: function (api, readOnlyMemory, context) {
+      condition: function (api, readOnlyMemory, context, events) {
         return (${condition})
       },
     }`;

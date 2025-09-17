@@ -103,7 +103,7 @@ Il motore di gioco si aspetta che il tuo codice definisca una logica a tre livel
       NOME_STATO: {
         interruptibleBy: [], // Proprietà opzionale, vedi Sezione 4
         onEnter: function(api, readOnlyMemory, context) { /* ... */ },
-        onExecute: function(api, readOnlyMemory, events, context) { /* ... */ },
+        onExecute: function(api, readOnlyMemory, context, events) { /* ... */ },
         onExit: function(api, readOnlyMemory, context) { /* ... */ },
         transitions: [ /* ... array di oggetti Transizione ... */ ]
       }

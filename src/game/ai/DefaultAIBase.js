@@ -119,7 +119,7 @@ const DefaultAIBase = {
       onEnter(api, readOnlyMemory, context) {
         api.log("Inizio pattugliamento...");
       },
-      onExecute(api, readOnlyMemory, events, context) {
+      onExecute(api, readOnlyMemory, context, events) {
         // La logica di transizione è stata spostata.
         // Questa funzione ora gestisce solo le azioni continue o di "mantenimento".
 
@@ -187,7 +187,7 @@ const DefaultAIBase = {
       onEnter(api, readOnlyMemory, context) {
         api.log("Nemico ingaggiato! Valuto la situazione...");
       },
-      onExecute(api, readOnlyMemory, events, context) {
+      onExecute(api, readOnlyMemory, context, events) {
         // La logica di transizione è stata spostata.
         // Questa funzione ora gestisce solo le azioni continue dello stato.
         const { enemy } = context;
@@ -197,15 +197,6 @@ const DefaultAIBase = {
         api.updateMemory({
           lastKnownEnemyPosition: { x: enemy.x, y: enemy.y },
         });
-
-        // Mira predittiva: calcola dove sarà il nemico e mira lì.
-        const predictedPos = this._predictTargetPosition(
-          enemy,
-          api,
-          readOnlyMemory,
-          context
-        );
-        api.aimAt(predictedPos.x, predictedPos.y);
 
         // Spara se la mira è buona e la linea di tiro è libera
         if (
@@ -217,6 +208,15 @@ const DefaultAIBase = {
 
         // Logica di azione (non di transizione): se il nemico è troppo lontano, avvicinati.
         if (api.isQueueEmpty()) {
+          // Mira predittiva: calcola dove sarà il nemico e mira lì.
+          const predictedPos = this._predictTargetPosition(
+            enemy,
+            api,
+            readOnlyMemory,
+            context
+          );
+          api.aimAt(predictedPos.x, predictedPos.y);
+
           if (
             enemy.distance >
             context.constants.engagementDistance +
@@ -255,6 +255,7 @@ const DefaultAIBase = {
     // STATO KITING
     // =================================================================
     KITING: {
+      interruptibleBy: [],
       onEnter(api, readOnlyMemory, context) {
         api.log("Nemico troppo vicino! Valuto manovra di kiting...");
         // Rilevamento e gestione del loop KITING -> UNSTUCKING
@@ -276,20 +277,20 @@ const DefaultAIBase = {
           kitingAttemptCounter: readOnlyMemory.kitingAttemptCounter + 1,
         });
       },
-      onExecute(api, readOnlyMemory, events, context) {
+      onExecute(api, readOnlyMemory, context, events) {
         // La logica di transizione è stata spostata.
         // Questa funzione ora gestisce solo le azioni continue dello stato.
         const { enemy } = context;
-        if (!enemy) return; // Guardia di sicurezza
+        if (!enemy) return "SEARCHING"; // Guardia di sicurezza
 
-        // Mira predittiva anche durante il kiting
-        const predictedPos = this._predictTargetPosition(
-          enemy,
-          api,
-          readOnlyMemory,
-          context
-        );
-        api.aimAt(predictedPos.x, predictedPos.y);
+        // // Mira predittiva anche durante il kiting
+        // const predictedPos = this._predictTargetPosition(
+        //   enemy,
+        //   api,
+        //   readOnlyMemory,
+        //   context
+        // );
+        // api.aimAt(predictedPos.x, predictedPos.y);
 
         api.fire({ trackMiss: true });
 
@@ -302,10 +303,7 @@ const DefaultAIBase = {
               api.log(
                 "Spazio per avanzare bloccato, cerco una nuova posizione."
               );
-              const arena = api.getArenaDimensions();
-              const randomX = Math.random() * arena.width;
-              const randomY = Math.random() * arena.height;
-              api.moveTo(randomX, randomY);
+              return "FLANKING";
             } else {
               api.move(moveDistance);
             }
@@ -314,13 +312,7 @@ const DefaultAIBase = {
             api.log("Nemico di fronte, arretro (kiting).");
             const moveDistance = context.constants.kitingMoveDistance; // Valore negativo
             if (api.isObstacleAhead(moveDistance)) {
-              api.log(
-                "Spazio per arretrare bloccato, cerco una nuova posizione."
-              );
-              const arena = api.getArenaDimensions();
-              const randomX = Math.random() * arena.width;
-              const randomY = Math.random() * arena.height;
-              api.moveTo(randomX, randomY);
+              return "FLANKING";
             } else {
               api.move(moveDistance);
             }
@@ -378,7 +370,7 @@ const DefaultAIBase = {
       onEnter(api, readOnlyMemory, context) {
         api.log("Inizio manovra di fiancheggiamento...");
       },
-      onExecute(api, readOnlyMemory, events, context) {
+      onExecute(api, readOnlyMemory, context, events) {
         // Esecuzione: se inattivi, calcola e avvia la manovra.
         if (api.isQueueEmpty()) {
           const { enemy } = context;
@@ -445,10 +437,10 @@ const DefaultAIBase = {
         // La chiamata a stop() è ora gestita da setCurrentState,
         // quindi qui ci concentriamo solo sulla logica specifica dello stato.
         api.updateMemory({
-          evasionGraceTicks: context.config.evasionGracePeriod,
+          evasionGraceTicks: context.constants.evasionGracePeriod,
         });
       },
-      onExecute(api, readOnlyMemory, events, context) {
+      onExecute(api, readOnlyMemory, context, events) {
         // Esecuzione: se inattivi, inizia una nuova manovra.
         if (api.isQueueEmpty()) {
           // La logica di transizione è stata spostata.
@@ -541,7 +533,7 @@ const DefaultAIBase = {
       onEnter(api, readOnlyMemory, context) {
         api.log("Il nemico mi sta puntando! Manovra evasiva...");
       },
-      onExecute(api, readOnlyMemory, events, context) {
+      onExecute(api, readOnlyMemory, context, events) {
         // Se siamo inattivi, eseguiamo una manovra di "strafe" laterale.
         if (api.isQueueEmpty()) {
           const strafeDirection = Math.random() < 0.5 ? "left" : "right";
@@ -589,7 +581,7 @@ const DefaultAIBase = {
           { type: "START_ROTATE", payload: { angle: randomAngle } },
         ]);
       },
-      onExecute(api, readOnlyMemory, events, context) {
+      onExecute(api, readOnlyMemory, context, events) {
         if (api.isQueueEmpty()) {
           return "SEARCHING"; // Ritorna il nuovo stato
         }
@@ -629,7 +621,7 @@ const DefaultAIBase = {
         // Resetta il flag per forzare la ricerca di un nuovo punto sicuro.
         api.updateMemory({ isMovingToRecharge: false });
       },
-      onExecute(api, readOnlyMemory, events, context) {
+      onExecute(api, readOnlyMemory, context, events) {
         // Se abbiamo completato un movimento, siamo arrivati a destinazione.
         if (
           readOnlyMemory.isMovingToRecharge &&

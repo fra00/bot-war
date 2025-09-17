@@ -248,6 +248,7 @@ const AIEditorModal = ({
             onSwitchView={handleAttemptSwitchView}
             visualParseError={visualParseError}
             onHelpOpen={onVisualEditorGuideOpen}
+            isFsm={isFsm}
           />
         </div>
         <CardFooter>

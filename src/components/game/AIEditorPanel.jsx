@@ -1,15 +1,20 @@
-import React, { useState, useEffect, useCallback } from "react";
-import * as Blockly from "blockly/core";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import PropTypes from "prop-types";
 import Button from "../ui/Button";
 import Alert from "../ui/Alert";
 import Card from "../ui/Card";
+import * as Blockly from "blockly/core";
 import CardHeader from "../ui/CardHeader";
 import Input from "../ui/Input";
 import CodeEditor from "./CodeEditor";
 import VisualEditor from "./VisualEditor"; // Importa il nuovo componente
 import BlocklyEditor from "../editor/BlocklyEditor";
-import { useRef } from "react";
 import DefaultAIBase from "../../game/ai/DefaultAIBase.js";
 import initialPlayerCode from "../../game/ai/PlayerAI";
 import Spinner from "../ui/Spinner";
@@ -41,6 +46,7 @@ const AIEditorPanel = ({
   onSwitchView,
   visualParseError,
   onHelpOpen,
+  isFsm,
 }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [newScriptName, setNewScriptName] = useState("");
@@ -83,10 +89,34 @@ const AIEditorPanel = ({
   const [importError, setImportError] = useState("");
   const [copyExportSuccess, setCopyExportSuccess] = useState(false);
 
-  // Stato locale per determinare se lo script è una FSM standard.
-  // Questo risolve il bug logico centralizzando il controllo qui,
-  // derivandolo direttamente dal codice ricevuto come prop.
-  const [isFsm, setIsFsm] = useState(false);
+  const blocklyRef = useRef();
+
+  // Mantiene un riferimento aggiornato alle callback per evitare problemi di "stale closure"
+  // all'interno del componente memoizzato.
+  const onBlocklyModelChangeRef = useRef(onBlocklyModelChange);
+  const onCodeChangeRef = useRef(onCodeChange);
+  useEffect(() => {
+    onBlocklyModelChangeRef.current = onBlocklyModelChange;
+    onCodeChangeRef.current = onCodeChange;
+  });
+
+  // Memoizza il componente BlocklyEditor per prevenire re-render inutili che causano
+  // il reset dello scroll. Viene ricreato solo quando l'ID dello script attivo cambia.
+  const memoizedBlocklyEditor = useMemo(() => {
+    // Crea wrapper stabili per le callback che usano i ref.
+    const stableOnWorkspaceChange = (model) =>
+      onBlocklyModelChangeRef.current(model);
+    const stableOnCodeChange = (code) => onCodeChangeRef.current(code);
+
+    return (
+      <BlocklyEditor
+        ref={blocklyRef}
+        initialWorkspace={blocklyModel}
+        onWorkspaceChange={stableOnWorkspaceChange}
+        onCodeChange={stableOnCodeChange}
+      />
+    );
+  }, [activeScript?.id]);
 
   useEffect(() => {
     // Ridimensiona l'area di lavoro di Blockly quando si entra/esce dalla modalità a schermo intero
@@ -95,17 +125,9 @@ const AIEditorPanel = ({
       blocklyRef.current?.getWorkspace // Assicurati che BlocklyEditor esponga questo metodo
     ) {
       const workspace = blocklyRef.current.getWorkspace();
-      // Un piccolo ritardo per consentire al DOM di aggiornarsi
-      setTimeout(() => {
-        Blockly.svgResize(workspace);
-      }, 50);
+      setTimeout(() => Blockly.svgResize(workspace), 50);
     }
   }, [isBlocklyFullscreen, activeView]);
-
-  useEffect(() => {
-    // Ogni volta che il codice cambia, ricalcoliamo se è una FSM.
-    setIsFsm(isStandardFSM(code));
-  }, [code]);
 
   const handleInitiateCreate = (mode = "new") => {
     setIsCreating(true);
@@ -144,7 +166,6 @@ const AIEditorPanel = ({
       </div>
     );
   }
-  const blocklyRef = useRef();
 
   const handleGenerateCode = () => {
     if (blocklyRef.current?.getGeneratedCode) {
@@ -454,12 +475,7 @@ const AIEditorPanel = ({
                     : "relative border border-gray-700 rounded-md overflow-hidden"
                 }`}
               >
-                <BlocklyEditor
-                  ref={blocklyRef}
-                  initialWorkspace={blocklyModel}
-                  onWorkspaceChange={onBlocklyModelChange}
-                  onCodeChange={onCodeChange}
-                />
+                {memoizedBlocklyEditor}
                 {isBlocklyFullscreen && (
                   <div className="flex-shrink-0 pt-4 text-right">
                     <Button
@@ -631,6 +647,8 @@ AIEditorPanel.propTypes = {
   visualParseError: PropTypes.string,
   /** Funzione per aprire la guida dell'editor visuale. */
   onHelpOpen: PropTypes.func,
+  /** Indica se lo script attivo è una FSM standard. */
+  isFsm: PropTypes.bool,
 };
 
 export default AIEditorPanel;
