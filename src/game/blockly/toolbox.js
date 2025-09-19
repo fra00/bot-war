@@ -77,7 +77,7 @@ export const toolbox = {
           kind: "block",
           type: "api_strafe",
           inputs: {
-            DISTANCE: { shadow: { type: "math_number", fields: { NUM: 100 } } },
+            DIRECTION: { shadow: { type: "text", fields: { TEXT: "left" } } },
           },
         },
         {

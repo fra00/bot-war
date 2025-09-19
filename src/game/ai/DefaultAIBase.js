@@ -416,7 +416,7 @@ const DefaultAIBase = {
         {
           target: "SEARCHING",
           condition: function (api, readOnlyMemory, context, events) {
-            events.some(
+            return events.some(
               (e) =>
                 e.type === "SEQUENCE_COMPLETED" ||
                 (e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")
@@ -432,6 +432,7 @@ const DefaultAIBase = {
     // STATO EVADING
     // =================================================================
     EVADING: {
+      interruptibleBy: [], // Può essere interrotto solo da collisioni
       onEnter(api, readOnlyMemory, context) {
         api.log("Colpito! Inizio manovra evasiva...");
         // La chiamata a stop() è ora gestita da setCurrentState,
@@ -515,7 +516,7 @@ const DefaultAIBase = {
         {
           target: "SEARCHING",
           condition: function (api, readOnlyMemory, context, events) {
-            events.some(
+            return events.some(
               (e) =>
                 e.type === "SEQUENCE_COMPLETED" ||
                 (e.type === "ACTION_STOPPED" && e.source !== "STATE_TRANSITION")

@@ -7,7 +7,7 @@ export const perceptionGenerators = {
   },
   context_battery_percent: function (block) {
     const code = "context.batteryPercent";
-    return [code, Order.DIVISION];
+    return [code, Order.MEMBER];
   },
   get_enemy_distance: function (block) {
     const code = `(function() {
@@ -39,11 +39,11 @@ export const perceptionGenerators = {
     //   return 0;
     // })()`;
     const code = `api.scan().angle`;
-    return [code, Order.FUNCTION_CALL];
+    return [code, Order.MEMBER];
   },
   was_hit: function (block) {
     const code = `api.getEvents().some(e => e.type === 'HIT_BY_PROJECTILE')`;
-    return [code, Order.CALL];
+    return [code, Order.FUNCTION_CALL];
   },
   is_turret_aligned: function (block) {
     const code = `(function() {
@@ -66,7 +66,7 @@ export const perceptionGenerators = {
       }
       return true; // Se non c'è nemico, non c'è un target, quindi è "allineata"
     })()`;
-    return [code, Order.CALL];
+    return [code, Order.FUNCTION_CALL];
   },
   context_is_moving: function (block) {
     const code = "context.bot.isMoving";
@@ -90,7 +90,7 @@ export const perceptionGenerators = {
   },
   is_wall_collision: function (block) {
     const code = `api.getEvents().some(e => e.type === 'COLLISION_WITH_WALL')`;
-    return [code, Order.CALL];
+    return [code, Order.FUNCTION_CALL];
   },
   api_is_queue_empty: function (block) {
     const code = "api.isQueueEmpty()";

@@ -47,10 +47,9 @@ export const actionGenerators = {
     return "api.stop();\n";
   },
   api_strafe: function (block, generator) {
-    const direction = block.getFieldValue("DIRECTION");
-    const distance =
-      generator.valueToCode(block, "DISTANCE", Order.ATOMIC) || "50";
-    return `api.strafe('${direction}', ${distance});\n`;
+    const direction =
+      generator.valueToCode(block, "DIRECTION", Order.ATOMIC) || "'left'";
+    return `api.strafe(${direction});\n`;
   },
   action_sequence: function (block, generator) {
     const statements = generator.statementToCode(block, "DO");

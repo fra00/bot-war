@@ -60,12 +60,19 @@ export const actionBlocks = [
   },
   {
     type: "api_strafe",
-    message0: "schiva di %1",
-    args0: [{ type: "input_value", name: "DISTANCE", check: "Number" }],
+    message0: "schiva in direzione %1",
+    args0: [
+      {
+        type: "input_value",
+        name: "DIRECTION",
+        check: "String",
+      },
+    ],
     previousStatement: null,
     nextStatement: null,
     colour: 160,
-    tooltip: "Si muove lateralmente rispetto alla direzione attuale.",
+    tooltip:
+      "Si muove lateralmente. La direzione deve essere 'left' o 'right'.",
   },
   {
     type: "action_sequence",
