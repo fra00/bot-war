@@ -3,7 +3,7 @@ import { javascriptGenerator, Order } from "blockly/javascript";
 export const perceptionGenerators = {
   is_enemy_visible: function (block) {
     const code = "!!api.scan()";
-    return [code, Order.FUNCTION_CALL];
+    return [code, Order.LOGICAL_NOT];
   },
   context_battery_percent: function (block) {
     const code = "context.batteryPercent";
@@ -43,7 +43,7 @@ export const perceptionGenerators = {
   },
   was_hit: function (block) {
     const code = `api.getEvents().some(e => e.type === 'HIT_BY_PROJECTILE')`;
-    return [code, Order.FUNCTION_CALL];
+    return [code, Order.CALL];
   },
   is_turret_aligned: function (block) {
     const code = `(function() {
@@ -66,7 +66,7 @@ export const perceptionGenerators = {
       }
       return true; // Se non c'è nemico, non c'è un target, quindi è "allineata"
     })()`;
-    return [code, Order.FUNCTION_CALL];
+    return [code, Order.CALL];
   },
   context_is_moving: function (block) {
     const code = "context.bot.isMoving";
@@ -85,11 +85,11 @@ export const perceptionGenerators = {
     return [code, Order.MEMBER];
   },
   is_projectile_incoming: function (block) {
-    const code = `api.events.some(e => e.type === 'INCOMING_PROJECTILE')`;
-    return [code, Order.CALL];
+    const code = "api.scanForIncomingProjectiles().length > 0";
+    return [code, Order.RELATIONAL];
   },
   is_wall_collision: function (block) {
-    const code = `api.events.some(e => e.type === 'COLLISION_WALL')`;
+    const code = `api.getEvents().some(e => e.type === 'COLLISION_WITH_WALL')`;
     return [code, Order.CALL];
   },
   api_is_queue_empty: function (block) {
