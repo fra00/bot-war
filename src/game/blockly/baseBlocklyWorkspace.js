@@ -69,6 +69,42 @@ export const baseBlocklyWorkspace = {
                       },
                     },
                   },
+                  next: {
+                    block: {
+                      type: "fsm_emergency_transition",
+                      id: "ey`ie5N)?$8Z@_8T@8rG",
+                      fields: {
+                        TARGET: "STRAFE",
+                        DESCRIPTION: "descrizione transizione",
+                      },
+                      inputs: {
+                        CONDITION: {
+                          block: {
+                            type: "is_projectile_incoming",
+                            id: "${p(A$IZWGDwMoKok?gM",
+                          },
+                        },
+                      },
+                      next: {
+                        block: {
+                          type: "fsm_emergency_transition",
+                          id: "zs6{iqf3}M-UjjbB.al*",
+                          fields: {
+                            TARGET: "EVADING",
+                            DESCRIPTION: "descrizione transizione",
+                          },
+                          inputs: {
+                            CONDITION: {
+                              block: {
+                                type: "was_hit",
+                                id: "?Y@{?b57H]E92=D*K21Q",
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -325,8 +361,22 @@ export const baseBlocklyWorkspace = {
                             },
                             next: {
                               block: {
-                                type: "aim_at_enemy",
-                                id: "^wXGjACGVdeS.E/v^rF(",
+                                type: "controls_if",
+                                id: "f|O38).SWS*!_~prRjz/",
+                                inputs: {
+                                  IF0: {
+                                    block: {
+                                      type: "api_is_queue_empty",
+                                      id: "V~ZYd5I={SpL+!$8^F?x",
+                                    },
+                                  },
+                                  DO0: {
+                                    block: {
+                                      type: "aim_at_enemy",
+                                      id: "^wXGjACGVdeS.E/v^rF(",
+                                    },
+                                  },
+                                },
                                 next: {
                                   block: {
                                     type: "controls_if",
@@ -500,6 +550,119 @@ export const baseBlocklyWorkspace = {
                             id: "@+.QOaK.FPv`N/%-I@;l",
                             fields: {
                               STATE_NAME: "NESSUNO",
+                            },
+                          },
+                        },
+                      },
+                      next: {
+                        block: {
+                          type: "fsm_state",
+                          id: "p_XyLLccCR{4}Kak;:yX",
+                          fields: {
+                            STATE_NAME: "EVADING",
+                          },
+                          inputs: {
+                            ON_EXECUTE: {
+                              block: {
+                                type: "controls_if",
+                                id: "$v`w_*kj-1bGb^U=y^*T",
+                                inputs: {
+                                  IF0: {
+                                    block: {
+                                      type: "api_is_queue_empty",
+                                      id: "K=hToXJY(+[NtjzCTK?X",
+                                    },
+                                  },
+                                  DO0: {
+                                    block: {
+                                      type: "api_move_random",
+                                      id: "Ed]s*6^G}c{HZjXnv{-|",
+                                    },
+                                  },
+                                },
+                              },
+                            },
+                            TRANSITIONS: {
+                              block: {
+                                type: "fsm_transition",
+                                id: ":L!C@~ue_KFiA0/Ell{z",
+                                fields: {
+                                  TARGET: "SEARCHING",
+                                  DESCRIPTION: "opzionale",
+                                },
+                                inputs: {
+                                  CONDITION: {
+                                    block: {
+                                      type: "api_is_queue_empty",
+                                      id: "Q;!]snEjUf/Dah0~^COc",
+                                    },
+                                  },
+                                },
+                              },
+                            },
+                            INTERRUPTIBLE_BY: {
+                              block: {
+                                type: "state_reference",
+                                id: "Vu},DM80Kn#.)w}B2],2",
+                                fields: {
+                                  STATE_NAME: "NESSUNO",
+                                },
+                              },
+                            },
+                          },
+                          next: {
+                            block: {
+                              type: "fsm_state",
+                              id: "fYO+Qu.UlvnatEAvsCg)",
+                              fields: {
+                                STATE_NAME: "STRAFE",
+                              },
+                              inputs: {
+                                ON_ENTER: {
+                                  block: {
+                                    type: "api_strafe",
+                                    id: "2h_i80u#o{uAFR_oWlc(",
+                                    inputs: {
+                                      DIRECTION: {
+                                        shadow: {
+                                          type: "text",
+                                          id: "F-(%5JgiH9Y)-K=1t1`]",
+                                          fields: {
+                                            TEXT: "left",
+                                          },
+                                        },
+                                      },
+                                    },
+                                  },
+                                },
+                                TRANSITIONS: {
+                                  block: {
+                                    type: "fsm_transition",
+                                    id: "BbE[K^2PGP`gdx?A.uN4",
+                                    fields: {
+                                      TARGET: "SEARCHING",
+                                      DESCRIPTION: "opzionale",
+                                    },
+                                    inputs: {
+                                      CONDITION: {
+                                        block: {
+                                          type: "api_is_queue_empty",
+                                          id: "nZC9Femq}^og$EpwLf_k",
+                                        },
+                                      },
+                                    },
+                                  },
+                                },
+                                INTERRUPTIBLE_BY: {
+                                  block: {
+                                    type: "state_reference",
+                                    id: "`xNb-,GNiz$:,5pRRI@N",
+                                    fields: {
+                                      STATE_NAME: "NESSUNO",
+                                    },
+                                  },
+                                },
+                              },
                             },
                           },
                         },
