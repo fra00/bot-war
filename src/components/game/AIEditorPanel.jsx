@@ -96,6 +96,12 @@ const AIEditorPanel = ({
 
   const blocklyRef = useRef();
 
+  const isBlocklyEmpty =
+    !blocklyModel ||
+    !blocklyModel.blocks ||
+    !blocklyModel.blocks.blocks ||
+    blocklyModel.blocks.blocks.length === 0;
+
   // Mantiene un riferimento aggiornato alle callback per evitare problemi di "stale closure"
   // all'interno del componente memoizzato.
   const onBlocklyModelChangeRef = useRef(onBlocklyModelChange);
@@ -156,7 +162,7 @@ const AIEditorPanel = ({
         // Genera la stringa di codice completa a partire dall'oggetto Base.
         // Questo è l'approccio corretto che sfrutta l'architettura che abbiamo costruito.
         code = stringifyAI(DefaultAIBase);
-        blocklyModel = baseBlocklyWorkspace;
+        blocklyModel = null; // Non pre-popolare l'editor a blocchi
       } else {
         code = initialPlayerCode;
       }
@@ -395,57 +401,84 @@ const AIEditorPanel = ({
             />
           )}
           {activeView === "blockly" && (
-            <div className="flex flex-col h-full">
-              <div className="flex gap-2 mb-2">
-                <Button onClick={handleLoadBaseBlockly} variant="primary">
-                  Carica Base
-                </Button>
-                <Button onClick={handleGenerateCode} variant="secondary">
-                  Anteprima codice
-                </Button>
-                <Button onClick={handleExport} variant="secondary">
-                  Esporta
-                </Button>
-                <Button
-                  onClick={() => {
-                    setImportJson("");
-                    setImportError("");
-                    onImportModalOpen();
-                  }}
-                  variant="secondary"
-                >
-                  Importa
-                </Button>
-                <Button
-                  onClick={onBlocklyFullscreenOpen}
-                  variant="secondary"
-                  className="px-2"
-                  title="Schermo intero"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+            <div className="flex flex-col h-full relative">
+              {!isBlocklyEmpty && (
+                <div className="flex gap-2 mb-2">
+                  <Button onClick={handleLoadBaseBlockly} variant="primary">
+                    Carica Base
+                  </Button>
+                  <Button onClick={handleGenerateCode} variant="secondary">
+                    Anteprima codice
+                  </Button>
+                  <Button onClick={handleExport} variant="secondary">
+                    Esporta
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setImportJson("");
+                      setImportError("");
+                      onImportModalOpen();
+                    }}
+                    variant="secondary"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5"
-                    />
-                  </svg>
-                </Button>
-              </div>
+                    Importa
+                  </Button>
+                  <Button
+                    onClick={onBlocklyFullscreenOpen}
+                    variant="secondary"
+                    className="px-2"
+                    title="Schermo intero"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5"
+                      />
+                    </svg>
+                  </Button>
+                </div>
+              )}
               <div
                 className={`flex-grow transition-all duration-300 ease-in-out ${
                   isBlocklyFullscreen
                     ? "fixed inset-0 z-50 bg-gray-800 p-4 flex flex-col"
-                    : "relative border border-gray-700 rounded-md overflow-hidden"
+                    : `relative border ${
+                        isBlocklyEmpty
+                          ? "border-dashed border-gray-600"
+                          : "border-gray-700"
+                      } rounded-md overflow-hidden`
                 }`}
               >
                 {memoizedBlocklyEditor}
+                {isBlocklyEmpty && !isBlocklyFullscreen && (
+                  <div className="absolute inset-0 bg-gray-900 bg-opacity-80 flex flex-col items-center justify-center z-[70] p-8 text-center">
+                    <h3 className="text-xl font-bold mb-4">
+                      Attiva l'Editor a Blocchi
+                    </h3>
+                    <p className="mb-6 text-gray-300">
+                      Attivando l'editor a blocchi, il codice JavaScript attuale
+                      verrà <strong>sovrascritto</strong> con una struttura a
+                      blocchi di base.
+                      <br />
+                      Questa azione non può essere annullata.
+                    </p>
+                    <Button
+                      onClick={handleLoadBaseBlockly}
+                      variant="primary"
+                      size="large"
+                    >
+                      Attiva e Sovrascrivi Codice
+                    </Button>
+                  </div>
+                )}
                 {isBlocklyFullscreen && (
                   <div className="flex-shrink-0 pt-4 text-right">
                     <Button
