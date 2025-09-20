@@ -128,4 +128,14 @@ export const perceptionGenerators = {
     const code = "api.getEvents()";
     return [code, Order.FUNCTION_CALL];
   },
+  api_get_orbiting_position: function (block, generator) {
+    const targetPoint =
+      generator.valueToCode(block, "TARGET_POINT", Order.ATOMIC) || "null";
+    const distance =
+      generator.valueToCode(block, "DISTANCE", Order.ATOMIC) || "150";
+    const direction =
+      generator.valueToCode(block, "DIRECTION", Order.ATOMIC) || "'random'";
+    const code = `api.getOrbitingPosition(${targetPoint}, ${distance}, ${direction})`;
+    return [code, Order.FUNCTION_CALL];
+  },
 };

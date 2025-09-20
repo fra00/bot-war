@@ -444,6 +444,31 @@ api.getRandomPoint(bounds)
     }
     ```
 
+api.getOrbitingPosition(targetPoint, distance, direction)
+
+    Calcola un punto di "orbita" attorno a un punto bersaglio, utile per manovre di fiancheggiamento o per aggirare ostacoli.
+
+    Parametri:
+    - `targetPoint` (Object): L'oggetto bersaglio attorno al quale calcolare il punto. **Deve avere le proprietà `{x, y}`**.
+    - `distance` (number): La distanza desiderata dal centro del `targetPoint`.
+    - `direction` (string, opzionale, default: `'random'`): La direzione in cui calcolare il punto. Può essere `'left'`, `'right'` o `'random'`.
+
+    Valore di ritorno:
+    - Un oggetto `{ x: number, y: number }` con le coordinate del punto calcolato, già contenuto entro i limiti dell'arena.
+    - `null` se il `targetPoint` fornito non è valido.
+
+    Esempio:
+    ```javascript
+    // Ottiene un punto per fiancheggiare il nemico a 150 pixel di distanza.
+    const enemy = api.scan();
+    if (enemy) {
+      const flankPoint = api.getOrbitingPosition(enemy, 150, 'left');
+      if (flankPoint) {
+        api.moveTo(flankPoint.x, flankPoint.y);
+      }
+    }
+    ```
+
 api.isQueueEmpty()
 
     Controlla se la coda di comandi del robot è vuota.

@@ -323,6 +323,50 @@ class RobotAPI {
     return point;
   };
 
+  /**
+   * Calcola un punto di orbita attorno a un bersaglio.
+   * @param {{x: number, y: number}} targetPoint - L'oggetto bersaglio. DEVE avere le proprietà {x, y}.
+   * @param {number} distance - La distanza a cui orbitare.
+   * @param {'left'|'right'|'random'} [direction='random'] - La direzione.
+   * @returns {{x: number, y: number}|null} Un punto valido o null se il target non è valido.
+   */
+  getOrbitingPosition = (targetPoint, distance, direction = "random") => {
+    if (
+      !targetPoint ||
+      typeof targetPoint.x !== "number" ||
+      typeof targetPoint.y !== "number"
+    ) {
+      this.log("Errore in getOrbitingPosition: targetPoint non è valido.");
+      return null;
+    }
+
+    const arena = this.getArenaDimensions();
+    const self = this.getState();
+    const dx = targetPoint.x - self.x;
+    const dy = targetPoint.y - self.y;
+
+    let randomDirection;
+    if (direction === "left") {
+      randomDirection = -1;
+    } else if (direction === "right") {
+      randomDirection = 1;
+    } else {
+      randomDirection = Math.random() < 0.5 ? 1 : -1;
+    }
+
+    const perp_dx = -dy * randomDirection;
+    const perp_dy = dx * randomDirection;
+    const len = Math.sqrt(perp_dx ** 2 + perp_dy ** 2) || 1;
+
+    const targetX = targetPoint.x + (perp_dx / len) * distance;
+    const targetY = targetPoint.y + (perp_dy / len) * distance;
+
+    const clampedX = Math.max(0, Math.min(arena.width, targetX));
+    const clampedY = Math.max(0, Math.min(arena.height, targetY));
+    console.log({ targetX, targetY, clampedX, clampedY });
+    return { x: clampedX, y: clampedY };
+  };
+
   // --- Memoria Persistente ---
 
   /**

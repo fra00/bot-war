@@ -108,4 +108,29 @@ export const actionBlocks = [
     tooltip:
       "Tenta di muovere il bot verso la posizione specificata. Restituisce 'vero' se il movimento è possibile, 'falso' altrimenti.",
   },
+  {
+    type: "api_get_orbiting_position",
+    message0: "punto orbitante intorno a %1 a distanza %2 in direzione %3",
+    args0: [
+      {
+        type: "input_value",
+        name: "TARGET_POINT",
+        check: "Position",
+      },
+      {
+        type: "input_value",
+        name: "DISTANCE",
+        check: "Number",
+      },
+      {
+        type: "input_value",
+        name: "DIRECTION",
+        check: "String",
+      },
+    ],
+    output: "Position",
+    colour: 230, // Perception color
+    tooltip: "Calcola un punto di orbita attorno a un punto bersaglio.",
+    helpUrl: "",
+  },
 ];

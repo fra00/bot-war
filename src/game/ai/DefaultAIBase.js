@@ -16,7 +16,7 @@ const DefaultAIBase = {
     // Distanze
     engagementDistance: 250, // Distanza ottimale per attaccare
     kitingDistance: 150, // Distanza sotto la quale iniziare il kiting
-    flankDistance: 150, // Distanza per la manovra di fiancheggiamento
+    flankDistance: 75, // Distanza per la manovra di fiancheggiamento
     maxCoverDistance: 150, // Distanza massima per cercare copertura
     coverSeekDistance: 40, // Distanza da un ostacolo per nascondersi
     unstuckDistance: -60, // Distanza per arretrare quando incastrati
@@ -376,28 +376,13 @@ const DefaultAIBase = {
           const { enemy } = context;
           if (!enemy) return; // Guardia di sicurezza, la transizione gestirà il cambio stato.
 
-          const arena = api.getArenaDimensions();
-          const self = api.getState(); // N.B: api.getState() è un metodo dell'API
-          const dx = enemy.x - self.x;
-          const dy = enemy.y - self.y;
-
-          const randomDirection = Math.random() < 0.5 ? 1 : -1;
-          const perp_dx = -dy * randomDirection;
-          const perp_dy = dx * randomDirection;
-          const len = Math.sqrt(perp_dx ** 2 + perp_dy ** 2) || 1;
-          // Calcola un punto sul fianco del nemico (orbita) invece che un punto
-          // laterale rispetto alla posizione corrente del bot (strafe).
-          // Questo è più efficace per aggirare gli ostacoli.
-          const targetX =
-            enemy.x + (perp_dx / len) * context.constants.flankDistance;
-          const targetY =
-            enemy.y + (perp_dy / len) * context.constants.flankDistance;
-
-          const clampedX = Math.max(0, Math.min(arena.width, targetX));
-          const clampedY = Math.max(0, Math.min(arena.height, targetY));
+          const flankPoint = api.getOrbitingPosition(
+            enemy,
+            context.constants.flankDistance
+          );
 
           // Transizione guidata dall'azione: se moveTo fallisce, cambia stato.
-          if (!api.moveTo(clampedX, clampedY)) {
+          if (!flankPoint || !api.moveTo(flankPoint.x, flankPoint.y)) {
             api.log(
               "Impossibile trovare un percorso di fiancheggiamento. Fallback in evading."
             );

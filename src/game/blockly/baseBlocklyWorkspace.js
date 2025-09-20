@@ -277,6 +277,40 @@ export const baseBlocklyWorkspace = {
                                             },
                                           },
                                         },
+                                        next: {
+                                          block: {
+                                            type: "controls_if",
+                                            id: "[isfLZD-c?zG0@|c80s[",
+                                            inputs: {
+                                              IF0: {
+                                                block: {
+                                                  type: "logic_negate",
+                                                  id: "Z3Vn$;:B-!OLb;M$!?)h",
+                                                  inputs: {
+                                                    BOOL: {
+                                                      block: {
+                                                        type: "local_get_variable",
+                                                        id: "f79RqgS?NwppG0`S9M!I",
+                                                        fields: {
+                                                          VAR_NAME: "point",
+                                                        },
+                                                      },
+                                                    },
+                                                  },
+                                                },
+                                              },
+                                              DO0: {
+                                                block: {
+                                                  type: "fsm_return_state",
+                                                  id: "%pvF/ZuQ;}4gmq/meaw7",
+                                                  fields: {
+                                                    STATE_NAME: "EVADING",
+                                                  },
+                                                },
+                                              },
+                                            },
+                                          },
+                                        },
                                       },
                                     },
                                   },
@@ -438,6 +472,83 @@ export const baseBlocklyWorkspace = {
                                         block: {
                                           type: "api_fire",
                                           id: "6BILD+wtwT5n|FveIr56",
+                                        },
+                                      },
+                                    },
+                                    next: {
+                                      block: {
+                                        type: "controls_if",
+                                        id: "|EOYAVEK(GUsQ]i6wq}1",
+                                        inputs: {
+                                          IF0: {
+                                            block: {
+                                              type: "logic_operation",
+                                              id: "I*|l]R`d5X]Jm^dv*ie?",
+                                              fields: {
+                                                OP: "AND",
+                                              },
+                                              inputs: {
+                                                A: {
+                                                  block: {
+                                                    type: "logic_compare",
+                                                    id: "![^v=G+-7{v6DQ.(eLq[",
+                                                    fields: {
+                                                      OP: "LTE",
+                                                    },
+                                                    inputs: {
+                                                      A: {
+                                                        block: {
+                                                          type: "get_enemy_angle",
+                                                          id: "34U-+yioP2z9D!.?K4}$",
+                                                        },
+                                                      },
+                                                      B: {
+                                                        block: {
+                                                          type: "game_constant",
+                                                          id: "^y(mBrmek2U|RHJS%;OL",
+                                                          fields: {
+                                                            CONSTANT:
+                                                              "aimTolerance",
+                                                          },
+                                                        },
+                                                      },
+                                                    },
+                                                  },
+                                                },
+                                                B: {
+                                                  block: {
+                                                    type: "logic_negate",
+                                                    id: "s*-ou2.w+;OOdrVv|ec/",
+                                                    inputs: {
+                                                      BOOL: {
+                                                        block: {
+                                                          type: "api_is_line_of_sight_clear",
+                                                          id: "GdaP%bX~:q8w3)F:;*0w",
+                                                          inputs: {
+                                                            POSITION: {
+                                                              shadow: {
+                                                                type: "get_enemy_position",
+                                                                id: "HZnR}lX=b.s4,SFdU9,n",
+                                                              },
+                                                            },
+                                                          },
+                                                        },
+                                                      },
+                                                    },
+                                                  },
+                                                },
+                                              },
+                                            },
+                                          },
+                                          DO0: {
+                                            block: {
+                                              type: "fsm_return_state",
+                                              id: "@bBgMOEYH#txdPehgY6G",
+                                              fields: {
+                                                STATE_NAME: "FLANKING",
+                                              },
+                                            },
+                                          },
                                         },
                                       },
                                     },
@@ -659,6 +770,119 @@ export const baseBlocklyWorkspace = {
                                     id: "`xNb-,GNiz$:,5pRRI@N",
                                     fields: {
                                       STATE_NAME: "NESSUNO",
+                                    },
+                                  },
+                                },
+                              },
+                              next: {
+                                block: {
+                                  type: "fsm_state",
+                                  id: "xAZ^QM(O17#`s:[,.WS=",
+                                  fields: {
+                                    STATE_NAME: "FLANKING",
+                                  },
+                                  inputs: {
+                                    ON_ENTER: {
+                                      block: {
+                                        type: "controls_if",
+                                        id: "*xl}Pd=EQaXbhH!OG=hM",
+                                        inputs: {
+                                          IF0: {
+                                            block: {
+                                              type: "logic_negate",
+                                              id: "Plbg[WUVH3+joP,W1AYV",
+                                              inputs: {
+                                                BOOL: {
+                                                  block: {
+                                                    type: "is_enemy_visible",
+                                                    id: "~eXP_)k22{I}{r{Kg1]?",
+                                                  },
+                                                },
+                                              },
+                                            },
+                                          },
+                                          DO0: {
+                                            block: {
+                                              type: "fsm_return_state",
+                                              id: "m/1#fi_=fsWRotPjM53X",
+                                              fields: {
+                                                STATE_NAME: "SEARCHING",
+                                              },
+                                            },
+                                          },
+                                        },
+                                        next: {
+                                          block: {
+                                            type: "api_move_to",
+                                            id: "4TpqA%h.fwndt8:y@|_u",
+                                            inputs: {
+                                              POSITION: {
+                                                block: {
+                                                  type: "api_get_orbiting_position",
+                                                  id: "q2#+c)JS`5YLpd21_:W^",
+                                                  inputs: {
+                                                    TARGET_POINT: {
+                                                      shadow: {
+                                                        type: "get_enemy_position",
+                                                        id: "N:uczU*:*SN+pg+Zn@Uc",
+                                                      },
+                                                      block: {
+                                                        type: "get_enemy_position",
+                                                        id: "}?lPZu^)~/StV.H{?|[.",
+                                                      },
+                                                    },
+                                                    DISTANCE: {
+                                                      shadow: {
+                                                        type: "math_number",
+                                                        id: "pS{dfy!XANj`2fD,p[ft",
+                                                        fields: {
+                                                          NUM: 50,
+                                                        },
+                                                      },
+                                                    },
+                                                    DIRECTION: {
+                                                      shadow: {
+                                                        type: "text",
+                                                        id: "g4l]es[LmltZ@B;F{-ce",
+                                                        fields: {
+                                                          TEXT: "random",
+                                                        },
+                                                      },
+                                                    },
+                                                  },
+                                                },
+                                              },
+                                            },
+                                          },
+                                        },
+                                      },
+                                    },
+                                    TRANSITIONS: {
+                                      block: {
+                                        type: "fsm_transition",
+                                        id: "Vv?h|LjN#/!G!HCkHK2l",
+                                        fields: {
+                                          TARGET: "SEARCHING",
+                                          DESCRIPTION: "opzionale",
+                                        },
+                                        inputs: {
+                                          CONDITION: {
+                                            block: {
+                                              type: "api_is_queue_empty",
+                                              id: "(-;]y9K)EeV9hgP8/H7.",
+                                            },
+                                          },
+                                        },
+                                      },
+                                    },
+                                    INTERRUPTIBLE_BY: {
+                                      block: {
+                                        type: "state_reference",
+                                        id: "d=6,)sw;4Q:;J]T)Qw/R",
+                                        fields: {
+                                          STATE_NAME: "EVADING",
+                                        },
+                                      },
                                     },
                                   },
                                 },

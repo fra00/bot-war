@@ -176,6 +176,17 @@ export const toolbox = {
         },
         {
           kind: "block",
+          type: "api_get_orbiting_position",
+          inputs: {
+            TARGET_POINT: { shadow: { type: "get_enemy_position" } },
+            DISTANCE: {
+              shadow: { type: "math_number", fields: { NUM: 150 } },
+            },
+            DIRECTION: { shadow: { type: "text", fields: { TEXT: "random" } } },
+          },
+        },
+        {
+          kind: "block",
           type: "api_is_line_of_sight_clear",
           inputs: {
             POSITION: { shadow: { type: "get_enemy_position" } },

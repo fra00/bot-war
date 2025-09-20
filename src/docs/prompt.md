@@ -1,4 +1,4 @@
-﻿---
+﻿﻿---
 - **Copia e incolla il seguente prompt nel tuo LLM per generare il tuo primo bot.**
 - Modifica la **sezione 8** per spiegare le regole del tuo bot.
 - Genera un nuovo Base Script dell'editor e incolla il testo generato dal tuo LLM
@@ -217,6 +217,7 @@ Il sistema di controllo è asincrono. Comandi come `move`, `rotate`, `moveTo`, `
 - `api.isLineOfSightClear(targetPosition)`: **Restituisce:** `boolean`. Verifica se un percorso in linea retta verso una posizione è libero.
 - `api.isPositionValid(position)`: **Restituisce:** `boolean`. Verifica se un punto `{x, y}` è "calpestabile" (non dentro un muro/ostacolo).
 - `api.getRandomPoint(bounds)`: **Restituisce:** `Object | null`. Genera un punto valido casuale `{x, y}`. `bounds` è opzionale e deve essere `{ x, y, endX, endY }`.
+- `api.getOrbitingPosition(targetPoint, distance, direction)`: **Restituisce:** `Object | null`. Calcola un punto di orbita attorno a un `targetPoint` `{x, y}`. `direction` è opzionale (`'left'`, `'right'`, `'random'`).
 - `api.isQueueEmpty()`: **Restituisce:** `boolean`. `true` se non ci sono azioni in esecuzione o in coda.
 
 #### **Gestione Memoria ed Eventi**
