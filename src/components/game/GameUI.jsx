@@ -194,6 +194,7 @@ const GameUI = ({
       <AIEditorModal
         isOpen={isEditorOpen}
         onClose={onEditorClose}
+        onOpen={onEditorOpen}
         onUpdate={onUpdate}
         onSaveOnly={onSaveOnly}
         gameStateStatus={gameState.status}

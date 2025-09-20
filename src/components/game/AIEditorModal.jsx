@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import Modal from "../ui/Modal";
 import AIEditorPanel from "./AIEditorPanel";
@@ -21,6 +21,7 @@ import {
 
 const AIEditorModal = ({
   isOpen,
+  onOpen,
   onClose,
   onUpdate,
   onSaveOnly,
@@ -65,6 +66,9 @@ const AIEditorModal = ({
   // da parte dell'utente, per evitare di perdere il modello Blockly.
   const [pendingAction, setPendingAction] = useState(null);
 
+  // Ref per tenere traccia dell'ID dello script attualmente visualizzato nella modale.
+  const displayedScriptId = useRef(null);
+
   // Un modello Blockly è considerato "non vuoto" se contiene almeno un blocco.
   // Questo previene l'avviso per script nuovi o per quelli in cui Blockly è stato cancellato.
   const isBlocklyWorkspaceNonEmpty =
@@ -76,23 +80,28 @@ const AIEditorModal = ({
   const [visualParseError, setVisualParseError] = useState(null);
 
   useEffect(() => {
-    // Quando la prop 'code' esterna cambia (es. cambio script),
-    // la modale si aggiorna.
-    if (code) {
-      // 1. Determina se è una FSM standard
-      const isFsmScript = isStandardFSM(code);
-      setIsFsm(isFsmScript);
+    // Questo effetto si attiva all'apertura della modale o al cambio dello script attivo.
+    if (isOpen) {
+      // Resetta la vista solo se lo script selezionato è DIVERSO da quello già visualizzato.
+      // Questo evita il reset durante un salvataggio dello stesso script.
+      if (activeScript?.id !== displayedScriptId.current) {
+        displayedScriptId.current = activeScript?.id;
 
-      // 2. "Pulisce" il codice se è una FSM, altrimenti lo lascia inalterato.
-      const cleanCode = prepareCodeForEditor(code);
-      setInternalCode(cleanCode);
-
-      // 3. Resetta lo stato dirty e la vista
-      setIsDirty(false);
-      setActiveView("code");
-      setVisualParseError(null);
+        if (code) {
+          const isFsmScript = isStandardFSM(code);
+          setIsFsm(isFsmScript);
+          const cleanCode = prepareCodeForEditor(code);
+          setInternalCode(cleanCode);
+          setIsDirty(false);
+          setActiveView("code");
+          setVisualParseError(null);
+        }
+      }
+    } else {
+      // Quando la modale si chiude, resettiamo il ref per la prossima apertura.
+      displayedScriptId.current = null;
     }
-  }, [activeScript, isOpen]); // Rimosso 'code' per evitare reset durante la digitazione
+  }, [isOpen, activeScript, code]);
 
   /**
    * Esegue un'azione solo dopo aver verificato se è necessario un avviso
@@ -150,19 +159,16 @@ const AIEditorModal = ({
     if (success && updatedScript) {
       setIsDirty(false);
       addToast("Script salvato.", "success");
-      // La chiamata a onSelectScript è ridondante e causa la race condition.
-      // La funzione onSaveOnly è già responsabile di aggiornare lo stato.
+      // Se il salvataggio proviene dall'editor a blocchi, chiudi e riapri la modale
+      // per forzare un ricaricamento completo dello stato.
+      if (activeView === "blockly") {
+        onClose();
+        setTimeout(() => onOpen(), 50);
+      }
     } else {
       addToast("Salvataggio fallito. Controlla gli errori.", "danger");
     }
-  }, [
-    onSaveOnly,
-    addToast,
-    setIsDirty,
-    activeView,
-    onSelectScript,
-    activeScript,
-  ]);
+  }, [onSaveOnly, activeView, addToast, setIsDirty, onClose, onOpen]);
 
   const handleUpdateClick = useCallback(async () => {
     if (isDirty) {
@@ -345,6 +351,7 @@ const AIEditorModal = ({
 
 AIEditorModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
+  onOpen: PropTypes.func.isRequired,
   onClose: PropTypes.func.isRequired,
   onUpdate: PropTypes.func.isRequired,
   onSaveOnly: PropTypes.func.isRequired,
