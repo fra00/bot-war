@@ -179,7 +179,7 @@ Ad ogni tick, il motore esegue la seguente sequenza:
 ### **SEZIONE 7: Documentazione API del Bot (`api.*`)**
 
 **Concetti Fondamentali: La Coda di Comandi (Command Queue)**
-Il sistema di controllo è asincrono. Comandi come `move`, `rotate`, `moveTo` vengono aggiunti a una coda e eseguiti in sequenza. Azioni come `fire` e `scan` sono istantanee. La logica deve essere reattiva agli eventi (`api.getEvents()`).
+Il sistema di controllo è asincrono. Comandi come `move`, `rotate`, `moveTo`, `aimAt` vengono aggiunti a una coda e eseguiti in sequenza. Azioni come `fire` e `scan` sono istantanee. La logica deve essere reattiva agli eventi (`api.getEvents()`).
 
 #### **Comandi di Movimento e Navigazione (Accodabili)**
 
@@ -194,9 +194,9 @@ Il sistema di controllo è asincrono. Comandi come `move`, `rotate`, `moveTo` ve
 - `api.fire(options)`: **Restituisce:** `void`. Spara un proiettile. `options` può essere `{ trackMiss: true }`.
 - `api.log(...args)`: **Restituisce:** `void`. Scrive messaggi nella console di debug.
 
-#### **Comandi di Combattimento (Dichiarativi)**
+#### **Comandi di Combattimento (Accodabili)**
 
-- `api.aimAt(x, y, speedPercentage)`: **Restituisce:** `void`. Comando continuo da chiamare ad ogni tick per mantenere la mira.
+- `api.aimAt(x, y, speedPercentage)`: **Restituisce:** `void`. Accoda il comando di mira.
 
 #### **Percezione e Stato (Istantanei)**
 
