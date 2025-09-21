@@ -252,6 +252,11 @@ const LandingPage = ({ onStartGame }) => {
             &copy; {new Date().getFullYear()} Bot War. Per domande, suggerimenti
             o per contribuire, apri una issue su GitHub.
           </p>
+          <p className="mt-4 text-xs text-gray-500 flex items-center justify-center gap-1">
+            <span>✨</span>
+            <span>Sviluppato in collaborazione con Gemini Code Assist</span>
+            <span>✨</span>
+          </p>
         </div>
       </footer>
     </div>
