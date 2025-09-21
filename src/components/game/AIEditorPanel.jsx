@@ -127,7 +127,7 @@ const AIEditorPanel = ({
         onCodeChange={stableOnCodeChange}
       />
     );
-  }, [activeScript?.id]);
+  }, [activeScript]);
 
   useEffect(() => {
     // Ridimensiona l'area di lavoro di Blockly quando si entra/esce dalla modalità a schermo intero

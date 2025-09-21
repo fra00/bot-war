@@ -159,12 +159,12 @@ const AIEditorModal = ({
     if (success && updatedScript) {
       setIsDirty(false);
       addToast("Script salvato.", "success");
-      // Se il salvataggio proviene dall'editor a blocchi, chiudi e riapri la modale
-      // per forzare un ricaricamento completo dello stato.
-      if (activeView === "blockly") {
-        onClose();
-        setTimeout(() => onOpen(), 50);
-      }
+      // // Se il salvataggio proviene dall'editor a blocchi, chiudi e riapri la modale
+      // // per forzare un ricaricamento completo dello stato.
+      // if (activeView === "blockly") {
+      //   onClose();
+      //   setTimeout(() => onOpen(), 50);
+      // }
     } else {
       addToast("Salvataggio fallito. Controlla gli errori.", "danger");
     }
