@@ -11,10 +11,38 @@ import { useTutorial } from "../../hooks/useTutorial";
 import InteractiveTutorial from "../tutorial/InteractiveTutorial";
 import { tutorialSteps } from "../../config/tutorialSteps";
 import { useAuth } from "../../context/AuthContext";
+import { useIsMobile } from "../../hooks/useIsMobile";
 import FirestoreService from "../../services/FirestoreService";
 import Arena from "../game/Arena";
 import GameInfoPanel from "../game/GameInfoPanel";
 import GameUI from "../game/GameUI";
+import Button from "../ui/Button";
+
+const MobileBlocker = ({ onNavigateBack }) => (
+  <div className="relative isolate min-h-screen p-4 pt-20 animate-fade-in flex items-center justify-center">
+    {/* Sfondo e overlay */}
+    <div
+      className="absolute inset-0 -z-20 bg-cover bg-center"
+      style={{ backgroundImage: "url('/multi-background.png')" }}
+    />
+    <div className="absolute inset-0 -z-10 bg-black/60" />
+    <div className="text-center text-white max-w-lg p-8 bg-gray-800/50 rounded-lg backdrop-blur-sm">
+      <h1 className="text-3xl font-bold mb-4">
+        Esperienza Ottimizzata per Desktop
+      </h1>
+      <p className="text-lg mb-8">
+        Bot War è progettato per schermi più grandi. Per favore, visita il sito da un computer per accedere all'editor e all'arena.
+      </p>
+      <Button onClick={onNavigateBack} variant="primary" size="large">
+        Torna alla Home
+      </Button>
+    </div>
+  </div>
+);
+
+MobileBlocker.propTypes = {
+  onNavigateBack: PropTypes.func.isRequired,
+};
 
 const EditorAndArena = ({ onNavigateBack }) => {
   const {
@@ -104,6 +132,13 @@ const EditorAndArena = ({ onNavigateBack }) => {
     skipTutorial,
     completeTutorial,
   } = useTutorial();
+
+  const isMobile = useIsMobile();
+
+  // Se è un dispositivo mobile, mostra il messaggio di blocco invece del gioco.
+  if (isMobile) {
+    return <MobileBlocker onNavigateBack={onNavigateBack} />;
+  }
 
   // Ref per evitare che l'effetto di riavvio del gioco venga eseguito al montaggio iniziale.
   const isInitialMountRef = useRef(true);

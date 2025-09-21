@@ -1,22 +1,58 @@
+import React, { useRef, useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import Button from "../ui/Button";
 import { useAuth } from "../../context/AuthContext";
 
 // Helper component for feature cards
-const FeatureCard = ({ icon, title, children }) => (
-  <div className="bg-gray-800/50 p-6 rounded-lg shadow-lg backdrop-blur-sm">
-    <div className="flex items-center mb-4">
-      <span className="text-3xl mr-4 text-cyan-400">{icon}</span>
-      <h3 className="text-xl font-bold text-white">{title}</h3>
+const FeatureCard = ({ icon, title, children, animationDelay = "0ms" }) => {
+  const cardRef = useRef(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.unobserve(entry.target);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentRef = cardRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, []);
+
+  return (
+    <div
+      ref={cardRef}
+      className={`bg-gray-800/50 p-6 rounded-lg shadow-lg backdrop-blur-sm transition-all duration-700 ease-out ${
+        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"
+      }`}
+      style={{ transitionDelay: animationDelay }}
+    >
+      <div className="flex items-center mb-4">
+        <span className="text-3xl mr-4 text-cyan-400">{icon}</span>
+        <h3 className="text-xl font-bold text-white">{title}</h3>
+      </div>
+      <p className="text-gray-300">{children}</p>
     </div>
-    <p className="text-gray-300">{children}</p>
-  </div>
-);
+  );
+};
 
 FeatureCard.propTypes = {
   icon: PropTypes.string.isRequired,
   title: PropTypes.string.isRequired,
   children: PropTypes.node.isRequired,
+  animationDelay: PropTypes.string,
 };
 
 const LandingPage = ({ onStartGame }) => {
@@ -170,25 +206,41 @@ const LandingPage = ({ onStartGame }) => {
             </h2>
           </div>
           <div className="grid md:grid-cols-2 gap-8">
-            <FeatureCard icon="⚡️" title="API Potente e Intuitiva">
+            <FeatureCard
+              icon="⚡️"
+              title="API Potente e Intuitiva"
+              animationDelay="0ms"
+            >
               Comanda il tuo bot con un'API semplice ma completa. Funzioni come{" "}
               <code>api.scan()</code>, <code>api.moveTo(x, y)</code> e{" "}
               <code>api.fire()</code> ti danno il pieno controllo sulle azioni,
               mentre <code>api.getEvents()</code> ti permette di reagire in
               tempo reale a ciò che accade nell'arena.
             </FeatureCard>
-            <FeatureCard icon="🧠" title="Multiplayer Online">
+            <FeatureCard
+              icon="🧠"
+              title="Multiplayer Online"
+              animationDelay="100ms"
+            >
               Pensi che il tuo bot sia il migliore? Mettilo alla prova! Abilita
               il tuo script per il multiplayer, sfida le creazioni di altri
               giocatori in partite classificate e scala la classifica globale.
             </FeatureCard>
-            <FeatureCard icon="🏗️" title="Parti da una Base Solida">
+            <FeatureCard
+              icon="🏗️"
+              title="Parti da una Base Solida"
+              animationDelay="200ms"
+            >
               Non sai da dove iniziare? Ogni giocatore parte con una IA di base
               ben commentata e strutturata come una macchina a stati finiti
               (FSM). Studiala, modificala e usala come trampolino di lancio per
               le tue strategie uniche.
             </FeatureCard>
-            <FeatureCard icon="⚙️" title="Debug e Feedback Istantaneo">
+            <FeatureCard
+              icon="⚙️"
+              title="Debug e Feedback Istantaneo"
+              animationDelay="300ms"
+            >
               Ogni bot ha una propria console di log. Usa <code>api.log()</code>{" "}
               per tracciare le decisioni, i valori e gli stati del tuo bot in
               tempo reale. Il ciclo di feedback rapido è essenziale per
